@@ -103,6 +103,23 @@ dependencies {
   compile project(":libs:elasticsearch-cli")
   compile 'com.carrotsearch:hppc:0.8.1'
 
+  // es 20190823
+  // compile 'es_qat_wrapper-1.0.0'
+  //compile 'com.intel.qat:es_qat_wrapper:1.0.0'
+  compile fileTree(dir:'../buildSrc/libs',includes:['*jar'])
+  testCompile fileTree(dir:'../buildSrc/libs',includes:['*jar'])
+
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
+  testCompile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.2'
+
+  // https://mvnrepository.com/artifact/org.slf4j/slf4j-log4j12
+  testCompile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.2'
+
+  // https://mvnrepository.com/artifact/log4j/log4j
+  testCompile group: 'log4j', name: 'log4j', version: '1.2.17'
+
+
+
   // time handling, remove with java 8 time
   compile "joda-time:joda-time:${versions.joda}"
 
