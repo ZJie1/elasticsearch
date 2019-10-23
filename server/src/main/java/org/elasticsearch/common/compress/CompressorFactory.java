@@ -30,8 +30,8 @@ import java.util.Objects;
 
 public class CompressorFactory {
 
-    public static final Compressor COMPRESSOR = new DeflateCompressor();// QatCompressor();// DeflateCompressor();
-
+    //public static final Compressor COMPRESSOR = new DeflateCompressor();// QatCompressor();// DeflateCompressor();
+    public static final Compressor COMPRESSOR = new QatCompressor();
     public static boolean isCompressed(BytesReference bytes) {
         return compressor(bytes) != null;
     }

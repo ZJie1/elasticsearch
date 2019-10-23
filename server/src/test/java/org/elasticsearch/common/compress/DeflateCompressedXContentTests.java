@@ -34,7 +34,8 @@ import static org.hamcrest.Matchers.not;
 
 public class DeflateCompressedXContentTests extends ESTestCase {
 
-    private final Compressor compressor = new DeflateCompressor();
+   // private final Compressor compressor = new DeflateCompressor();
+   private final Compressor compressor = new QatCompressor();
 
     private void assertEquals(CompressedXContent s1, CompressedXContent s2) {
         Assert.assertEquals(s1, s2);
