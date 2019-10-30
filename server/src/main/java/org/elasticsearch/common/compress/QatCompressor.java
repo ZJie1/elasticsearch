@@ -1,16 +1,14 @@
 package org.elasticsearch.common.compress;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.stream.InputStreamStreamInput;
 import org.elasticsearch.common.io.stream.OutputStreamStreamOutput;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.Deflater;
@@ -23,6 +21,8 @@ import com.intel.qat.es.QatInputStream;
 import com.intel.qat.es.QatOutputStream;
 
 public class QatCompressor implements Compressor{
+    //add log to identify whether using qat
+    private final Logger logger = LogManager.getLogger(QatCompressor.class);
 
     private static final byte[] HEADER = new byte[]{'Q', 'A', 'T', '\0'};
     // 3 is a good trade-off between speed and compression ratio
@@ -34,6 +34,7 @@ public class QatCompressor implements Compressor{
 
     @Override
     public boolean isCompressed(BytesReference bytes){
+        logger.info("--> go into the isCompressed function");
         if (bytes.length() < HEADER.length) {
             return false;
         }
@@ -48,6 +49,15 @@ public class QatCompressor implements Compressor{
 
     @Override
     public StreamInput streamInput(StreamInput in) throws IOException{
+        logger.info("--> go into the streamInput function");
+//        /*write to txt */
+//        File writename = new File("/home/sparkuser/Downloads/elasticsearch/testToCompressQat_1030.txt\n");
+//        writename.createNewFile(); //
+//        BufferedWriter out = new BufferedWriter(new FileWriter(writename));
+//        out.write("\r\n"); //
+//        out.flush();
+//        out.close(); //
+
         final byte[] headerBytes = new byte[HEADER.length];
         int len = 0;
         while (len < headerBytes.length) {
@@ -97,6 +107,7 @@ public class QatCompressor implements Compressor{
      */
     @Override
     public StreamOutput streamOutput(StreamOutput out) throws IOException{
+        logger.info("--> go into the streamOutput function");
         out.writeBytes(HEADER);
        // final boolean nowrap = true;
        // final Deflater deflater = new Deflater(LEVEL, nowrap); //
