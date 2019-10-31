@@ -46,7 +46,7 @@ public class DeflateCompressTests extends ESTestCase {
     SimpleDateFormat def = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss a");
     Date date = new Date();
 
-/*    public void testFixed() throws IOException {
+    public void testFixed() throws IOException {
 
         // read file to bytes
         File file = new File("/home/sparkuser/Downloads/NOTICE.txt");
@@ -58,7 +58,7 @@ public class DeflateCompressTests extends ESTestCase {
         for (int i = 0; i < 10; i++) {
             doTest(bytes);
         }
-    }*/
+    }
 
     public void testRandom() throws IOException {
 

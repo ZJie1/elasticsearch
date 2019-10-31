@@ -29,11 +29,7 @@ import org.elasticsearch.common.io.stream.OutputStreamStreamOutput;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,7 +38,7 @@ public class QatCompressor implements Compressor {
     private static final byte[] HEADER = new byte[]{'Q', 'A', 'T', '\0'};
     private static final int LEVEL = 3;
     // limit the number of JNI calls
-     private static final int BUFFER_SIZE = 4096;
+    private static final int BUFFER_SIZE = 4096;
     //add log to identify whether using qat
     private static final Logger logger = LogManager.getLogger(QatCompressor.class);
 
@@ -83,6 +79,7 @@ public class QatCompressor implements Compressor {
 
         return new InputStreamStreamInput(decompressedIn) {
             final AtomicBoolean closed = new AtomicBoolean(false);
+
             public void close() throws IOException {
                 try {
                     super.close();
@@ -102,11 +99,12 @@ public class QatCompressor implements Compressor {
         out.writeBytes(HEADER);
 
         final boolean useNativeBuffer = false;
-        QatCompressionOutputStream qatOutputStream = new QatCompressionOutputStream(out,LEVEL,BUFFER_SIZE, useNativeBuffer);
+        QatCompressionOutputStream qatOutputStream = new QatCompressionOutputStream(out, LEVEL, BUFFER_SIZE, useNativeBuffer);
         OutputStream compressedOut = new BufferedOutputStream(qatOutputStream, BUFFER_SIZE);
 
         return new OutputStreamStreamOutput(compressedOut) {
             final AtomicBoolean closed = new AtomicBoolean(false);
+
             public void close() throws IOException {
                 try {
                     super.close();
