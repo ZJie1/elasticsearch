@@ -120,7 +120,9 @@ dependencies {
  // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core
   compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.11.1'
 
-
+  dependencies {
+    compile group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.11.1'
+  }
 
   // time handling, remove with java 8 time
   compile "joda-time:joda-time:${versions.joda}"

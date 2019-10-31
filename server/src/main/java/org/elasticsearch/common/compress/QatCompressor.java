@@ -8,19 +8,21 @@ import org.elasticsearch.common.io.stream.OutputStreamStreamOutput;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 
-import java.io.*;
+//import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
-import java.lang.*;
+
+//import java.lang.*;
 
 import com.intel.qat.es.QatInputStream;
 import com.intel.qat.es.QatOutputStream;
 
-public class QatCompressor implements Compressor{
+public class QatCompressor implements Compressor {
     //add log to identify whether using qat
     private final Logger logger = LogManager.getLogger(QatCompressor.class);
 
@@ -29,11 +31,11 @@ public class QatCompressor implements Compressor{
     private static final int LEVEL = 3;
     // We use buffering on the input and output of in/def-laters in order to
     // limit the number of JNI calls
-   // private static final int BUFFER_SIZE = 4096;
+    // private static final int BUFFER_SIZE = 4096;
     private static final int BUFFER_SIZE = 8192;
 
     @Override
-    public boolean isCompressed(BytesReference bytes){
+    public boolean isCompressed(BytesReference bytes) {
         logger.info("--> go into the isCompressed function");
         if (bytes.length() < HEADER.length) {
             return false;
@@ -48,7 +50,7 @@ public class QatCompressor implements Compressor{
     }
 
     @Override
-    public StreamInput streamInput(StreamInput in) throws IOException{
+    public StreamInput streamInput(StreamInput in) throws IOException {
         logger.info("--> go into the streamInput function");
 //        /*write to txt */
 //        File writename = new File("/home/sparkuser/Downloads/elasticsearch/testToCompressQat_1030.txt\n");
@@ -75,7 +77,7 @@ public class QatCompressor implements Compressor{
         final boolean useNativeBuffer = false;
         //final QatInputStream qatInputStream = new QatInputStream(in);
 
-        QatInputStream qatInputStream  = new QatInputStream(in,BUFFER_SIZE,useNativeBuffer);
+        QatInputStream qatInputStream = new QatInputStream(in, BUFFER_SIZE, useNativeBuffer);
 
         //final boolean nowrap = true;
         //final Inflater inflater = new Inflater(nowrap);  // zhi chi ZIP ya suo  chuang jian yi ge  xin de  jie ya suo  cheng xu
@@ -106,19 +108,19 @@ public class QatCompressor implements Compressor{
      * output. Closing the returned {@link StreamOutput} will close the provided stream output.
      */
     @Override
-    public StreamOutput streamOutput(StreamOutput out) throws IOException{
+    public StreamOutput streamOutput(StreamOutput out) throws IOException {
         logger.info("--> go into the streamOutput function");
         out.writeBytes(HEADER);
-       // final boolean nowrap = true;
-       // final Deflater deflater = new Deflater(LEVEL, nowrap); //
-       // final boolean syncFlush = true;
+        // final boolean nowrap = true;
+        // final Deflater deflater = new Deflater(LEVEL, nowrap); //
+        // final boolean syncFlush = true;
         /** Zhangjie   20190731
          *  DeflaterOutputStream(out, deflater, BUFFER_SIZE, syncFlush)
          * *使用指定的压缩器，缓冲区大小和刷新模式创建新的输出流。
          * ***/
 
         final boolean useNativeBuffer = false;
-        QatOutputStream qatOutputStream = new QatOutputStream(out,BUFFER_SIZE,useNativeBuffer);
+        QatOutputStream qatOutputStream = new QatOutputStream(out, BUFFER_SIZE, useNativeBuffer);
 
         //DeflaterOutputStream deflaterOutputStream = new DeflaterOutputStream(out, deflater, BUFFER_SIZE, syncFlush);
 
@@ -149,7 +151,6 @@ public class QatCompressor implements Compressor{
             }
         };
     }
-
 
 
 }
