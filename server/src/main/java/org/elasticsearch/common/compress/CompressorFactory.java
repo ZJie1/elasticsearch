@@ -30,21 +30,22 @@ import java.util.Objects;
 
 public class CompressorFactory {
 
-    //public static final Compressor COMPRESSOR = new DeflateCompressor();// QatCompressor();// DeflateCompressor();
+    //public static final Compressor COMPRESSOR = new DeflateCompressor();
     public static final Compressor COMPRESSOR = new QatCompressor();
+
     public static boolean isCompressed(BytesReference bytes) {
         return compressor(bytes) != null;
     }
 
     @Nullable
     public static Compressor compressor(BytesReference bytes) {
-            if (COMPRESSOR.isCompressed(bytes)) {
-                // bytes should be either detected as compressed or as xcontent,
-                // if we have bytes that can be either detected as compressed or
-                // as a xcontent, we have a problem
-                assert XContentHelper.xContentType(bytes) == null;
-                return COMPRESSOR;
-            }
+        if (COMPRESSOR.isCompressed(bytes)) {
+            // bytes should be either detected as compressed or as xcontent,
+            // if we have bytes that can be either detected as compressed or
+            // as a xcontent, we have a problem
+            assert XContentHelper.xContentType(bytes) == null;
+            return COMPRESSOR;
+        }
 
         XContentType contentType = XContentHelper.xContentType(bytes);
         if (contentType == null) {
@@ -57,16 +58,19 @@ public class CompressorFactory {
         return null;
     }
 
-    /** true if the bytes were compressed with LZF: only used before elasticsearch 2.0 */
+    /**
+     * true if the bytes were compressed with LZF: only used before elasticsearch 2.0
+     */
     private static boolean isAncient(BytesReference bytes) {
         return bytes.length() >= 3 &&
-               bytes.get(0) == 'Z' &&
-               bytes.get(1) == 'V' &&
-               (bytes.get(2) == 0 || bytes.get(2) == 1);
+            bytes.get(0) == 'Z' &&
+            bytes.get(1) == 'V' &&
+            (bytes.get(2) == 0 || bytes.get(2) == 1);
     }
 
     /**
      * Uncompress the provided data, data can be detected as compressed using {@link #isCompressed(BytesReference)}.
+     *
      * @throws NullPointerException a NullPointerException will be thrown when bytes is null
      */
     public static BytesReference uncompressIfNeeded(BytesReference bytes) throws IOException {
@@ -81,7 +85,9 @@ public class CompressorFactory {
         return uncompressed;
     }
 
-    /** Decompress the provided {@link BytesReference}. */
+    /**
+     * Decompress the provided {@link BytesReference}.
+     */
     public static BytesReference uncompress(BytesReference bytes) throws IOException {
         Compressor compressor = compressor(bytes);
         if (compressor == null) {

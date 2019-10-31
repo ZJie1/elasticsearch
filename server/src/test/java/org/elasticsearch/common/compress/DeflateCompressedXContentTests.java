@@ -27,6 +27,7 @@ import org.elasticsearch.test.ESTestCase;
 import org.junit.Assert;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 
 import static org.hamcrest.Matchers.equalTo;
@@ -34,8 +35,8 @@ import static org.hamcrest.Matchers.not;
 
 public class DeflateCompressedXContentTests extends ESTestCase {
 
-   // private final Compressor compressor = new DeflateCompressor();
-   private final Compressor compressor = new QatCompressor();
+    // private final Compressor compressor = new DeflateCompressor();
+    private final Compressor compressor = new QatCompressor();
 
     private void assertEquals(CompressedXContent s1, CompressedXContent s2) {
         Assert.assertEquals(s1, s2);
@@ -68,7 +69,7 @@ public class DeflateCompressedXContentTests extends ESTestCase {
     }
 
     public void testDifferentCompressedRepresentation() throws Exception {
-        byte[] b = "---\nf:abcdefghijabcdefghij".getBytes("UTF-8");
+        byte[] b = "---\nf:abcdefghijabcdefghij".getBytes(StandardCharsets.UTF_8);
         BytesStreamOutput bout = new BytesStreamOutput();
         StreamOutput out = compressor.streamOutput(bout);
         out.writeBytes(b);
