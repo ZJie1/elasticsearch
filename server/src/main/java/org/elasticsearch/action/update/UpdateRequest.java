@@ -19,6 +19,7 @@
 
 package org.elasticsearch.action.update;
 
+import org.elasticsearch.Version;
 import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.index.IndexRequest;
@@ -96,8 +97,6 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
         PARSER.declareLong(UpdateRequest::setIfPrimaryTerm, IF_PRIMARY_TERM);
     }
 
-    // Set to null initially so we can know to override in bulk requests that have a default type.
-    private String type;
     private String id;
     @Nullable
     private String routing;
@@ -121,6 +120,7 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
     private boolean scriptedUpsert = false;
     private boolean docAsUpsert = false;
     private boolean detectNoop = true;
+    private Boolean preferV2Templates;
 
     @Nullable
     private IndexRequest doc;
@@ -130,7 +130,10 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
     public UpdateRequest(StreamInput in) throws IOException {
         super(in);
         waitForActiveShards = ActiveShardCount.readFrom(in);
-        type = in.readString();
+        if (in.getVersion().before(Version.V_8_0_0)) {
+            String type = in.readString();
+            assert MapperService.SINGLE_MAPPING_NAME.equals(type) : "Expected [_doc] but received [" + type + "]";
+        }
         id = in.readString();
         routing = in.readOptionalString();
         if (in.readBoolean()) {
@@ -150,20 +153,13 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
         ifPrimaryTerm = in.readVLong();
         detectNoop = in.readBoolean();
         scriptedUpsert = in.readBoolean();
+        if (in.getVersion().onOrAfter(Version.V_7_8_0)) {
+            preferV2Templates = in.readOptionalBoolean();
+        }
     }
 
     public UpdateRequest(String index, String id) {
         super(index);
-        this.id = id;
-    }
-
-    /**
-     * @deprecated Types are in the process of being removed. Use {@link #UpdateRequest(String, String)} instead.
-     */
-    @Deprecated
-    public UpdateRequest(String index, String type, String id) {
-        super(index);
-        this.type = type;
         this.id = id;
     }
 
@@ -172,9 +168,6 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
         ActionRequestValidationException validationException = super.validate();
         if(upsertRequest != null && upsertRequest.version() != Versions.MATCH_ANY) {
             validationException = addValidationError("can't provide version in upsert request", validationException);
-        }
-        if (Strings.isEmpty(type())) {
-            validationException = addValidationError("type is missing", validationException);
         }
         if (Strings.isEmpty(id)) {
             validationException = addValidationError("id is missing", validationException);
@@ -208,46 +201,6 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
         return validationException;
     }
 
-    /**
-     * The type of the indexed document.
-     *
-     * @deprecated Types are in the process of being removed.
-     */
-    @Deprecated
-    @Override
-    public String type() {
-        if (type == null) {
-            return MapperService.SINGLE_MAPPING_NAME;                    
-        }
-        return type;
-    }
-
-    /**
-     * Sets the type of the indexed document.
-     *
-     * @deprecated Types are in the process of being removed.
-     */
-    @Deprecated
-    public UpdateRequest type(String type) {
-        this.type = type;
-        return this;
-    }
-
-    /**
-     * Set the default type supplied to a bulk
-     * request if this individual request's type is null
-     * or empty
-     * @deprecated Types are in the process of being removed.
-     */
-    @Deprecated
-    @Override
-    public UpdateRequest defaultTypeIfNull(String defaultType) {
-        if (Strings.isNullOrEmpty(type)) {
-            type = defaultType;
-        }
-        return this;
-    }  
-    
     /**
      * The id of the indexed document.
      */
@@ -851,13 +804,23 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
         return this;
     }
 
+    @Nullable
+    public Boolean preferV2Templates() {
+        return this.preferV2Templates;
+    }
+
+    public UpdateRequest preferV2Templates(@Nullable Boolean preferV2Templates) {
+        this.preferV2Templates = preferV2Templates;
+        return this;
+    }
+
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         waitForActiveShards.writeTo(out);
-        // A 7.x request allows null types but if deserialized in a 6.x node will cause nullpointer exceptions. 
-        // So we use the type accessor method here to make the type non-null (will default it to "_doc"). 
-        out.writeString(type());
+        if (out.getVersion().before(Version.V_8_0_0)) {
+            out.writeString(MapperService.SINGLE_MAPPING_NAME);
+        }
         out.writeString(id);
         out.writeOptionalString(routing);
 
@@ -874,7 +837,6 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
             out.writeBoolean(true);
             // make sure the basics are set
             doc.index(index);
-            doc.type(type);
             doc.id(id);
             doc.writeTo(out);
         }
@@ -885,7 +847,6 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
             out.writeBoolean(true);
             // make sure the basics are set
             upsertRequest.index(index);
-            upsertRequest.type(type);
             upsertRequest.id(id);
             upsertRequest.writeTo(out);
         }
@@ -894,6 +855,9 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
         out.writeVLong(ifPrimaryTerm);
         out.writeBoolean(detectNoop);
         out.writeBoolean(scriptedUpsert);
+        if (out.getVersion().onOrAfter(Version.V_7_8_0)) {
+            out.writeOptionalBoolean(preferV2Templates);
+        }
     }
 
     @Override
@@ -944,7 +908,6 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
     public String toString() {
         StringBuilder res = new StringBuilder()
             .append("update {[").append(index)
-            .append("][").append(type())
             .append("][").append(id).append("]");
         res.append(", doc_as_upsert[").append(docAsUpsert).append("]");
         if (doc != null) {

@@ -23,7 +23,7 @@ import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexFormatTooNewException;
 import org.apache.lucene.index.IndexFormatTooOldException;
 import org.apache.lucene.store.OutputStreamIndexOutput;
-import org.elasticsearch.cluster.metadata.MetaData;
+import org.elasticsearch.cluster.metadata.Metadata;
 import org.elasticsearch.common.CheckedConsumer;
 import org.elasticsearch.common.CheckedFunction;
 import org.elasticsearch.common.blobstore.BlobContainer;
@@ -65,8 +65,8 @@ public final class ChecksumBlobStoreFormat<T extends ToXContent> {
     static {
         Map<String, String> snapshotOnlyParams = new HashMap<>();
         // when metadata is serialized certain elements of the metadata shouldn't be included into snapshot
-        // exclusion of these elements is done by setting MetaData.CONTEXT_MODE_PARAM to MetaData.CONTEXT_MODE_SNAPSHOT
-        snapshotOnlyParams.put(MetaData.CONTEXT_MODE_PARAM, MetaData.CONTEXT_MODE_SNAPSHOT);
+        // exclusion of these elements is done by setting Metadata.CONTEXT_MODE_PARAM to Metadata.CONTEXT_MODE_SNAPSHOT
+        snapshotOnlyParams.put(Metadata.CONTEXT_MODE_PARAM, Metadata.CONTEXT_MODE_SNAPSHOT);
         // serialize SnapshotInfo using the SNAPSHOT mode
         snapshotOnlyParams.put(SnapshotInfo.CONTEXT_MODE_PARAM, SnapshotInfo.CONTEXT_MODE_SNAPSHOT);
         SNAPSHOT_ONLY_FORMAT_PARAMS = new ToXContent.MapParams(snapshotOnlyParams);
@@ -112,13 +112,6 @@ public final class ChecksumBlobStoreFormat<T extends ToXContent> {
     public T read(BlobContainer blobContainer, String name) throws IOException {
         String blobName = blobName(name);
         return readBlob(blobContainer, blobName);
-    }
-
-    /**
-     * Deletes obj in the blob container
-     */
-    public void delete(BlobContainer blobContainer, String name) throws IOException {
-        blobContainer.deleteBlob(blobName(name));
     }
 
     public String blobName(String name) {
@@ -175,15 +168,16 @@ public final class ChecksumBlobStoreFormat<T extends ToXContent> {
      * <p>
      * The blob will be compressed and checksum will be written if required.
      *
-     * @param obj           object to be serialized
-     * @param blobContainer blob container
-     * @param name          blob name
+     * @param obj                 object to be serialized
+     * @param blobContainer       blob container
+     * @param name                blob name
+     * @param failIfAlreadyExists Whether to fail if the blob already exists
      */
-    public void write(T obj, BlobContainer blobContainer, String name) throws IOException {
+    public void write(T obj, BlobContainer blobContainer, String name, boolean failIfAlreadyExists) throws IOException {
         final String blobName = blobName(name);
         writeTo(obj, blobName, bytesArray -> {
             try (InputStream stream = bytesArray.streamInput()) {
-                blobContainer.writeBlob(blobName, stream, bytesArray.length(), true);
+                blobContainer.writeBlob(blobName, stream, bytesArray.length(), failIfAlreadyExists);
             }
         });
     }

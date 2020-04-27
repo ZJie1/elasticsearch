@@ -19,22 +19,21 @@
 
 package org.elasticsearch.painless.node;
 
-import org.elasticsearch.painless.CompilerSettings;
-import org.elasticsearch.painless.Globals;
-import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.MethodWriter;
+import org.elasticsearch.painless.Scope;
+import org.elasticsearch.painless.ir.BraceSubNode;
+import org.elasticsearch.painless.ir.ClassNode;
+import org.elasticsearch.painless.symbol.ScriptRoot;
 
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Represents an array load/store.
  */
-final class PSubBrace extends AStoreable {
+public class PSubBrace extends AExpression {
 
-    private final Class<?> clazz;
-    private AExpression index;
+    protected final Class<?> clazz;
+    protected final AExpression index;
 
     PSubBrace(Location location, Class<?> clazz, AExpression index) {
         super(location);
@@ -44,65 +43,25 @@ final class PSubBrace extends AStoreable {
     }
 
     @Override
-    void storeSettings(CompilerSettings settings) {
-        throw createError(new IllegalStateException("illegal tree structure"));
-    }
+    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
+        Output output = new Output();
 
-    @Override
-    void extractVariables(Set<String> variables) {
-        throw createError(new IllegalStateException("illegal tree structure"));
-    }
+        Input indexInput = new Input();
+        indexInput.expected = int.class;
+        Output indexOutput = index.analyze(classNode, scriptRoot, scope, indexInput);
+        index.cast(indexInput, indexOutput);
 
-    @Override
-    void analyze(Locals locals) {
-        index.expected = int.class;
-        index.analyze(locals);
-        index = index.cast(locals);
+        output.actual = clazz.getComponentType();
 
-        actual = clazz.getComponentType();
-    }
+        BraceSubNode braceSubNode = new BraceSubNode();
 
-    @Override
-    void write(MethodWriter writer, Globals globals) {
-        setup(writer, globals);
-        load(writer, globals);
-    }
+        braceSubNode.setChildNode(index.cast(indexOutput));
 
-    @Override
-    int accessElementCount() {
-        return 2;
-    }
+        braceSubNode.setLocation(location);
+        braceSubNode.setExpressionType(output.actual);
 
-    @Override
-    boolean isDefOptimized() {
-        return false;
-    }
+        output.expressionNode = braceSubNode;
 
-    @Override
-    void updateActual(Class<?> actual) {
-        throw createError(new IllegalStateException("Illegal tree structure."));
-    }
-
-    @Override
-    void setup(MethodWriter writer, Globals globals) {
-        index.write(writer, globals);
-        writeIndexFlip(writer, MethodWriter::arrayLength);
-    }
-
-    @Override
-    void load(MethodWriter writer, Globals globals) {
-        writer.writeDebugInfo(location);
-        writer.arrayLoad(MethodWriter.getType(actual));
-    }
-
-    @Override
-    void store(MethodWriter writer, Globals globals) {
-        writer.writeDebugInfo(location);
-        writer.arrayStore(MethodWriter.getType(actual));
-    }
-
-    @Override
-    public String toString() {
-        return singleLineToString(prefix, index);
+        return output;
     }
 }

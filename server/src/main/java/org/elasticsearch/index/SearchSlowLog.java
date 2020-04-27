@@ -19,9 +19,9 @@
 
 package org.elasticsearch.index;
 
+import com.fasterxml.jackson.core.io.JsonStringEncoder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.logging.ESLogMessage;
 import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.settings.Setting;
@@ -32,6 +32,7 @@ import org.elasticsearch.index.shard.SearchOperationListener;
 import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.tasks.Task;
 
+import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 public final class SearchSlowLog implements SearchOperationListener {
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
+
     private long queryWarnThreshold;
     private long queryInfoThreshold;
     private long queryDebugThreshold;
@@ -48,8 +51,6 @@ public final class SearchSlowLog implements SearchOperationListener {
     private long fetchInfoThreshold;
     private long fetchDebugThreshold;
     private long fetchTraceThreshold;
-
-    private SlowLogLevel level;
 
     private final Logger queryLogger;
     private final Logger fetchLogger;
@@ -87,8 +88,8 @@ public final class SearchSlowLog implements SearchOperationListener {
 
     public SearchSlowLog(IndexSettings indexSettings) {
 
-        this.queryLogger = LogManager.getLogger(INDEX_SEARCH_SLOWLOG_PREFIX + ".query");
-        this.fetchLogger = LogManager.getLogger(INDEX_SEARCH_SLOWLOG_PREFIX + ".fetch");
+        this.queryLogger = LogManager.getLogger(INDEX_SEARCH_SLOWLOG_PREFIX + ".query." + indexSettings.getUUID());
+        this.fetchLogger = LogManager.getLogger(INDEX_SEARCH_SLOWLOG_PREFIX + ".fetch." + indexSettings.getUUID());
 
         indexSettings.getScopedSettings().addSettingsUpdateConsumer(INDEX_SEARCH_SLOWLOG_THRESHOLD_QUERY_WARN_SETTING,
             this::setQueryWarnThreshold);
@@ -121,7 +122,6 @@ public final class SearchSlowLog implements SearchOperationListener {
     }
 
     private void setLevel(SlowLogLevel level) {
-        this.level = level;
         Loggers.setLevel(queryLogger, level.name());
         Loggers.setLevel(fetchLogger, level.name());
     }
@@ -129,33 +129,34 @@ public final class SearchSlowLog implements SearchOperationListener {
     @Override
     public void onQueryPhase(SearchContext context, long tookInNanos) {
         if (queryWarnThreshold >= 0 && tookInNanos > queryWarnThreshold) {
-            queryLogger.warn(new SearchSlowLogMessage(context, tookInNanos));
+            queryLogger.warn(SearchSlowLogMessage.of(context, tookInNanos));
         } else if (queryInfoThreshold >= 0 && tookInNanos > queryInfoThreshold) {
-            queryLogger.info(new SearchSlowLogMessage(context, tookInNanos));
+            queryLogger.info(SearchSlowLogMessage.of(context, tookInNanos));
         } else if (queryDebugThreshold >= 0 && tookInNanos > queryDebugThreshold) {
-            queryLogger.debug(new SearchSlowLogMessage(context, tookInNanos));
+            queryLogger.debug(SearchSlowLogMessage.of(context, tookInNanos));
         } else if (queryTraceThreshold >= 0 && tookInNanos > queryTraceThreshold) {
-            queryLogger.trace(new SearchSlowLogMessage(context, tookInNanos));
+            queryLogger.trace(SearchSlowLogMessage.of(context, tookInNanos));
         }
     }
 
     @Override
     public void onFetchPhase(SearchContext context, long tookInNanos) {
         if (fetchWarnThreshold >= 0 && tookInNanos > fetchWarnThreshold) {
-            fetchLogger.warn(new SearchSlowLogMessage(context, tookInNanos));
+            fetchLogger.warn(SearchSlowLogMessage.of(context, tookInNanos));
         } else if (fetchInfoThreshold >= 0 && tookInNanos > fetchInfoThreshold) {
-            fetchLogger.info(new SearchSlowLogMessage(context, tookInNanos));
+            fetchLogger.info(SearchSlowLogMessage.of(context, tookInNanos));
         } else if (fetchDebugThreshold >= 0 && tookInNanos > fetchDebugThreshold) {
-            fetchLogger.debug(new SearchSlowLogMessage(context, tookInNanos));
+            fetchLogger.debug(SearchSlowLogMessage.of(context, tookInNanos));
         } else if (fetchTraceThreshold >= 0 && tookInNanos > fetchTraceThreshold) {
-            fetchLogger.trace(new SearchSlowLogMessage(context, tookInNanos));
+            fetchLogger.trace(SearchSlowLogMessage.of(context, tookInNanos));
         }
     }
 
-    static final class SearchSlowLogMessage extends ESLogMessage {
+    static final class SearchSlowLogMessage  {
 
-        SearchSlowLogMessage(SearchContext context, long tookInNanos) {
-            super(prepareMap(context, tookInNanos), message(context, tookInNanos));
+        public static ESLogMessage of(SearchContext context, long tookInNanos) {
+            Map<String, Object> jsonFields = prepareMap(context, tookInNanos);
+            return new ESLogMessage().withFields(jsonFields);
         }
 
         private static Map<String, Object> prepareMap(SearchContext context, long tookInNanos) {
@@ -168,7 +169,7 @@ public final class SearchSlowLog implements SearchOperationListener {
             } else {
                 messageFields.put("total_hits", "-1");
             }
-            messageFields.put("stats", escapeJson(asJsonArray(
+            messageFields.put("stats", escapeJson(ESLogMessage.asJsonArray(
                 context.groupStats() != null ? context.groupStats().stream() : Stream.empty())));
             messageFields.put("search_type", context.searchType());
             messageFields.put("total_shards", context.numberOfShards());
@@ -185,40 +186,9 @@ public final class SearchSlowLog implements SearchOperationListener {
             return messageFields;
         }
 
-        // Message will be used in plaintext logs
-        private static String message(SearchContext context, long tookInNanos) {
-            StringBuilder sb = new StringBuilder();
-            sb.append(context.indexShard().shardId())
-                .append(" ")
-                .append("took[").append(TimeValue.timeValueNanos(tookInNanos)).append("], ")
-                .append("took_millis[").append(TimeUnit.NANOSECONDS.toMillis(tookInNanos)).append("], ")
-                .append("total_hits[");
-            if (context.queryResult().getTotalHits() != null) {
-                sb.append(context.queryResult().getTotalHits());
-            } else {
-                sb.append("-1");
-            }
-            sb.append("], ");
-            if (context.groupStats() == null) {
-                sb.append("stats[], ");
-            } else {
-                sb.append("stats[");
-                Strings.collectionToDelimitedString(context.groupStats(), ",", "", "", sb);
-                sb.append("], ");
-            }
-            sb.append("search_type[").append(context.searchType()).append("], total_shards[")
-                .append(context.numberOfShards()).append("], ");
-            if (context.request().source() != null) {
-                sb.append("source[").append(context.request().source().toString(FORMAT_PARAMS)).append("], ");
-            } else {
-                sb.append("source[], ");
-            }
-            if (context.getTask().getHeader(Task.X_OPAQUE_ID) != null) {
-                sb.append("id[").append(context.getTask().getHeader(Task.X_OPAQUE_ID)).append("], ");
-            } else {
-                sb.append("id[], ");
-            }
-            return sb.toString();
+        private static String escapeJson(String text) {
+            byte[] sourceEscaped = JsonStringEncoder.getInstance().quoteAsUTF8(text);
+            return new String(sourceEscaped, UTF_8);
         }
     }
 
@@ -287,6 +257,7 @@ public final class SearchSlowLog implements SearchOperationListener {
     }
 
     SlowLogLevel getLevel() {
-        return level;
+        assert queryLogger.getLevel().equals(fetchLogger.getLevel());
+        return SlowLogLevel.parse(queryLogger.getLevel().name());
     }
 }
