@@ -102,7 +102,7 @@ public class GoogleCloudStorageService {
      * @return a new client storage instance that can be used to manage objects
      *         (blobs)
      */
-    private Storage createClient(String clientName, GoogleCloudStorageClientSettings clientSettings) throws IOException {
+    private static Storage createClient(String clientName, GoogleCloudStorageClientSettings clientSettings) throws IOException {
         logger.debug(() -> new ParameterizedMessage("creating GCS client with client_name [{}], endpoint [{}]", clientName,
                 clientSettings.getHost()));
         final HttpTransport httpTransport = SocketAccess.doPrivilegedIOException(() -> {
@@ -113,16 +113,10 @@ public class GoogleCloudStorageService {
             return builder.build();
         });
         final HttpTransportOptions httpTransportOptions = HttpTransportOptions.newBuilder()
-            .setConnectTimeout(toTimeout(clientSettings.getConnectTimeout()))
-            .setReadTimeout(toTimeout(clientSettings.getReadTimeout()))
-            .setHttpTransportFactory(() -> httpTransport)
-            .build();
-        final StorageOptions storageOptions = createStorageOptions(clientSettings, httpTransportOptions);
-        return storageOptions.getService();
-    }
-
-    StorageOptions createStorageOptions(final GoogleCloudStorageClientSettings clientSettings,
-                                        final HttpTransportOptions httpTransportOptions) {
+                .setConnectTimeout(toTimeout(clientSettings.getConnectTimeout()))
+                .setReadTimeout(toTimeout(clientSettings.getReadTimeout()))
+                .setHttpTransportFactory(() -> httpTransport)
+                .build();
         final StorageOptions.Builder storageOptionsBuilder = StorageOptions.newBuilder()
                 .setTransportOptions(httpTransportOptions)
                 .setHeaderProvider(() -> {
@@ -152,7 +146,7 @@ public class GoogleCloudStorageService {
             }
             storageOptionsBuilder.setCredentials(serviceAccountCredentials);
         }
-        return storageOptionsBuilder.build();
+        return storageOptionsBuilder.build().getService();
     }
 
     /**

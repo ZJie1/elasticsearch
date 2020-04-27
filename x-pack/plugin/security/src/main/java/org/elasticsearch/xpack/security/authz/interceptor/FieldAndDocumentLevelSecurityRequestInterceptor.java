@@ -11,7 +11,6 @@ import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.IndicesRequest;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.license.XPackLicenseState;
-import org.elasticsearch.license.XPackLicenseState.Feature;
 import org.elasticsearch.xpack.core.security.authz.AuthorizationEngine;
 import org.elasticsearch.xpack.core.security.authz.AuthorizationEngine.AuthorizationInfo;
 import org.elasticsearch.xpack.core.security.authz.AuthorizationEngine.RequestInfo;
@@ -39,8 +38,7 @@ abstract class FieldAndDocumentLevelSecurityRequestInterceptor implements Reques
                           ActionListener<Void> listener) {
         if (requestInfo.getRequest() instanceof IndicesRequest) {
             IndicesRequest indicesRequest = (IndicesRequest) requestInfo.getRequest();
-            boolean shouldIntercept = licenseState.isSecurityEnabled() && licenseState.isAllowed(Feature.SECURITY_DLS_FLS);
-            if (supports(indicesRequest) && shouldIntercept) {
+            if (supports(indicesRequest) && licenseState.isDocumentAndFieldLevelSecurityAllowed()) {
                 final IndicesAccessControl indicesAccessControl =
                     threadContext.getTransient(AuthorizationServiceField.INDICES_PERMISSIONS_KEY);
                 for (String index : indicesRequest.indices()) {

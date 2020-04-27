@@ -12,9 +12,8 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.xpack.core.ml.action.GetDataFrameAnalyticsStatsAction;
 import org.elasticsearch.xpack.core.ml.dataframe.DataFrameAnalyticsConfig;
-import org.elasticsearch.xpack.core.ml.dataframe.analyses.OutlierDetection;
+import org.elasticsearch.xpack.core.ml.dataframe.DataFrameAnalyticsState;
 import org.junit.After;
 
 import java.util.Map;
@@ -36,7 +35,7 @@ public class OutlierDetectionWithMissingFieldsIT extends MlNativeDataFrameAnalyt
         String sourceIndex = "test-outlier-detection-with-missing-fields";
 
         client().admin().indices().prepareCreate(sourceIndex)
-            .setMapping("numeric", "type=double", "categorical", "type=keyword")
+            .addMapping("_doc", "numeric", "type=double", "categorical", "type=keyword")
             .get();
 
         BulkRequestBuilder bulkRequestBuilder = client().prepareBulk();
@@ -69,21 +68,15 @@ public class OutlierDetectionWithMissingFieldsIT extends MlNativeDataFrameAnalyt
         }
 
         String id = "test_outlier_detection_with_missing_fields";
-        DataFrameAnalyticsConfig config = buildAnalytics(id, sourceIndex, sourceIndex + "-results", null,
-            new OutlierDetection.Builder().build());
+        DataFrameAnalyticsConfig config = buildOutlierDetectionAnalytics(id, new String[] {sourceIndex}, sourceIndex + "-results", null);
+        registerAnalytics(config);
         putAnalytics(config);
 
-        assertIsStopped(id);
+        assertState(id, DataFrameAnalyticsState.STOPPED);
         assertProgress(id, 0, 0, 0, 0);
 
         startAnalytics(id);
         waitUntilAnalyticsIsStopped(id);
-
-        GetDataFrameAnalyticsStatsAction.Response.Stats stats = getAnalyticsStats(id);
-        assertThat(stats.getDataCounts().getJobId(), equalTo(id));
-        assertThat(stats.getDataCounts().getTrainingDocsCount(), equalTo(5L));
-        assertThat(stats.getDataCounts().getTestDocsCount(), equalTo(0L));
-        assertThat(stats.getDataCounts().getSkippedDocsCount(), equalTo(2L));
 
         SearchResponse sourceData = client().prepareSearch(sourceIndex).get();
         for (SearchHit hit : sourceData.getHits()) {

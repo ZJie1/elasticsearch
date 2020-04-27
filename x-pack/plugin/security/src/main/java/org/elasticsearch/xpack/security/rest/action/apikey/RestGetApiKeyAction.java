@@ -12,6 +12,7 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.license.XPackLicenseState;
 import org.elasticsearch.rest.BytesRestResponse;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.RestStatus;
@@ -21,22 +22,15 @@ import org.elasticsearch.xpack.core.security.action.GetApiKeyRequest;
 import org.elasticsearch.xpack.core.security.action.GetApiKeyResponse;
 
 import java.io.IOException;
-import java.util.List;
-
-import static org.elasticsearch.rest.RestRequest.Method.GET;
 
 /**
  * Rest action to get one or more API keys information.
  */
 public final class RestGetApiKeyAction extends ApiKeyBaseRestHandler {
 
-    public RestGetApiKeyAction(Settings settings, XPackLicenseState licenseState) {
+    public RestGetApiKeyAction(Settings settings, RestController controller, XPackLicenseState licenseState) {
         super(settings, licenseState);
-    }
-
-    @Override
-    public List<Route> routes() {
-        return List.of(new Route(GET, "/_security/api_key"));
+        controller.registerHandler(RestRequest.Method.GET, "/_security/api_key", this);
     }
 
     @Override
@@ -59,7 +53,6 @@ public final class RestGetApiKeyAction extends ApiKeyBaseRestHandler {
                         }
                         return new BytesRestResponse(RestStatus.OK, builder);
                     }
-
                 });
     }
 

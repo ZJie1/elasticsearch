@@ -20,14 +20,12 @@
 package org.elasticsearch.cluster.routing;
 
 import org.elasticsearch.Version;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.repositories.IndexId;
 import org.elasticsearch.snapshots.Snapshot;
 
 import java.io.IOException;
@@ -63,7 +61,7 @@ public abstract class RecoverySource implements Writeable, ToXContentObject {
         Type type = Type.values()[in.readByte()];
         switch (type) {
             case EMPTY_STORE: return EmptyStoreRecoverySource.INSTANCE;
-            case EXISTING_STORE: return ExistingStoreRecoverySource.read(in);
+            case EXISTING_STORE: return new ExistingStoreRecoverySource(in);
             case PEER: return PeerRecoverySource.INSTANCE;
             case SNAPSHOT: return new SnapshotRecoverySource(in);
             case LOCAL_SHARDS: return LocalShardsRecoverySource.INSTANCE;
@@ -152,8 +150,8 @@ public abstract class RecoverySource implements Writeable, ToXContentObject {
             this.bootstrapNewHistoryUUID = bootstrapNewHistoryUUID;
         }
 
-        private static ExistingStoreRecoverySource read(StreamInput in) throws IOException {
-            return in.readBoolean() ? FORCE_STALE_PRIMARY_INSTANCE : INSTANCE;
+        private ExistingStoreRecoverySource(StreamInput in) throws IOException {
+            bootstrapNewHistoryUUID = in.readBoolean();
         }
 
         @Override
@@ -215,25 +213,21 @@ public abstract class RecoverySource implements Writeable, ToXContentObject {
     public static class SnapshotRecoverySource extends RecoverySource {
         private final String restoreUUID;
         private final Snapshot snapshot;
-        private final IndexId index;
+        private final String index;
         private final Version version;
 
-        public SnapshotRecoverySource(String restoreUUID, Snapshot snapshot, Version version, IndexId indexId) {
+        public SnapshotRecoverySource(String restoreUUID, Snapshot snapshot, Version version, String index) {
             this.restoreUUID = restoreUUID;
             this.snapshot = Objects.requireNonNull(snapshot);
             this.version = Objects.requireNonNull(version);
-            this.index = Objects.requireNonNull(indexId);
+            this.index = Objects.requireNonNull(index);
         }
 
         SnapshotRecoverySource(StreamInput in) throws IOException {
             restoreUUID = in.readString();
             snapshot = new Snapshot(in);
             version = Version.readVersion(in);
-            if (in.getVersion().onOrAfter(Version.V_7_7_0)) {
-                index = new IndexId(in);
-            } else {
-                index = new IndexId(in.readString(), IndexMetadata.INDEX_UUID_NA_VALUE);
-            }
+            index = in.readString();
         }
 
         public String restoreUUID() {
@@ -244,13 +238,7 @@ public abstract class RecoverySource implements Writeable, ToXContentObject {
             return snapshot;
         }
 
-        /**
-         * Gets the {@link IndexId} of the recovery source. May contain {@link IndexMetadata#INDEX_UUID_NA_VALUE} as the index uuid if it
-         * was created by an older version master in a mixed version cluster.
-         *
-         * @return IndexId
-         */
-        public IndexId index() {
+        public String index() {
             return index;
         }
 
@@ -263,11 +251,7 @@ public abstract class RecoverySource implements Writeable, ToXContentObject {
             out.writeString(restoreUUID);
             snapshot.writeTo(out);
             Version.writeVersion(version, out);
-            if (out.getVersion().onOrAfter(Version.V_7_7_0)) {
-                index.writeTo(out);
-            } else {
-                out.writeString(index.getName());
-            }
+            out.writeString(index);
         }
 
         @Override
@@ -280,7 +264,7 @@ public abstract class RecoverySource implements Writeable, ToXContentObject {
             builder.field("repository", snapshot.getRepository())
                 .field("snapshot", snapshot.getSnapshotId().getName())
                 .field("version", version.toString())
-                .field("index", index.getName())
+                .field("index", index)
                 .field("restoreUUID", restoreUUID);
         }
 

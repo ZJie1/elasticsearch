@@ -22,9 +22,8 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.elasticsearch.Version;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.query.QueryShardContext;
 import org.junit.Before;
@@ -60,15 +59,14 @@ public class FieldNamesFieldTypeTests extends FieldTypeTestCase {
 
         Settings settings = settings(Version.CURRENT).build();
         IndexSettings indexSettings = new IndexSettings(
-                new IndexMetadata.Builder("foo").settings(settings).numberOfShards(1).numberOfReplicas(0).build(), settings);
+                new IndexMetaData.Builder("foo").settings(settings).numberOfShards(1).numberOfReplicas(0).build(), settings);
         MapperService mapperService = mock(MapperService.class);
-        when(mapperService.fieldType("_field_names")).thenReturn(fieldNamesFieldType);
-        when(mapperService.fieldType("field_name")).thenReturn(fieldType);
+        when(mapperService.fullName("_field_names")).thenReturn(fieldNamesFieldType);
+        when(mapperService.fullName("field_name")).thenReturn(fieldType);
         when(mapperService.simpleMatchToFullName("field_name")).thenReturn(Collections.singleton("field_name"));
 
         QueryShardContext queryShardContext = new QueryShardContext(0,
-                indexSettings, BigArrays.NON_RECYCLING_INSTANCE, null, null, mapperService,
-                null, null, null, null, null, null, () -> 0L, null, null, () -> true, null);
+                indexSettings, null, null, null, mapperService, null, null, null, null, null, null, () -> 0L, null);
         fieldNamesFieldType.setEnabled(true);
         Query termQuery = fieldNamesFieldType.termQuery("field_name", queryShardContext);
         assertEquals(new TermQuery(new Term(FieldNamesFieldMapper.CONTENT_TYPE, "field_name")), termQuery);

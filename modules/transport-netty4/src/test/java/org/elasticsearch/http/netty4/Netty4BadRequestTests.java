@@ -23,7 +23,6 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.util.ReferenceCounted;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.network.NetworkService;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.common.util.MockBigArrays;
@@ -86,8 +85,8 @@ public class Netty4BadRequestTests extends ESTestCase {
             }
         };
 
-        try (HttpServerTransport httpServerTransport = new Netty4HttpServerTransport(Settings.EMPTY, networkService, bigArrays, threadPool,
-            xContentRegistry(), dispatcher, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+        try (HttpServerTransport httpServerTransport =
+                     new Netty4HttpServerTransport(Settings.EMPTY, networkService, bigArrays, threadPool, xContentRegistry(), dispatcher)) {
             httpServerTransport.start();
             final TransportAddress transportAddress = randomFrom(httpServerTransport.boundAddress().boundAddresses());
 

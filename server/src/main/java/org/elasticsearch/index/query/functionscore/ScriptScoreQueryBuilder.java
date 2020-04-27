@@ -20,22 +20,19 @@
 package org.elasticsearch.index.query.functionscore;
 
 import org.apache.lucene.search.Query;
-import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.Version;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.common.lucene.search.function.ScriptScoreFunction;
 import org.elasticsearch.common.lucene.search.function.ScriptScoreQuery;
 import org.elasticsearch.common.xcontent.ConstructingObjectParser;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
 import org.elasticsearch.index.query.InnerHitContextBuilder;
-import org.elasticsearch.index.query.MatchNoneQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryRewriteContext;
 import org.elasticsearch.index.query.QueryShardContext;
-import org.elasticsearch.script.ScoreScript;
 import org.elasticsearch.script.Script;
 
 import java.io.IOException;
@@ -44,7 +41,6 @@ import java.util.Objects;
 
 import static org.elasticsearch.common.xcontent.ConstructingObjectParser.constructorArg;
 import static org.elasticsearch.common.xcontent.ConstructingObjectParser.optionalConstructorArg;
-import static org.elasticsearch.search.SearchService.ALLOW_EXPENSIVE_QUERIES;
 
 /**
  * A query that computes a document score based on the provided script
@@ -56,9 +52,10 @@ public class ScriptScoreQueryBuilder extends AbstractQueryBuilder<ScriptScoreQue
     public static final ParseField SCRIPT_FIELD = new ParseField("script");
     public static final ParseField MIN_SCORE_FIELD = new ParseField("min_score");
 
-    private static final ConstructingObjectParser<ScriptScoreQueryBuilder, Void> PARSER = new ConstructingObjectParser<>(NAME, false,
+    private static ConstructingObjectParser<ScriptScoreQueryBuilder, Void> PARSER = new ConstructingObjectParser<>(NAME, false,
         args -> {
-            ScriptScoreQueryBuilder ssQueryBuilder = new ScriptScoreQueryBuilder((QueryBuilder) args[0], (Script) args[1]);
+            ScriptScoreFunctionBuilder ssFunctionBuilder = new ScriptScoreFunctionBuilder((Script) args[1]);
+            ScriptScoreQueryBuilder ssQueryBuilder = new ScriptScoreQueryBuilder((QueryBuilder) args[0], ssFunctionBuilder);
             if (args[2] != null) ssQueryBuilder.setMinScore((Float) args[2]);
             if (args[3] != null) ssQueryBuilder.boost((Float) args[3]);
             if (args[4] != null) ssQueryBuilder.queryName((String) args[4]);
@@ -79,25 +76,25 @@ public class ScriptScoreQueryBuilder extends AbstractQueryBuilder<ScriptScoreQue
 
     private final QueryBuilder query;
     private Float minScore = null;
-    private final Script script;
+    private final ScriptScoreFunctionBuilder scriptScoreFunctionBuilder;
 
 
     /**
      * Creates a script_score query that executes the provided script function on documents that match a query.
      *
      * @param query the query that defines which documents the script_score query will be executed on.
-     * @param script the script to run for computing the query score
+     * @param scriptScoreFunctionBuilder defines script function
      */
-    public ScriptScoreQueryBuilder(QueryBuilder query, Script script) {
+    public ScriptScoreQueryBuilder(QueryBuilder query, ScriptScoreFunctionBuilder scriptScoreFunctionBuilder) {
         // require the supply of the query, even the explicit supply of "match_all" query
         if (query == null) {
             throw new IllegalArgumentException("script_score: query must not be null");
         }
-        if (script == null) {
+        if (scriptScoreFunctionBuilder == null) {
             throw new IllegalArgumentException("script_score: script must not be null");
         }
         this.query = query;
-        this.script = script;
+        this.scriptScoreFunctionBuilder = scriptScoreFunctionBuilder;
     }
 
     /**
@@ -106,22 +103,14 @@ public class ScriptScoreQueryBuilder extends AbstractQueryBuilder<ScriptScoreQue
     public ScriptScoreQueryBuilder(StreamInput in) throws IOException {
         super(in);
         query = in.readNamedWriteable(QueryBuilder.class);
-        if (in.getVersion().onOrAfter(Version.V_7_5_0)) {
-            script = new Script(in);
-        } else {
-            script = in.readNamedWriteable(ScriptScoreFunctionBuilder.class).getScript();
-        }
+        scriptScoreFunctionBuilder = in.readNamedWriteable(ScriptScoreFunctionBuilder.class);
         minScore = in.readOptionalFloat();
     }
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
         out.writeNamedWriteable(query);
-        if (out.getVersion().onOrAfter(Version.V_7_5_0)) {
-            script.writeTo(out);
-        } else {
-            out.writeNamedWriteable(new ScriptScoreFunctionBuilder(script));
-        }
+        out.writeNamedWriteable(scriptScoreFunctionBuilder);
         out.writeOptionalFloat(minScore);
     }
 
@@ -137,7 +126,7 @@ public class ScriptScoreQueryBuilder extends AbstractQueryBuilder<ScriptScoreQue
         builder.startObject(NAME);
         builder.field(QUERY_FIELD.getPreferredName());
         query.toXContent(builder, params);
-        builder.field(SCRIPT_FIELD.getPreferredName(), script);
+        builder.field(SCRIPT_FIELD.getPreferredName(), scriptScoreFunctionBuilder.getScript());
         if (minScore != null) {
             builder.field(MIN_SCORE_FIELD.getPreferredName(), minScore);
         }
@@ -162,41 +151,29 @@ public class ScriptScoreQueryBuilder extends AbstractQueryBuilder<ScriptScoreQue
     @Override
     protected boolean doEquals(ScriptScoreQueryBuilder other) {
         return Objects.equals(this.query, other.query) &&
-            Objects.equals(this.script, other.script) &&
+            Objects.equals(this.scriptScoreFunctionBuilder, other.scriptScoreFunctionBuilder) &&
             Objects.equals(this.minScore, other.minScore) ;
     }
 
     @Override
     protected int doHashCode() {
-        return Objects.hash(this.query, this.script, this.minScore);
+        return Objects.hash(this.query, this.scriptScoreFunctionBuilder, this.minScore);
     }
 
     @Override
     protected Query doToQuery(QueryShardContext context) throws IOException {
-        if (context.allowExpensiveQueries() == false) {
-            throw new ElasticsearchException("[script score] queries cannot be executed when '"
-                    + ALLOW_EXPENSIVE_QUERIES.getKey() + "' is set to false.");
-        }
-        ScoreScript.Factory factory = context.compile(script, ScoreScript.CONTEXT);
-        ScoreScript.LeafFactory scoreScriptFactory = factory.newFactory(script.getParams(), context.lookup());
+        ScriptScoreFunction function = (ScriptScoreFunction) scriptScoreFunctionBuilder.toFunction(context);
         Query query = this.query.toQuery(context);
-        return new ScriptScoreQuery(query, script, scoreScriptFactory, minScore,
-            context.index().getName(), context.getShardId(), context.indexVersionCreated());
+        return new ScriptScoreQuery(query, function, minScore);
     }
 
 
     @Override
     protected QueryBuilder doRewrite(QueryRewriteContext queryRewriteContext) throws IOException {
         QueryBuilder newQuery = this.query.rewrite(queryRewriteContext);
-        if (newQuery instanceof MatchNoneQueryBuilder) {
-            return newQuery;
-        }
-
         if (newQuery != query) {
-            ScriptScoreQueryBuilder newQueryBuilder = new ScriptScoreQueryBuilder(newQuery, script);
-            if (minScore != null) {
-                newQueryBuilder.setMinScore(minScore);
-            }
+            ScriptScoreQueryBuilder newQueryBuilder = new ScriptScoreQueryBuilder(newQuery, scriptScoreFunctionBuilder);
+            newQueryBuilder.setMinScore(minScore);
             return newQueryBuilder;
         }
         return this;

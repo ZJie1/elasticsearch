@@ -33,7 +33,6 @@
         "options":[
           "open",
           "closed",
-          "hidden",
           "none",
           "all"
         ],
@@ -97,6 +96,7 @@
           "yellow",
           "red"
         ],
+        "default":null,
         "description":"Wait until cluster is in a specific state"
       }
     }

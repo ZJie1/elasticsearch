@@ -63,7 +63,6 @@ public class NamedWriteableRegistry {
     /**
      * Constructs a new registry from the given entries.
      */
-    @SuppressWarnings("rawtypes")
     public NamedWriteableRegistry(List<Entry> entries) {
         if (entries.isEmpty()) {
             registry = Collections.emptyMap();

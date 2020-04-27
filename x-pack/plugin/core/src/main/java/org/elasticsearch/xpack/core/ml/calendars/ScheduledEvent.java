@@ -85,7 +85,7 @@ public class ScheduledEvent implements ToXContentObject, Writeable {
 
     public ScheduledEvent(StreamInput in) throws IOException {
         description = in.readString();
-        if (in.getVersion().onOrAfter(Version.V_7_4_0)) {
+        if (in.getVersion().onOrAfter(Version.CURRENT)) {
             startTime = in.readInstant();
             endTime = in.readInstant();
         } else {
@@ -146,7 +146,7 @@ public class ScheduledEvent implements ToXContentObject, Writeable {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(description);
-        if (out.getVersion().onOrAfter(Version.V_7_4_0)) {
+        if (out.getVersion().onOrAfter(Version.CURRENT)) {
             out.writeInstant(startTime);
             out.writeInstant(endTime);
         } else {
@@ -167,7 +167,7 @@ public class ScheduledEvent implements ToXContentObject, Writeable {
         if (eventId != null) {
             builder.field(EVENT_ID.getPreferredName(), eventId);
         }
-        if (params.paramAsBoolean(ToXContentParams.FOR_INTERNAL_STORAGE, false)) {
+        if (params.paramAsBoolean(ToXContentParams.INCLUDE_TYPE, false)) {
             builder.field(TYPE.getPreferredName(), SCHEDULED_EVENT_TYPE);
         }
         builder.endObject();

@@ -21,23 +21,22 @@ package org.elasticsearch.plugin.noop.action.search;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.rest.BaseRestHandler;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.action.RestStatusToXContentListener;
-
-import java.util.List;
 
 import static org.elasticsearch.rest.RestRequest.Method.GET;
 import static org.elasticsearch.rest.RestRequest.Method.POST;
 
 public class RestNoopSearchAction extends BaseRestHandler {
 
-    @Override
-    public List<Route> routes() {
-        return List.of(
-            new Route(GET, "/_noop_search"),
-            new Route(POST, "/_noop_search"),
-            new Route(GET, "/{index}/_noop_search"),
-            new Route(POST, "/{index}/_noop_search"));
+    public RestNoopSearchAction(RestController controller) {
+        controller.registerHandler(GET, "/_noop_search", this);
+        controller.registerHandler(POST, "/_noop_search", this);
+        controller.registerHandler(GET, "/{index}/_noop_search", this);
+        controller.registerHandler(POST, "/{index}/_noop_search", this);
+        controller.registerHandler(GET, "/{index}/{type}/_noop_search", this);
+        controller.registerHandler(POST, "/{index}/{type}/_noop_search", this);
     }
 
     @Override

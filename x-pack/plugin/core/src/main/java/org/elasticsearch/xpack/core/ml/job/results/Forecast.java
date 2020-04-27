@@ -13,7 +13,6 @@ import org.elasticsearch.common.xcontent.ConstructingObjectParser;
 import org.elasticsearch.common.xcontent.ObjectParser.ValueType;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.xpack.core.ml.MachineLearningField;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
 import org.elasticsearch.xpack.core.common.time.TimeUtils;
 
@@ -166,9 +165,12 @@ public class Forecast implements ToXContentObject, Writeable {
     }
 
     public String getId() {
+        int valuesHash = Objects.hash(byFieldValue, partitionFieldValue);
+        int length = (byFieldValue == null ? 0 : byFieldValue.length()) +
+                (partitionFieldValue == null ? 0 : partitionFieldValue.length());
         return jobId + "_model_forecast_" + forecastId + "_" + timestamp.getTime()
                 + "_" + bucketSpan + "_" + detectorIndex + "_"
-                + MachineLearningField.valuesToId(byFieldValue, partitionFieldValue);
+                + valuesHash + "_" + length;
     }
 
     public Date getTimestamp() {

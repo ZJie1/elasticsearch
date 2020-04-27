@@ -18,8 +18,6 @@
  */
 package org.elasticsearch.index.mapper;
 
-import org.elasticsearch.Version;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.test.ESTestCase;
 
@@ -37,7 +35,7 @@ public class MapperMergeValidatorTests extends ESTestCase {
     public void testMismatchedFieldTypes() {
         FieldMapper existingField = new MockFieldMapper("foo");
         FieldTypeLookup lookup = new FieldTypeLookup()
-            .copyAndAddAll(singletonList(existingField), emptyList());
+            .copyAndAddAll("type", singletonList(existingField), emptyList());
 
         FieldTypeLookupTests.OtherFakeFieldType newFieldType = new FieldTypeLookupTests.OtherFakeFieldType();
         newFieldType.setName("foo");
@@ -55,7 +53,7 @@ public class MapperMergeValidatorTests extends ESTestCase {
     public void testConflictingFieldTypes() {
         FieldMapper existingField = new MockFieldMapper("foo");
         FieldTypeLookup lookup = new FieldTypeLookup()
-            .copyAndAddAll(singletonList(existingField), emptyList());
+            .copyAndAddAll("type", singletonList(existingField), emptyList());
 
         MappedFieldType newFieldType = new MockFieldMapper.FakeFieldType();
         newFieldType.setName("foo");
@@ -215,19 +213,15 @@ public class MapperMergeValidatorTests extends ESTestCase {
         assertEquals(expectedMessage, e.getMessage());
     }
 
-    private static final Settings SETTINGS = Settings.builder()
-        .put(IndexMetadata.SETTING_INDEX_VERSION_CREATED.getKey(), Version.CURRENT)
-        .build();
-
     private static ObjectMapper createObjectMapper(String name) {
         return new ObjectMapper(name, name, true,
             ObjectMapper.Nested.NO,
-            ObjectMapper.Dynamic.FALSE, emptyMap(), SETTINGS);
+            ObjectMapper.Dynamic.FALSE, emptyMap(), Settings.EMPTY);
     }
 
     private static ObjectMapper createNestedObjectMapper(String name) {
         return new ObjectMapper(name, name, true,
             ObjectMapper.Nested.newNested(false, false),
-            ObjectMapper.Dynamic.FALSE, emptyMap(), SETTINGS);
+            ObjectMapper.Dynamic.FALSE, emptyMap(), Settings.EMPTY);
     }
 }

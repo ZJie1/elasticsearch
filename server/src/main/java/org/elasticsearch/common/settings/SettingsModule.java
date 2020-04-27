@@ -63,27 +63,11 @@ public class SettingsModule implements Module {
             List<Setting<?>> additionalSettings,
             List<String> settingsFilter,
             Set<SettingUpgrader<?>> settingUpgraders) {
-        this(
-            settings,
-            additionalSettings,
-            settingsFilter,
-            settingUpgraders,
-            ClusterSettings.BUILT_IN_CLUSTER_SETTINGS,
-            IndexScopedSettings.BUILT_IN_INDEX_SETTINGS);
-    }
-
-    SettingsModule(
-        final Settings settings,
-        final List<Setting<?>> additionalSettings,
-        final List<String> settingsFilter,
-        final Set<SettingUpgrader<?>> settingUpgraders,
-        final Set<Setting<?>> registeredClusterSettings,
-        final Set<Setting<?>> registeredIndexSettings) {
         this.settings = settings;
-        for (Setting<?> setting : registeredClusterSettings) {
+        for (Setting<?> setting : ClusterSettings.BUILT_IN_CLUSTER_SETTINGS) {
             registerSetting(setting);
         }
-        for (Setting<?> setting : registeredIndexSettings) {
+        for (Setting<?> setting : IndexScopedSettings.BUILT_IN_INDEX_SETTINGS) {
             registerSetting(setting);
         }
 
@@ -159,7 +143,7 @@ public class SettingsModule implements Module {
         // by now we are fully configured, lets check node level settings for unregistered index settings
         clusterSettings.validate(settings, true);
         this.settingsFilter = new SettingsFilter(settingsFilterPattern);
-    }
+     }
 
     @Override
     public void configure(Binder binder) {
@@ -175,9 +159,6 @@ public class SettingsModule implements Module {
      * the setting during startup.
      */
     private void registerSetting(Setting<?> setting) {
-        if (setting.getKey().contains(".") == false) {
-            throw new IllegalArgumentException("setting [" + setting.getKey() + "] is not in any namespace, its name must contain a dot");
-        }
         if (setting.isFiltered()) {
             if (settingsFilterPattern.contains(setting.getKey()) == false) {
                 registerSettingsFilter(setting.getKey());

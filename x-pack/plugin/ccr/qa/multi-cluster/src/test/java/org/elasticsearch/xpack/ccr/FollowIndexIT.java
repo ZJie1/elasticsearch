@@ -30,7 +30,10 @@ public class FollowIndexIT extends ESCCRRestTestCase {
                     "  \"excludes\": [\"filtered_field\"]" +
                     "}";
             }
-            createIndex(leaderIndexName, Settings.EMPTY, mapping);
+            Settings indexSettings = Settings.builder()
+                    .put("index.soft_deletes.enabled", true)
+                    .build();
+            createIndex(leaderIndexName, indexSettings, mapping);
             for (int i = 0; i < numDocs; i++) {
                 logger.info("Indexing doc [{}]", i);
                 index(client(), leaderIndexName, Integer.toString(i), "field", i, "filtered_field", "true");

@@ -31,6 +31,14 @@ public class ValidateQueryRequestBuilder
     }
 
     /**
+     * The types of documents the query will run against. Defaults to all types.
+     */
+    public ValidateQueryRequestBuilder setTypes(String... types) {
+        request.types(types);
+        return this;
+    }
+
+    /**
      * The query to validate.
      *
      * @see org.elasticsearch.index.query.QueryBuilders

@@ -3,7 +3,6 @@
 :request: GetModelSnapshotsRequest
 :response: GetModelSnapshotsResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
 === Get model snapshots API
 

@@ -5,19 +5,20 @@
  */
 package org.elasticsearch.xpack.sql.expression.predicate.operator.arithmetic;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.tree.NodeInfo;
-import org.elasticsearch.xpack.ql.tree.Source;
-import org.elasticsearch.xpack.ql.type.DataType;
-import org.elasticsearch.xpack.sql.type.SqlDataTypeConverter;
+import org.elasticsearch.xpack.sql.expression.Expression;
+import org.elasticsearch.xpack.sql.expression.predicate.operator.arithmetic.BinaryArithmeticProcessor.BinaryArithmeticOperation;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.tree.NodeInfo;
+import org.elasticsearch.xpack.sql.type.DataType;
+import org.elasticsearch.xpack.sql.type.DataTypeConversion;
 
 /**
  * Division function ({@code a / b}).
  */
-public class Div extends SqlArithmeticOperation {
+public class Div extends ArithmeticOperation {
 
     public Div(Source source, Expression left, Expression right) {
-        super(source, left, right, SqlBinaryArithmeticOperation.DIV);
+        super(source, left, right, BinaryArithmeticOperation.DIV);
     }
 
     @Override
@@ -32,6 +33,6 @@ public class Div extends SqlArithmeticOperation {
 
     @Override
     public DataType dataType() {
-        return SqlDataTypeConverter.commonType(left().dataType(), right().dataType());
+        return DataTypeConversion.commonType(left().dataType(), right().dataType());
     }
 }

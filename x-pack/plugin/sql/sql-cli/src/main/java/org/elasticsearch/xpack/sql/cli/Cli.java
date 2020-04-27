@@ -22,9 +22,9 @@ import org.elasticsearch.xpack.sql.cli.command.PrintLogoCommand;
 import org.elasticsearch.xpack.sql.cli.command.ServerInfoCliCommand;
 import org.elasticsearch.xpack.sql.cli.command.ServerQueryCliCommand;
 import org.elasticsearch.xpack.sql.client.ClientException;
-import org.elasticsearch.xpack.sql.client.ClientVersion;
 import org.elasticsearch.xpack.sql.client.ConnectionConfiguration;
 import org.elasticsearch.xpack.sql.client.HttpClient;
+import org.elasticsearch.xpack.sql.client.Version;
 import org.jline.terminal.TerminalBuilder;
 
 import java.io.IOException;
@@ -38,7 +38,6 @@ public class Cli extends LoggingAwareCommand {
     private final OptionSpec<String> keystoreLocation;
     private final OptionSpec<Boolean> checkOption;
     private final OptionSpec<String> connectionString;
-    private final OptionSpec<Boolean> binaryCommunication;
 
     /**
      * Use this VM Options to run in IntelliJ or Eclipse:
@@ -81,15 +80,11 @@ public class Cli extends LoggingAwareCommand {
         super("Elasticsearch SQL CLI");
         this.cliTerminal = cliTerminal;
         parser.acceptsAll(Arrays.asList("d", "debug"), "Enable debug logging");
-        this.binaryCommunication = parser.acceptsAll(Arrays.asList("b", "binary"), "Disable binary communication. "
-                + "Enabled by default. Accepts 'true' or 'false' values.")
-                .withRequiredArg().ofType(Boolean.class)
-                .defaultsTo(Boolean.parseBoolean(System.getProperty("binary", "true")));
         this.keystoreLocation = parser.acceptsAll(
-                Arrays.asList("k", "keystore_location"),
-                "Location of a keystore to use when setting up SSL. "
-                + "If specified then the CLI will prompt for a keystore password. "
-                + "If specified when the uri isn't https then an error is thrown.")
+                    Arrays.asList("k", "keystore_location"),
+                    "Location of a keystore to use when setting up SSL. "
+                    + "If specified then the CLI will prompt for a keystore password. "
+                    + "If specified when the uri isn't https then an error is thrown.")
                 .withRequiredArg().ofType(String.class);
         this.checkOption = parser.acceptsAll(Arrays.asList("c", "check"),
                 "Enable initial connection check on startup")
@@ -101,7 +96,6 @@ public class Cli extends LoggingAwareCommand {
     @Override
     protected void execute(org.elasticsearch.cli.Terminal terminal, OptionSet options) throws Exception {
         boolean debug = options.has("d") || options.has("debug");
-        boolean binary = binaryCommunication.value(options);
         boolean checkConnection = checkOption.value(options);
         List<String> args = connectionString.values(options);
         if (args.size() > 1) {
@@ -113,10 +107,10 @@ public class Cli extends LoggingAwareCommand {
             throw new UserException(ExitCodes.USAGE, "expecting a single keystore file");
         }
         String keystoreLocationValue = args.size() == 1 ? args.get(0) : null;
-        execute(uri, debug, binary, keystoreLocationValue, checkConnection);
+        execute(uri, debug, keystoreLocationValue, checkConnection);
     }
 
-    private void execute(String uri, boolean debug, boolean binary, String keystoreLocation, boolean checkConnection) throws Exception {
+    private void execute(String uri, boolean debug, String keystoreLocation, boolean checkConnection) throws Exception {
         CliCommand cliCommand = new CliCommands(
                 new PrintLogoCommand(),
                 new ClearScreenCliCommand(),
@@ -127,7 +121,7 @@ public class Cli extends LoggingAwareCommand {
         );
         try {
             ConnectionBuilder connectionBuilder = new ConnectionBuilder(cliTerminal);
-            ConnectionConfiguration con = connectionBuilder.buildConnection(uri, keystoreLocation, binary);
+            ConnectionConfiguration con = connectionBuilder.buildConnection(uri, keystoreLocation);
             CliSession cliSession = new CliSession(new HttpClient(con));
             cliSession.setDebug(debug);
             if (checkConnection) {
@@ -161,7 +155,7 @@ public class Cli extends LoggingAwareCommand {
                 // Most likely we connected to something other than Elasticsearch
                 throw new UserException(ExitCodes.DATA_ERROR,
                         "Cannot communicate with the server " + con.connectionString() +
-                                ". This version of CLI only works with Elasticsearch version " + ClientVersion.CURRENT.toString());
+                                ". This version of CLI only works with Elasticsearch version " + Version.CURRENT.toString());
             }
         }
     }

@@ -17,14 +17,12 @@ import org.elasticsearch.xpack.ml.MachineLearning;
 import org.yaml.snakeyaml.util.UriEncoder;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
 
 public class MlBasicMultiNodeIT extends ESRestTestCase {
@@ -38,7 +36,7 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
         assertTrue((Boolean) ml.get("enabled"));
     }
 
-    public void testInvalidJob() {
+    public void testInvalidJob() throws Exception {
         // The job name is invalid because it contains a space
         String jobId = "invalid job";
         ResponseException e = expectThrows(ResponseException.class, () -> createFarequoteJob(jobId));
@@ -56,7 +54,7 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
 
         Response openResponse = client().performRequest(
                 new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_open"));
-        assertThat(entityAsMap(openResponse), hasEntry("opened", true));
+        assertEquals(Collections.singletonMap("opened", true), entityAsMap(openResponse));
 
         Request addData = new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_data");
         addData.setEntity(new NStringEntity(
@@ -105,15 +103,11 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
     }
 
     public void testMiniFarequoteWithDatafeeder() throws Exception {
-        boolean datesHaveNanoSecondResolution = randomBoolean();
-        String dateMappingType = datesHaveNanoSecondResolution ? "date_nanos" : "date";
-        String dateFormat = datesHaveNanoSecondResolution ? "strict_date_optional_time_nanos" : "strict_date_optional_time";
-        String randomNanos = datesHaveNanoSecondResolution ? "," + randomIntBetween(100000000, 999999999) : "";
         Request createAirlineDataRequest = new Request("PUT", "/airline-data");
         createAirlineDataRequest.setJsonEntity("{"
                 + "  \"mappings\": {"
                 + "    \"properties\": {"
-                + "      \"time\": { \"type\":\"" + dateMappingType + "\", \"format\":\"" + dateFormat + "\"},"
+                + "      \"time\": { \"type\":\"date\"},"
                 + "      \"airline\": { \"type\":\"keyword\"},"
                 + "      \"responsetime\": { \"type\":\"float\"}"
                 + "    }"
@@ -121,14 +115,14 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
                 + "}");
         client().performRequest(createAirlineDataRequest);
         Request airlineData1 = new Request("PUT", "/airline-data/_doc/1");
-        airlineData1.setJsonEntity("{\"time\":\"2016-06-01T00:00:00" + randomNanos + "Z\",\"airline\":\"AAA\",\"responsetime\":135.22}");
+        airlineData1.setJsonEntity("{\"time\":\"2016-06-01T00:00:00Z\",\"airline\":\"AAA\",\"responsetime\":135.22}");
         client().performRequest(airlineData1);
         Request airlineData2 = new Request("PUT", "/airline-data/_doc/2");
-        airlineData2.setJsonEntity("{\"time\":\"2016-06-01T01:59:00" + randomNanos + "Z\",\"airline\":\"AAA\",\"responsetime\":541.76}");
+        airlineData2.setJsonEntity("{\"time\":\"2016-06-01T01:59:00Z\",\"airline\":\"AAA\",\"responsetime\":541.76}");
         client().performRequest(airlineData2);
 
         // Ensure all data is searchable
-        refreshAllIndices();
+        client().performRequest(new Request("POST", "/_refresh"));
 
         String jobId = "mini-farequote-with-data-feeder-job";
         createFarequoteJob(jobId);
@@ -137,12 +131,12 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
 
         Response openResponse = client().performRequest(
                 new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_open"));
-        assertThat(entityAsMap(openResponse), hasEntry("opened", true));
+        assertEquals(Collections.singletonMap("opened", true), entityAsMap(openResponse));
 
         Request startRequest = new Request("POST", MachineLearning.BASE_PATH + "datafeeds/" + datafeedId + "/_start");
         startRequest.addParameter("start", "0");
         Response startResponse = client().performRequest(startRequest);
-        assertThat(entityAsMap(startResponse), hasEntry("started", true));
+        assertEquals(Collections.singletonMap("started", true), entityAsMap(startResponse));
 
         assertBusy(() -> {
             try {
@@ -153,7 +147,7 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
                 assertEquals(2, dataCountsDoc.get("input_record_count"));
                 assertEquals(2, dataCountsDoc.get("processed_record_count"));
             } catch (IOException e) {
-                throw new UncheckedIOException(e);
+                throw new RuntimeException(e);
             }
         });
 
@@ -176,7 +170,7 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
 
         Response openResponse = client().performRequest(
                 new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_open"));
-        assertThat(entityAsMap(openResponse), hasEntry("opened", true));
+        assertEquals(Collections.singletonMap("opened", true), entityAsMap(openResponse));
 
         Request addDataRequest = new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_data");
         addDataRequest.setEntity(new NStringEntity(
@@ -215,7 +209,7 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
         Request openRequest = new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_open");
         openRequest.addParameter("timeout", "20s");
         Response openResponse2 = client().performRequest(openRequest);
-        assertThat(entityAsMap(openResponse2), hasEntry("opened", true));
+        assertEquals(Collections.singletonMap("opened", true), entityAsMap(openResponse2));
 
         // feed some more data points
         Request addDataRequest2 = new Request("POST", MachineLearning.BASE_PATH + "anomaly_detectors/" + jobId + "/_data");
@@ -239,7 +233,7 @@ public class MlBasicMultiNodeIT extends ESRestTestCase {
         assertEquals(1000, responseBody2.get("bucket_count"));
 
         // unintuitive: should return the earliest record timestamp of this feed???
-        assertNull(responseBody2.get("earliest_record_timestamp"));
+        assertEquals(null, responseBody2.get("earliest_record_timestamp"));
         assertEquals(1407082000000L, responseBody2.get("latest_record_timestamp"));
 
         assertEquals(Collections.singletonMap("closed", true),

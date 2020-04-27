@@ -35,7 +35,7 @@ A `extended_stats_bucket` aggregation looks like this in isolation:
 
 The following snippet calculates the extended stats for monthly `sales` bucket:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /sales/_search
 {
@@ -62,6 +62,7 @@ POST /sales/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 
 <1> `bucket_paths` instructs this `extended_stats_bucket` aggregation that we want the calculate stats for the `sales` aggregation in the
@@ -69,7 +70,7 @@ POST /sales/_search
 
 And the following may be the response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
    "took": 11,

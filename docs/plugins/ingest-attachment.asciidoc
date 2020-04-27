@@ -32,7 +32,7 @@ include::install_remove.asciidoc[]
 
 For example, this:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/attachment
 {
@@ -51,14 +51,16 @@ PUT my_index/_doc/my_id?pipeline=attachment
 }
 GET my_index/_doc/my_id
 --------------------------------------------------
+// CONSOLE
 
 Returns this:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "found": true,
   "_index": "my_index",
+  "_type": "_doc",
   "_id": "my_id",
   "_version": 1,
   "_seq_no": 22,
@@ -79,7 +81,7 @@ Returns this:
 
 To specify only some fields to be extracted:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/attachment
 {
@@ -94,6 +96,7 @@ PUT _ingest/pipeline/attachment
   ]
 }
 --------------------------------------------------
+// CONSOLE
 
 NOTE: Extracting contents from binary data is a resource intensive operation and
       consumes a lot of resources. It is highly recommended to run pipelines
@@ -112,7 +115,7 @@ setting.
 
 For example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/attachment
 {
@@ -133,14 +136,16 @@ PUT my_index/_doc/my_id?pipeline=attachment
 }
 GET my_index/_doc/my_id
 --------------------------------------------------
+// CONSOLE
 
 Returns this:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "found": true,
   "_index": "my_index",
+  "_type": "_doc",
   "_id": "my_id",
   "_version": 1,
   "_seq_no": 35,
@@ -159,7 +164,7 @@ Returns this:
 // TESTRESPONSE[s/"_seq_no": \d+/"_seq_no" : $body._seq_no/ s/"_primary_term" : 1/"_primary_term" : $body._primary_term/]
 
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/attachment
 {
@@ -181,14 +186,16 @@ PUT my_index/_doc/my_id_2?pipeline=attachment
 }
 GET my_index/_doc/my_id_2
 --------------------------------------------------
+// CONSOLE
 
 Returns this:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "found": true,
   "_index": "my_index",
+  "_type": "_doc",
   "_id": "my_id_2",
   "_version": 1,
   "_seq_no": 40,
@@ -240,7 +247,7 @@ of the attachments field and insert
 the properties into the document so the following `foreach`
 processor is used:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/attachment
 {
@@ -274,13 +281,14 @@ PUT my_index/_doc/my_id?pipeline=attachment
 }
 GET my_index/_doc/my_id
 --------------------------------------------------
+// CONSOLE
 
 Returns this:
-
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "_index" : "my_index",
+  "_type" : "_doc",
   "_id" : "my_id",
   "_version" : 1,
   "_seq_no" : 50,

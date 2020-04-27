@@ -19,7 +19,6 @@
 package org.elasticsearch.common;
 
 import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.Version;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
@@ -164,19 +163,6 @@ public abstract class Rounding implements Writeable {
      */
     public abstract long nextRoundingValue(long value);
 
-    /**
-     * How "offset" this rounding is from the traditional "start" of the period.
-     * @deprecated We're in the process of abstracting offset *into* Rounding
-     *             so keep any usage to migratory shims
-     */
-    @Deprecated
-    public abstract long offset();
-
-    /**
-     * Strip the {@code offset} from these bounds.
-     */
-    public abstract Rounding withoutOffset();
-
     @Override
     public abstract boolean equals(Object obj);
 
@@ -197,7 +183,6 @@ public abstract class Rounding implements Writeable {
         private final long interval;
 
         private ZoneId timeZone = ZoneOffset.UTC;
-        private long offset = 0;
 
         public Builder(DateTimeUnit unit) {
             this.unit = unit;
@@ -219,59 +204,35 @@ public abstract class Rounding implements Writeable {
             return this;
         }
 
-        /**
-         * Sets the offset of this rounding from the normal beginning of the interval. Use this
-         * to start days at 6am or months on the 15th.
-         * @param offset the offset, in milliseconds
-         */
-        public Builder offset(long offset) {
-            this.offset = offset;
-            return this;
-        }
-
-
         public Rounding build() {
-            Rounding rounding;
+            Rounding timeZoneRounding;
             if (unit != null) {
-                rounding = new TimeUnitRounding(unit, timeZone);
+                timeZoneRounding = new TimeUnitRounding(unit, timeZone);
             } else {
-                rounding = new TimeIntervalRounding(interval, timeZone);
+                timeZoneRounding = new TimeIntervalRounding(interval, timeZone);
             }
-            if (offset != 0) {
-                rounding = new OffsetRounding(rounding, offset);
-            }
-            return rounding;
+            return timeZoneRounding;
         }
     }
 
     static class TimeUnitRounding extends Rounding {
 
         static final byte ID = 1;
-        /** Since, there is no offset of -1 ms, it is safe to use -1 for non-fixed timezones */
-        static final long TZ_OFFSET_NON_FIXED = -1;
 
         private final DateTimeUnit unit;
         private final ZoneId timeZone;
         private final boolean unitRoundsToMidnight;
-        /** For fixed offset time zones, this is the offset in milliseconds, otherwise TZ_OFFSET_NON_FIXED */
-        private final long fixedOffsetMillis;
+        private final boolean isUtcTimeZone;
 
         TimeUnitRounding(DateTimeUnit unit, ZoneId timeZone) {
             this.unit = unit;
             this.timeZone = timeZone;
             this.unitRoundsToMidnight = this.unit.field.getBaseUnit().getDuration().toMillis() > 3600000L;
-            this.fixedOffsetMillis = timeZone.getRules().isFixedOffset() ?
-                timeZone.getRules().getOffset(Instant.EPOCH).getTotalSeconds() * 1000 : TZ_OFFSET_NON_FIXED;
+            this.isUtcTimeZone = timeZone.normalized().equals(ZoneOffset.UTC);
         }
 
         TimeUnitRounding(StreamInput in) throws IOException {
-            this(DateTimeUnit.resolve(in.readByte()), in.readZoneId());
-        }
-
-        @Override
-        public void innerWriteTo(StreamOutput out) throws IOException {
-            out.writeByte(unit.getId());
-            out.writeZoneId(timeZone);
+            this(DateTimeUnit.resolve(in.readByte()), DateUtils.of(in.readString()));
         }
 
         @Override
@@ -315,12 +276,11 @@ public abstract class Rounding implements Writeable {
 
         @Override
         public long round(long utcMillis) {
-            // This works as long as the tz offset doesn't change. It is worth getting this case out of the way first,
-            // as the calculations for fixing things near to offset changes are a little expensive and unnecessary
-            // in the common case of working with fixed offset timezones (such as UTC).
-            if (fixedOffsetMillis != TZ_OFFSET_NON_FIXED) {
-                long localMillis = utcMillis + fixedOffsetMillis;
-                return unit.roundFloor(localMillis) - fixedOffsetMillis;
+            // this works as long as the offset doesn't change.  It is worth getting this case out of the way first, as
+            // the calculations for fixing things near to offset changes are a little expensive and are unnecessary in the common case
+            // of working in UTC.
+            if (isUtcTimeZone) {
+                return unit.roundFloor(utcMillis);
             }
 
             Instant instant = Instant.ofEpochMilli(utcMillis);
@@ -434,13 +394,9 @@ public abstract class Rounding implements Writeable {
         }
 
         @Override
-        public long offset() {
-            return 0;
-        }
-
-        @Override
-        public Rounding withoutOffset() {
-            return this;
+        public void innerWriteTo(StreamOutput out) throws IOException {
+            out.writeByte(unit.getId());
+            out.writeString(timeZone.getId());
         }
 
         @Override
@@ -462,37 +418,34 @@ public abstract class Rounding implements Writeable {
 
         @Override
         public String toString() {
-            return "Rounding[" + unit + " in " + timeZone + "]";
+            return "[" + timeZone + "][" + unit + "]";
         }
     }
 
     static class TimeIntervalRounding extends Rounding {
+        @Override
+        public String toString() {
+            return "TimeIntervalRounding{" +
+                "interval=" + interval +
+                ", timeZone=" + timeZone +
+                '}';
+        }
+
         static final byte ID = 2;
-        /** Since, there is no offset of -1 ms, it is safe to use -1 for non-fixed timezones */
-        private static final long TZ_OFFSET_NON_FIXED = -1;
 
         private final long interval;
         private final ZoneId timeZone;
-        /** For fixed offset timezones, this is the offset in milliseconds, otherwise TZ_OFFSET_NON_FIXED */
-        private final long fixedOffsetMillis;
 
         TimeIntervalRounding(long interval, ZoneId timeZone) {
             if (interval < 1)
                 throw new IllegalArgumentException("Zero or negative time interval not supported");
             this.interval = interval;
             this.timeZone = timeZone;
-            this.fixedOffsetMillis = timeZone.getRules().isFixedOffset() ?
-                timeZone.getRules().getOffset(Instant.EPOCH).getTotalSeconds() * 1000 : TZ_OFFSET_NON_FIXED;
         }
 
         TimeIntervalRounding(StreamInput in) throws IOException {
-            this(in.readVLong(), in.readZoneId());
-        }
-
-        @Override
-        public void innerWriteTo(StreamOutput out) throws IOException {
-            out.writeVLong(interval);
-            out.writeZoneId(timeZone);
+            interval = in.readVLong();
+            timeZone = DateUtils.of(in.readString());
         }
 
         @Override
@@ -502,14 +455,6 @@ public abstract class Rounding implements Writeable {
 
         @Override
         public long round(final long utcMillis) {
-            // This works as long as the tz offset doesn't change. It is worth getting this case out of the way first,
-            // as the calculations for fixing things near to offset changes are a little expensive and unnecessary
-            // in the common case of working with fixed offset timezones (such as UTC).
-            if (fixedOffsetMillis != TZ_OFFSET_NON_FIXED) {
-                long localMillis = utcMillis + fixedOffsetMillis;
-                return (roundKey(localMillis, interval) * interval) - fixedOffsetMillis;
-            }
-
             final Instant utcInstant = Instant.ofEpochMilli(utcMillis);
             final LocalDateTime rawLocalDateTime = LocalDateTime.ofInstant(utcInstant, timeZone);
 
@@ -570,13 +515,9 @@ public abstract class Rounding implements Writeable {
         }
 
         @Override
-        public long offset() {
-            return 0;
-        }
-
-        @Override
-        public Rounding withoutOffset() {
-            return this;
+        public void innerWriteTo(StreamOutput out) throws IOException {
+            out.writeVLong(interval);
+            out.writeString(timeZone.getId());
         }
 
         @Override
@@ -595,95 +536,21 @@ public abstract class Rounding implements Writeable {
             TimeIntervalRounding other = (TimeIntervalRounding) obj;
             return Objects.equals(interval, other.interval) && Objects.equals(timeZone, other.timeZone);
         }
-
-        @Override
-        public String toString() {
-            return "Rounding[" + interval + " in " + timeZone + "]";
-        }
-    }
-
-    static class OffsetRounding extends Rounding {
-        static final byte ID = 3;
-
-        private final Rounding delegate;
-        private final long offset;
-
-        OffsetRounding(Rounding delegate, long offset) {
-            this.delegate = delegate;
-            this.offset = offset;
-        }
-
-        OffsetRounding(StreamInput in) throws IOException {
-            // Versions before 7.6.0 will never send this type of rounding.
-            delegate = Rounding.read(in);
-            offset = in.readZLong();
-        }
-
-        @Override
-        public void innerWriteTo(StreamOutput out) throws IOException {
-            if (out.getVersion().before(Version.V_7_6_0)) {
-                throw new IllegalArgumentException("Offset rounding not supported before 7.6.0");
-            }
-            delegate.writeTo(out);
-            out.writeZLong(offset);
-        }
-
-        @Override
-        public byte id() {
-            return ID;
-        }
-
-        @Override
-        public long round(long value) {
-            return delegate.round(value - offset) + offset;
-        }
-
-        @Override
-        public long nextRoundingValue(long value) {
-            return delegate.nextRoundingValue(value - offset) + offset;
-        }
-
-        @Override
-        public long offset() {
-            return offset;
-        }
-
-        @Override
-        public Rounding withoutOffset() {
-            return delegate;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(delegate, offset);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null || getClass() != obj.getClass()) {
-                return false;
-            }
-            OffsetRounding other = (OffsetRounding) obj;
-            return delegate.equals(other.delegate) && offset == other.offset;
-        }
-
-        @Override
-        public String toString() {
-            return delegate + " offset by " + offset;
-        }
     }
 
     public static Rounding read(StreamInput in) throws IOException {
+        Rounding rounding;
         byte id = in.readByte();
         switch (id) {
             case TimeUnitRounding.ID:
-                return new TimeUnitRounding(in);
+                rounding = new TimeUnitRounding(in);
+                break;
             case TimeIntervalRounding.ID:
-                return new TimeIntervalRounding(in);
-            case OffsetRounding.ID:
-                return new OffsetRounding(in);
+                rounding = new TimeIntervalRounding(in);
+                break;
             default:
                 throw new ElasticsearchException("unknown rounding id [" + id + "]");
         }
+        return rounding;
     }
 }

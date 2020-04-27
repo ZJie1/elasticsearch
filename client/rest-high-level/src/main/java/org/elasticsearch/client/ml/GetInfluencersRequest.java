@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.core.PageParams;
 import org.elasticsearch.client.ml.job.config.Job;
 import org.elasticsearch.common.ParseField;
@@ -32,7 +33,7 @@ import java.util.Objects;
 /**
  * A request to retrieve influencers of a given job
  */
-public class GetInfluencersRequest implements Validatable, ToXContentObject {
+public class GetInfluencersRequest extends ActionRequest implements ToXContentObject {
 
     public static final ParseField EXCLUDE_INTERIM = new ParseField("exclude_interim");
     public static final ParseField START = new ParseField("start");
@@ -164,6 +165,11 @@ public class GetInfluencersRequest implements Validatable, ToXContentObject {
      */
     public void setDescending(Boolean descending) {
         this.descending = descending;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

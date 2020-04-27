@@ -29,11 +29,13 @@ import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.IndexNotFoundException;
+import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.test.ESIntegTestCase;
@@ -42,11 +44,11 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_BLOCKS_METADATA;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_BLOCKS_READ;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_BLOCKS_WRITE;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_READ_ONLY;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_READ_ONLY_ALLOW_DELETE;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_BLOCKS_METADATA;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_BLOCKS_READ;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_BLOCKS_WRITE;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_READ_ONLY;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_READ_ONLY_ALLOW_DELETE;
 import static org.elasticsearch.indices.state.CloseIndexIT.assertIndexIsClosed;
 import static org.elasticsearch.indices.state.CloseIndexIT.assertIndexIsOpened;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
@@ -248,36 +250,38 @@ public class OpenCloseIndexIT extends ESIntegTestCase {
     public void testOpenWaitingForActiveShardsFailed() throws Exception {
         Client client = client();
         Settings settings = Settings.builder()
-            .put(IndexMetadata.INDEX_NUMBER_OF_SHARDS_SETTING.getKey(), 1)
-            .put(IndexMetadata.INDEX_NUMBER_OF_REPLICAS_SETTING.getKey(), 0)
+            .put(IndexMetaData.INDEX_NUMBER_OF_SHARDS_SETTING.getKey(), 1)
+            .put(IndexMetaData.INDEX_NUMBER_OF_REPLICAS_SETTING.getKey(), 0)
             .build();
         assertAcked(client.admin().indices().prepareCreate("test").setSettings(settings).get());
         assertAcked(client.admin().indices().prepareClose("test").get());
 
         OpenIndexResponse response = client.admin().indices().prepareOpen("test").setTimeout("100ms").setWaitForActiveShards(2).get();
         assertThat(response.isShardsAcknowledged(), equalTo(false));
-        assertBusy(() -> assertThat(client.admin().cluster().prepareState().get().getState().metadata().index("test").getState(),
-            equalTo(IndexMetadata.State.OPEN)));
+        assertBusy(() -> assertThat(client.admin().cluster().prepareState().get().getState().metaData().index("test").getState(),
+            equalTo(IndexMetaData.State.OPEN)));
         ensureGreen("test");
     }
 
     public void testOpenCloseWithDocs() throws IOException, ExecutionException, InterruptedException {
         String mapping = Strings.toString(XContentFactory.jsonBuilder().
                 startObject().
+                startObject("type").
                 startObject("properties").
                 startObject("test")
                 .field("type", "keyword")
-                .endObject()
-                .endObject()
+                .endObject().
+                        endObject().
+                        endObject()
                 .endObject());
 
         assertAcked(client().admin().indices().prepareCreate("test")
-                .setMapping(mapping));
+                .addMapping("type", mapping, XContentType.JSON));
         ensureGreen();
         int docs = between(10, 100);
         IndexRequestBuilder[] builder = new IndexRequestBuilder[docs];
         for (int i = 0; i < docs ; i++) {
-            builder[i] = client().prepareIndex("test").setId("" + i).setSource("test", "init");
+            builder[i] = client().prepareIndex("test", "type", "" + i).setSource("test", "init");
         }
         indexRandom(true, builder);
         if (randomBoolean()) {
@@ -299,7 +303,7 @@ public class OpenCloseIndexIT extends ESIntegTestCase {
 
         int docs = between(10, 100);
         for (int i = 0; i < docs ; i++) {
-            client().prepareIndex("test").setId("" + i).setSource("test", "init").execute().actionGet();
+            client().prepareIndex("test", "type", "" + i).setSource("test", "init").execute().actionGet();
         }
 
         for (String blockSetting : Arrays.asList(SETTING_BLOCKS_READ, SETTING_BLOCKS_WRITE)) {
@@ -351,13 +355,15 @@ public class OpenCloseIndexIT extends ESIntegTestCase {
     public void testTranslogStats() throws Exception {
         final String indexName = "test";
         createIndex(indexName, Settings.builder()
-            .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 0)
+            .put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, 0)
             .build());
+        boolean softDeletesEnabled = IndexSettings.INDEX_SOFT_DELETES_SETTING.get(
+            client().admin().indices().prepareGetSettings(indexName).get().getIndexToSettings().get(indexName));
 
         final int nbDocs = randomIntBetween(0, 50);
         int uncommittedOps = 0;
         for (long i = 0; i < nbDocs; i++) {
-            final IndexResponse indexResponse = client().prepareIndex(indexName).setId(Long.toString(i)).setSource("field", i).get();
+            final IndexResponse indexResponse = client().prepareIndex(indexName, "_doc", Long.toString(i)).setSource("field", i).get();
             assertThat(indexResponse.status(), is(RestStatus.CREATED));
 
             if (rarely()) {
@@ -372,8 +378,8 @@ public class OpenCloseIndexIT extends ESIntegTestCase {
         assertBusy(() -> {
             IndicesStatsResponse stats = client().admin().indices().prepareStats(indexName).clear().setTranslog(true).get();
             assertThat(stats.getIndex(indexName), notNullValue());
-            assertThat(stats.getIndex(indexName).getPrimaries().getTranslog().estimatedNumberOfOperations(),
-                equalTo(uncommittedTranslogOps));
+            assertThat(stats.getIndex(indexName).getPrimaries().getTranslog().estimatedNumberOfOperations(), equalTo(
+                softDeletesEnabled ? uncommittedTranslogOps : nbDocs));
             assertThat(stats.getIndex(indexName).getPrimaries().getTranslog().getUncommittedOperations(), equalTo(uncommittedTranslogOps));
         });
 
@@ -383,7 +389,8 @@ public class OpenCloseIndexIT extends ESIntegTestCase {
         IndicesStatsResponse stats = client().admin().indices().prepareStats(indexName).setIndicesOptions(indicesOptions)
             .clear().setTranslog(true).get();
         assertThat(stats.getIndex(indexName), notNullValue());
-        assertThat(stats.getIndex(indexName).getPrimaries().getTranslog().estimatedNumberOfOperations(), equalTo(0));
+        assertThat(stats.getIndex(indexName).getPrimaries().getTranslog().estimatedNumberOfOperations(),
+            equalTo(softDeletesEnabled ? 0 : nbDocs));
         assertThat(stats.getIndex(indexName).getPrimaries().getTranslog().getUncommittedOperations(), equalTo(0));
     }
 }

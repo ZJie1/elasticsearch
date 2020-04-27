@@ -27,15 +27,9 @@ public class RealmConfig {
         this.identifier = identifier;
         this.settings = settings;
         this.env = env;
-        this.threadContext = threadContext;
         this.enabled = getSetting(RealmSettings.ENABLED_SETTING);
-        if (false == hasSetting(RealmSettings.ORDER_SETTING.apply(type()))) {
-            throw new IllegalArgumentException("'order' is a mandatory parameter for realm config. " +
-                "Found invalid config for realm: '" + identifier.name + "'\n" +
-                "Please see the breaking changes documentation."
-            );
-        }
         this.order = getSetting(RealmSettings.ORDER_SETTING);
+        this.threadContext = threadContext;
     }
 
     public RealmIdentifier identifier() {

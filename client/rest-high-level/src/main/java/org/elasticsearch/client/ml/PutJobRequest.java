@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.job.config.Job;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.xcontent.ToXContentObject;
@@ -30,7 +31,7 @@ import java.util.Objects;
 /**
  * Request to create a new Machine Learning Job given a {@link Job} configuration
  */
-public class PutJobRequest implements Validatable, ToXContentObject {
+public class PutJobRequest extends ActionRequest implements ToXContentObject {
 
     private final Job job;
 
@@ -76,4 +77,8 @@ public class PutJobRequest implements Validatable, ToXContentObject {
         return Strings.toString(this);
     }
 
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
+    }
 }

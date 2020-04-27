@@ -3,9 +3,8 @@
 :request: StopWatchServiceRequest
 :response: StopWatchServiceResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
-=== Stop watch service API
+=== Stop Watch Service API
 
 [[java-rest-high-watcher-stop-watch-service-execution]]
 ==== Execution

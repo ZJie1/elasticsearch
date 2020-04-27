@@ -34,7 +34,6 @@ import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.index.SegmentInfos;
-import org.apache.lucene.index.ShuffleForcedMergePolicy;
 import org.apache.lucene.index.StandardDirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.DocIdSetIterator;
@@ -58,7 +57,7 @@ public class RecoverySourcePruneMergePolicyTests extends ESTestCase {
             IndexWriterConfig iwc = newIndexWriterConfig();
             RecoverySourcePruneMergePolicy mp = new RecoverySourcePruneMergePolicy("extra_source", MatchNoDocsQuery::new,
                 newLogMergePolicy());
-            iwc.setMergePolicy(new ShuffleForcedMergePolicy(mp));
+            iwc.setMergePolicy(mp);
             try (IndexWriter writer = new IndexWriter(dir, iwc)) {
                 for (int i = 0; i < 20; i++) {
                     if (i > 0 && randomBoolean()) {

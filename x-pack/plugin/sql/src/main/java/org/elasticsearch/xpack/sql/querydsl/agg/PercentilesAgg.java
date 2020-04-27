@@ -6,31 +6,29 @@
 package org.elasticsearch.xpack.sql.querydsl.agg;
 
 import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.metrics.PercentilesAggregationBuilder;
-import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
 
 import java.util.List;
-import java.util.function.Function;
 
-public class PercentilesAgg extends DefaultAggSourceLeafAgg {
+import static org.elasticsearch.search.aggregations.AggregationBuilders.percentiles;
+
+public class PercentilesAgg extends LeafAgg {
 
     private final List<Double> percents;
 
-    public PercentilesAgg(String id, AggSource source, List<Double> percents) {
-        super(id, source);
+    public PercentilesAgg(String id, String fieldName, List<Double> percents) {
+        super(id, fieldName);
         this.percents = percents;
     }
-    
-    @Override
-    AggregationBuilder toBuilder() {
-        // TODO: look at keyed
-        PercentilesAggregationBuilder builder = (PercentilesAggregationBuilder) super.toBuilder();
-        return builder.percentiles(percents.stream().mapToDouble(Double::doubleValue).toArray());
+
+    public List<Double> percents() {
+        return percents;
     }
 
     @Override
-    Function<String, ValuesSourceAggregationBuilder<?>> builder() {
-        return AggregationBuilders::percentiles;
+    AggregationBuilder toBuilder() {
+        // TODO: look at keyed
+        return percentiles(id())
+                .field(fieldName())
+                .percentiles(percents.stream().mapToDouble(Double::doubleValue).toArray());
     }
 }

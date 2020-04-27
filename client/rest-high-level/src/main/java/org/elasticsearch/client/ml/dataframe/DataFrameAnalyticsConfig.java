@@ -20,7 +20,7 @@
 package org.elasticsearch.client.ml.dataframe;
 
 import org.elasticsearch.Version;
-import org.elasticsearch.client.common.TimeUtil;
+import org.elasticsearch.client.dataframe.transforms.util.TimeUtil;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.Strings;
@@ -56,9 +56,8 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
     private static final ParseField MODEL_MEMORY_LIMIT = new ParseField("model_memory_limit");
     private static final ParseField CREATE_TIME = new ParseField("create_time");
     private static final ParseField VERSION = new ParseField("version");
-    private static final ParseField ALLOW_LAZY_START = new ParseField("allow_lazy_start");
 
-    private static final ObjectParser<Builder, Void> PARSER = new ObjectParser<>("data_frame_analytics_config", true, Builder::new);
+    private static ObjectParser<Builder, Void> PARSER = new ObjectParser<>("data_frame_analytics_config", true, Builder::new);
 
     static {
         PARSER.declareString(Builder::setId, ID);
@@ -87,7 +86,6 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
             },
             VERSION,
             ValueType.STRING);
-        PARSER.declareBoolean(Builder::setAllowLazyStart, ALLOW_LAZY_START);
     }
 
     private static DataFrameAnalysis parseAnalysis(XContentParser parser) throws IOException {
@@ -107,12 +105,11 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
     private final ByteSizeValue modelMemoryLimit;
     private final Instant createTime;
     private final Version version;
-    private final Boolean allowLazyStart;
 
     private DataFrameAnalyticsConfig(@Nullable String id, @Nullable String description, @Nullable DataFrameAnalyticsSource source,
                                      @Nullable DataFrameAnalyticsDest dest, @Nullable DataFrameAnalysis analysis,
                                      @Nullable FetchSourceContext analyzedFields, @Nullable ByteSizeValue modelMemoryLimit,
-                                     @Nullable Instant createTime, @Nullable Version version, @Nullable Boolean allowLazyStart) {
+                                     @Nullable Instant createTime, @Nullable Version version) {
         this.id = id;
         this.description = description;
         this.source = source;
@@ -122,7 +119,6 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
         this.modelMemoryLimit = modelMemoryLimit;
         this.createTime = createTime == null ? null : Instant.ofEpochMilli(createTime.toEpochMilli());;
         this.version = version;
-        this.allowLazyStart = allowLazyStart;
     }
 
     public String getId() {
@@ -161,10 +157,6 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
         return version;
     }
 
-    public Boolean getAllowLazyStart() {
-        return allowLazyStart;
-    }
-
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
@@ -198,9 +190,6 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
         if (version != null) {
             builder.field(VERSION.getPreferredName(), version);
         }
-        if (allowLazyStart != null) {
-            builder.field(ALLOW_LAZY_START.getPreferredName(), allowLazyStart);
-        }
         builder.endObject();
         return builder;
     }
@@ -219,13 +208,12 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
             && Objects.equals(analyzedFields, other.analyzedFields)
             && Objects.equals(modelMemoryLimit, other.modelMemoryLimit)
             && Objects.equals(createTime, other.createTime)
-            && Objects.equals(version, other.version)
-            && Objects.equals(allowLazyStart, other.allowLazyStart);
+            && Objects.equals(version, other.version);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, description, source, dest, analysis, analyzedFields, modelMemoryLimit, createTime, version, allowLazyStart);
+        return Objects.hash(id, description, source, dest, analysis, analyzedFields, modelMemoryLimit, createTime, version);
     }
 
     @Override
@@ -244,7 +232,6 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
         private ByteSizeValue modelMemoryLimit;
         private Instant createTime;
         private Version version;
-        private Boolean allowLazyStart;
 
         private Builder() {}
 
@@ -283,24 +270,19 @@ public class DataFrameAnalyticsConfig implements ToXContentObject {
             return this;
         }
 
-        Builder setCreateTime(Instant createTime) {
+        public Builder setCreateTime(Instant createTime) {
             this.createTime = createTime;
             return this;
         }
 
-        Builder setVersion(Version version) {
+        public Builder setVersion(Version version) {
             this.version = version;
-            return this;
-        }
-
-        public Builder setAllowLazyStart(Boolean allowLazyStart) {
-            this.allowLazyStart = allowLazyStart;
             return this;
         }
 
         public DataFrameAnalyticsConfig build() {
             return new DataFrameAnalyticsConfig(id, description, source, dest, analysis, analyzedFields, modelMemoryLimit, createTime,
-                version, allowLazyStart);
+                version);
         }
     }
 }

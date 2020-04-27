@@ -1,17 +1,18 @@
 [[indices-exists]]
-=== Index exists API
+=== Indices exists API
 ++++
-<titleabbrev>Index exists</titleabbrev>
+<titleabbrev>Indices exists</titleabbrev>
 ++++
 
 Checks if an index exists.
 The returned HTTP status code indicates if the index exists or not.
 A `404` means it does not exist, and `200` means it does.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 HEAD /twitter
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 
@@ -34,8 +35,6 @@ i.e. status code `200` is also returned if an alias exists with that name.
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `true`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +

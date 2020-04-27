@@ -7,6 +7,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -27,6 +28,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -59,6 +61,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -91,6 +94,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -112,6 +116,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -132,11 +137,13 @@ setup:
   - do:
       index:
         index:        source
+        type:         tweet
         id:           1
         body:         { "user": "kimchy" }
   - do:
       index:
         index:        source
+        type:         tweet
         id:           2
         body:         { "user": "another" }
   - do:
@@ -177,11 +184,13 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
       index:
         index:   source
+        type:    foo
         id:      2
         body:    { "text": "test", "hidden": true }
   - do:
@@ -226,6 +235,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test", "foo": "z", "bar": "z" }
   - do:
@@ -278,6 +288,7 @@ setup:
   - do:
       index:
         index:   dest
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -298,6 +309,7 @@ setup:
   - do:
       index:
         index:   dest
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:
@@ -318,6 +330,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    foo
         id:      1
         body:    { "text": "test" }
   - do:

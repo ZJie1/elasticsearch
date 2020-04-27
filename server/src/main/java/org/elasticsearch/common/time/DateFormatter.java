@@ -149,6 +149,6 @@ public interface DateFormatter {
             return formatters.get(0);
         }
 
-        return JavaDateFormatter.combined(input, formatters);
+        return DateFormatters.merge(input, formatters);
     }
 }

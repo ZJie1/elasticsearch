@@ -19,52 +19,62 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.NullNode;
+import org.elasticsearch.painless.MethodWriter;
 import org.elasticsearch.painless.lookup.PainlessLookupUtility;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.objectweb.asm.Opcodes;
+
+import java.util.Set;
 
 /**
  * Represents a null constant.
  */
-public class ENull extends AExpression {
+public final class ENull extends AExpression {
 
     public ENull(Location location) {
         super(location);
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException("invalid assignment: cannot assign a value to null constant"));
+    void storeSettings(CompilerSettings settings) {
+        // do nothing
+    }
+
+    @Override
+    void extractVariables(Set<String> variables) {
+        // Do nothing.
+    }
+
+    @Override
+    void analyze(Locals locals) {
+        if (!read) {
+            throw createError(new IllegalArgumentException("Must read from null constant."));
         }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException("not a statement: null constant not used"));
-        }
+        isNull = true;
 
-        Output output = new Output();
-
-        if (input.expected != null) {
-            if (input.expected.isPrimitive()) {
+        if (expected != null) {
+            if (expected.isPrimitive()) {
                 throw createError(new IllegalArgumentException(
-                    "Cannot cast null to a primitive type [" + PainlessLookupUtility.typeToCanonicalTypeName(input.expected) + "]."));
+                    "Cannot cast null to a primitive type [" + PainlessLookupUtility.typeToCanonicalTypeName(expected) + "]."));
             }
 
-            output.actual = input.expected;
+            actual = expected;
         } else {
-            output.actual = Object.class;
+            actual = Object.class;
         }
+    }
 
-        NullNode nullNode = new NullNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.visitInsn(Opcodes.ACONST_NULL);
+    }
 
-        nullNode.setLocation(location);
-        nullNode.setExpressionType(output.actual);
-
-        output.expressionNode = nullNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString();
     }
 }

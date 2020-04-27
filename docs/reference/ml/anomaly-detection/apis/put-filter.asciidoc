@@ -18,21 +18,20 @@ Instantiates a filter.
 
 * If the {es} {security-features} are enabled, you must have `manage_ml` or
 `manage` cluster privileges to use this API. See
-<<security-privileges>>.
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ml-put-filter-desc]]
 ==== {api-description-title}
 
-A {ml-docs}/ml-rules.html[filter] contains a list of strings. 
+A {stack-ov}/ml-rules.html[filter] contains a list of strings. 
 It can be used by one or more jobs. Specifically, filters are referenced in 
-the `custom_rules` property of detector configuration objects. 
+the `custom_rules` property of <<ml-detectorconfig,detector configuration objects>>. 
 
 [[ml-put-filter-path-parms]]
 ==== {api-path-parms-title}
 
 `<filter_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=filter-id]
+  (Required, string) Identifier for the filter.
 
 [[ml-put-filter-request-body]]
 ==== {api-request-body-title}
@@ -48,7 +47,9 @@ include::{docdir}/ml/ml-shared.asciidoc[tag=filter-id]
 [[ml-put-filter-example]]
 ==== {api-examples-title}
 
-[source,console]
+The following example creates the `safe_domains` filter:
+
+[source,js]
 --------------------------------------------------
 PUT _ml/filters/safe_domains
 {
@@ -56,11 +57,11 @@ PUT _ml/filters/safe_domains
   "items": ["*.google.com", "wikipedia.org"]
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:need-licence]
 
 When the filter is created, you receive the following response:
-
-[source,console-result]
+[source,js]
 ----
 {
   "filter_id": "safe_domains",
@@ -68,3 +69,4 @@ When the filter is created, you receive the following response:
   "items": ["*.google.com", "wikipedia.org"]
 }
 ----
+// TESTRESPONSE

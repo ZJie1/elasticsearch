@@ -31,7 +31,6 @@ import java.util.Optional;
 public class DeleteDataFrameAnalyticsRequest implements Validatable {
 
     private final String id;
-    private Boolean force;
 
     public DeleteDataFrameAnalyticsRequest(String id) {
         this.id = id;
@@ -39,20 +38,6 @@ public class DeleteDataFrameAnalyticsRequest implements Validatable {
 
     public String getId() {
         return id;
-    }
-
-    public Boolean getForce() {
-        return force;
-    }
-
-    /**
-     * Used to forcefully delete an job that is not stopped.
-     * This method is quicker than stopping and deleting the job.
-     *
-     * @param force When {@code true} forcefully delete a non stopped job. Defaults to {@code false}
-     */
-    public void setForce(Boolean force) {
-        this.force = force;
     }
 
     @Override
@@ -69,11 +54,11 @@ public class DeleteDataFrameAnalyticsRequest implements Validatable {
         if (o == null || getClass() != o.getClass()) return false;
 
         DeleteDataFrameAnalyticsRequest other = (DeleteDataFrameAnalyticsRequest) o;
-        return Objects.equals(id, other.id) && Objects.equals(force, other.force);
+        return Objects.equals(id, other.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, force);
+        return Objects.hash(id);
     }
 }

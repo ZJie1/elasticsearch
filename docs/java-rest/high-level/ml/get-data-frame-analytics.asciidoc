@@ -3,31 +3,30 @@
 :request: GetDataFrameAnalyticsRequest
 :response: GetDataFrameAnalyticsResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
-=== Get {dfanalytics-jobs} API
+=== Get Data Frame Analytics API
 
-Retrieves one or more {dfanalytics-jobs}.
+The Get Data Frame Analytics API is used to get one or more {dataframe-analytics-config}s.
 The API accepts a +{request}+ object and returns a +{response}+.
 
 [id="{upid}-{api}-request"]
-==== Get {dfanalytics-jobs} request
+==== Get Data Frame Analytics Request
 
-A +{request}+ requires either a {dfanalytics-job} ID, a comma-separated list of
-IDs, or the special wildcard `_all` to get all {dfanalytics-jobs}.
+A +{request}+ requires either a {dataframe-analytics-config} id, a comma separated list of ids or
+the special wildcard `_all` to get all {dataframe-analytics-config}s.
 
 ["source","java",subs="attributes,callouts,macros"]
 --------------------------------------------------
 include-tagged::{doc-tests-file}[{api}-request]
 --------------------------------------------------
-<1> Constructing a new GET request referencing an existing {dfanalytics-job}
+<1> Constructing a new GET request referencing an existing {dataframe-analytics-config}
 
 include::../execution.asciidoc[]
 
 [id="{upid}-{api}-response"]
 ==== Response
 
-The returned +{response}+ contains the requested {dfanalytics-jobs}.
+The returned +{response}+ contains the requested {dataframe-analytics-config}s.
 
 ["source","java",subs="attributes,callouts,macros"]
 --------------------------------------------------

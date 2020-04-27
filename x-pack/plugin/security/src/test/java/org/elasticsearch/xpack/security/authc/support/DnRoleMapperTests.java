@@ -19,7 +19,6 @@ import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.watcher.ResourceWatcherService;
 import org.elasticsearch.xpack.core.security.audit.logfile.CapturingLogger;
 import org.elasticsearch.xpack.core.security.authc.RealmConfig;
-import org.elasticsearch.xpack.core.security.authc.RealmSettings;
 import org.elasticsearch.xpack.core.security.authc.support.DnRoleMapperSettings;
 import org.junit.After;
 import org.junit.Before;
@@ -90,10 +89,9 @@ public class DnRoleMapperTests extends ESTestCase {
         // writing in utf_16 should cause a parsing error as we try to read the file in utf_8
         Files.write(file, Collections.singletonList("aldlfkjldjdflkjd"), StandardCharsets.UTF_16);
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = createMapper(file, watcherService);
-            assertThat(mapper.mappingsCount(), is(0));
-        }
+        ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool);
+        DnRoleMapper mapper = createMapper(file, watcherService);
+        assertThat(mapper.mappingsCount(), is(0));
     }
 
     public void testMapper_AutoReload() throws Exception {
@@ -103,42 +101,31 @@ public class DnRoleMapperTests extends ESTestCase {
 
         final CountDownLatch latch = new CountDownLatch(1);
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = createMapper(file, watcherService);
-            mapper.addListener(latch::countDown);
+        ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool);
+        DnRoleMapper mapper = createMapper(file, watcherService);
+        mapper.addListener(latch::countDown);
 
-            Set<String> roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
-            assertThat(roles, notNullValue());
-            assertThat(roles.size(), is(1));
-            assertThat(roles, contains("security"));
+        Set<String> roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
+        assertThat(roles, notNullValue());
+        assertThat(roles.size(), is(1));
+        assertThat(roles, contains("security"));
 
-            try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.APPEND)) {
-                writer.append("\n");
-            }
+        watcherService.start();
 
-            watcherService.notifyNow(ResourceWatcherService.Frequency.HIGH);
-            if (latch.getCount() != 1) {
-                fail("Listener should not be called as roles mapping is not changed.");
-            }
-
-            roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
-            assertThat(roles, contains("security"));
-
-            try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.APPEND)) {
-                writer.newLine();
-                writer.append("fantastic_four:\n")
+        try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.APPEND)) {
+            writer.newLine();
+            writer.append("fantastic_four:\n")
                     .append("  - \"cn=fantastic_four,ou=marvel,o=superheros\"");
-            }
-
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                fail("Waited too long for the updated file to be picked up");
-            }
-
-            roles = mapper.resolveRoles("", Collections.singletonList("cn=fantastic_four,ou=marvel,o=superheros"));
-            assertThat(roles, notNullValue());
-            assertThat(roles.size(), is(1));
-            assertThat(roles, contains("fantastic_four"));
         }
+
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            fail("Waited too long for the updated file to be picked up");
+        }
+
+        roles = mapper.resolveRoles("", Collections.singletonList("cn=fantastic_four,ou=marvel,o=superheros"));
+        assertThat(roles, notNullValue());
+        assertThat(roles.size(), is(1));
+        assertThat(roles, contains("fantastic_four"));
     }
 
     public void testMapper_AutoReload_WithParseFailures() throws Exception {
@@ -148,24 +135,25 @@ public class DnRoleMapperTests extends ESTestCase {
 
         final CountDownLatch latch = new CountDownLatch(1);
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = createMapper(file, watcherService);
-            mapper.addListener(latch::countDown);
+        ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool);
+        DnRoleMapper mapper = createMapper(file, watcherService);
+        mapper.addListener(latch::countDown);
 
-            Set<String> roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
-            assertThat(roles, notNullValue());
-            assertThat(roles.size(), is(1));
-            assertThat(roles, contains("security"));
+        Set<String> roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
+        assertThat(roles, notNullValue());
+        assertThat(roles.size(), is(1));
+        assertThat(roles, contains("security"));
 
-            // now replacing the content of the users file with something that cannot be read
-            Files.write(file, Collections.singletonList("aldlfkjldjdflkjd"), StandardCharsets.UTF_16);
+        watcherService.start();
 
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                fail("Waited too long for the updated file to be picked up");
-            }
+        // now replacing the content of the users file with something that cannot be read
+        Files.write(file, Collections.singletonList("aldlfkjldjdflkjd"), StandardCharsets.UTF_16);
 
-            assertThat(mapper.mappingsCount(), is(0));
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            fail("Waited too long for the updated file to be picked up");
         }
+
+        assertThat(mapper.mappingsCount(), is(0));
     }
 
     public void testMapperAutoReloadWithoutListener() throws Exception {
@@ -173,39 +161,37 @@ public class DnRoleMapperTests extends ESTestCase {
         Path file = env.configFile().resolve("test_role_mapping.yml");
         Files.copy(roleMappingFile, file, StandardCopyOption.REPLACE_EXISTING);
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = createMapper(file, watcherService);
-            Set<String> roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
-            assertThat(roles, notNullValue());
-            assertThat(roles.size(), is(1));
-            assertThat(roles, contains("security"));
+        ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool);
+        DnRoleMapper mapper = createMapper(file, watcherService);
+        Set<String> roles = mapper.resolveRoles("", Collections.singletonList("cn=shield,ou=marvel,o=superheros"));
+        assertThat(roles, notNullValue());
+        assertThat(roles.size(), is(1));
+        assertThat(roles, contains("security"));
 
-            try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.APPEND)) {
-                writer.newLine();
-                writer.append("fantastic_four:\n")
+        watcherService.start();
+
+        try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.APPEND)) {
+            writer.newLine();
+            writer.append("fantastic_four:\n")
                     .append("  - \"cn=fantastic_four,ou=marvel,o=superheros\"");
-            }
-
-            assertBusy(() -> {
-                Set<String> resolvedRoles = mapper.resolveRoles(
-                    "",
-                    Collections.singletonList("cn=fantastic_four,ou=marvel,o=superheros")
-                );
-                assertThat(resolvedRoles, notNullValue());
-                assertThat(resolvedRoles.size(), is(1));
-                assertThat(resolvedRoles, contains("fantastic_four"));
-            }, 2L, TimeUnit.SECONDS);
         }
+
+        assertBusy(() -> {
+            Set<String> resolvedRoles = mapper.resolveRoles("",
+                    Collections.singletonList("cn=fantastic_four,ou=marvel,o=superheros"));
+            assertThat(resolvedRoles, notNullValue());
+            assertThat(resolvedRoles.size(), is(1));
+            assertThat(resolvedRoles, contains("fantastic_four"));
+        }, 2L, TimeUnit.SECONDS);
     }
 
     public void testAddNullListener() throws Exception {
         Path file = env.configFile().resolve("test_role_mapping.yml");
         Files.write(file, Collections.singleton(""));
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = createMapper(file, watcherService);
-            NullPointerException e = expectThrows(NullPointerException.class, () -> mapper.addListener(null));
-            assertEquals("listener cannot be null", e.getMessage());
-        }
+        ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool);
+        DnRoleMapper mapper = createMapper(file, watcherService);
+        NullPointerException e = expectThrows(NullPointerException.class, () -> mapper.addListener(null));
+        assertEquals("listener cannot be null", e.getMessage());
     }
 
     public void testParseFile() throws Exception {
@@ -298,19 +284,16 @@ public class DnRoleMapperTests extends ESTestCase {
         Settings ldapSettings = Settings.builder()
             .put(settings)
             .put(getFullSettingKey(realmIdentifier, DnRoleMapperSettings.ROLE_MAPPING_FILE_SETTING), file.toAbsolutePath())
-            .put(getFullSettingKey(realmIdentifier, RealmSettings.ORDER_SETTING), 0)
             .build();
         RealmConfig config = new RealmConfig(realmIdentifier, ldapSettings,
                 TestEnvironment.newEnvironment(settings), new ThreadContext(Settings.EMPTY));
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = new DnRoleMapper(config, watcherService);
+        DnRoleMapper mapper = new DnRoleMapper(config, new ResourceWatcherService(settings, threadPool));
 
-            Set<String> roles = mapper.resolveRoles("", Arrays.asList(STARK_GROUP_DNS));
+        Set<String> roles = mapper.resolveRoles("", Arrays.asList(STARK_GROUP_DNS));
 
-            //verify
-            assertThat(roles, hasItems("security", "avenger"));
-        }
+        //verify
+        assertThat(roles, hasItems("security", "avenger"));
     }
 
     public void testRelativeDN() {
@@ -318,17 +301,14 @@ public class DnRoleMapperTests extends ESTestCase {
         Settings ldapSettings = Settings.builder()
                 .put(settings)
                 .put(getFullSettingKey(realmIdentifier, DnRoleMapperSettings.USE_UNMAPPED_GROUPS_AS_ROLES_SETTING), true)
-                .put(getFullSettingKey(realmIdentifier, RealmSettings.ORDER_SETTING), 0)
                 .build();
         RealmConfig config = new RealmConfig(realmIdentifier, ldapSettings,
                 TestEnvironment.newEnvironment(settings), new ThreadContext(Settings.EMPTY));
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = new DnRoleMapper(config, watcherService);
+        DnRoleMapper mapper = new DnRoleMapper(config, new ResourceWatcherService(settings, threadPool));
 
-            Set<String> roles = mapper.resolveRoles("", Arrays.asList(STARK_GROUP_DNS));
-            assertThat(roles, hasItems("genius", "billionaire", "playboy", "philanthropist", "shield", "avengers"));
-        }
+        Set<String> roles = mapper.resolveRoles("", Arrays.asList(STARK_GROUP_DNS));
+        assertThat(roles, hasItems("genius", "billionaire", "playboy", "philanthropist", "shield", "avengers"));
     }
 
     public void testUserDNMapping() throws Exception {
@@ -338,17 +318,14 @@ public class DnRoleMapperTests extends ESTestCase {
                 .put(settings)
                 .put(getFullSettingKey(realmIdentifier, DnRoleMapperSettings.ROLE_MAPPING_FILE_SETTING), file.toAbsolutePath())
                 .put(getFullSettingKey(realmIdentifier, DnRoleMapperSettings.USE_UNMAPPED_GROUPS_AS_ROLES_SETTING), false)
-                .put(getFullSettingKey(realmIdentifier, RealmSettings.ORDER_SETTING), 0)
                 .build();
         RealmConfig config = new RealmConfig(realmIdentifier, ldapSettings,
                 TestEnvironment.newEnvironment(settings), new ThreadContext(Settings.EMPTY));
 
-        try (ResourceWatcherService watcherService = new ResourceWatcherService(settings, threadPool)) {
-            DnRoleMapper mapper = new DnRoleMapper(config, watcherService);
+        DnRoleMapper mapper = new DnRoleMapper(config, new ResourceWatcherService(settings, threadPool));
 
-            Set<String> roles = mapper.resolveRoles("cn=Horatio Hornblower,ou=people,o=sevenSeas", Collections.emptyList());
-            assertThat(roles, hasItem("avenger"));
-        }
+        Set<String> roles = mapper.resolveRoles("cn=Horatio Hornblower,ou=people,o=sevenSeas", Collections.emptyList());
+        assertThat(roles, hasItem("avenger"));
     }
 
     protected DnRoleMapper createMapper(Path file, ResourceWatcherService watcherService) {
@@ -356,7 +333,6 @@ public class DnRoleMapperTests extends ESTestCase {
         Settings mergedSettings = Settings.builder()
                 .put(settings)
                 .put(getFullSettingKey(identifier, DnRoleMapperSettings.ROLE_MAPPING_FILE_SETTING), file.toAbsolutePath())
-                .put(getFullSettingKey(identifier, RealmSettings.ORDER_SETTING), 0)
                 .build();
         RealmConfig config = new RealmConfig(identifier, mergedSettings, env, new ThreadContext(Settings.EMPTY));
         return new DnRoleMapper(config, watcherService);

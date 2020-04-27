@@ -3,13 +3,16 @@
 [[sql-client-apps-dbvis]]
 === DbVisualizer
 
-You can use the {es} JDBC driver to access {es} data from DbVisualizer.
+[quote, http://www.dbvis.com/]
+____
+https://www.dbvis.com/[DbVisualizer] is a database management and analysis tool for all major databases.
+____
 
 IMPORTANT: Elastic does not endorse, promote or provide support for this application; for native Elasticsearch integration in this product, please reach out to its vendor.
 
 ==== Prerequisites
 
-* https://www.dbvis.com/[DbVisualizer] 10.0.21 or higher
+* DbVisualizer 10.0.21 or higher
 * {es-sql} <<sql-jdbc, JDBC driver>>
 
 ==== Add {es} JDBC driver

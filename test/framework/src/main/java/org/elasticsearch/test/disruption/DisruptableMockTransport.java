@@ -168,7 +168,7 @@ public abstract class DisruptableMockTransport extends MockTransport {
     protected void onConnectedDuringSend(long requestId, String action, TransportRequest request,
                                          DisruptableMockTransport destinationTransport) {
         final RequestHandlerRegistry<TransportRequest> requestHandler =
-            destinationTransport.getRequestHandlers().getHandler(action);
+            destinationTransport.getRequestHandler(action);
 
         final DiscoveryNode destination = destinationTransport.getLocalNode();
 

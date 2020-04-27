@@ -1,3 +1,4 @@
+
 String distroConfig = System.getProperty('tests.local_distro.config')
 if (distroConfig != null) {
   // setup the test distribution as an artifact of this project

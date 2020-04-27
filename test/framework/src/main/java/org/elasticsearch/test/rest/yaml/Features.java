@@ -46,8 +46,7 @@ public final class Features {
             "yaml",
             "contains",
             "transform_and_set",
-            "arbitrary_key",
-            "allowed_warnings");
+            "arbitrary_key");
 
     private Features() {
 

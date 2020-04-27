@@ -7,7 +7,6 @@
 package org.elasticsearch.xpack.sql.qa.jdbc;
 
 import com.carrotsearch.hppc.IntObjectHashMap;
-
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.geometry.Geometry;
 import org.elasticsearch.geometry.Point;
@@ -18,7 +17,6 @@ import org.elasticsearch.xpack.sql.proto.StringUtils;
 import org.relique.jdbc.csv.CsvResultSet;
 
 import java.io.IOException;
-import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -39,9 +37,6 @@ import static java.sql.Types.INTEGER;
 import static java.sql.Types.REAL;
 import static java.sql.Types.SMALLINT;
 import static java.sql.Types.TINYINT;
-import static java.time.ZoneOffset.UTC;
-import static org.elasticsearch.xpack.sql.qa.jdbc.JdbcTestUtils.logResultSetMetaData;
-import static org.elasticsearch.xpack.sql.qa.jdbc.JdbcTestUtils.resultSetCurrentData;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertEquals;
@@ -96,23 +91,23 @@ public class JdbcAssert {
     public static void assertResultSets(ResultSet expected, ResultSet actual, Logger logger, boolean lenientDataType,
             boolean lenientFloatingNumbers) throws SQLException {
         try (ResultSet ex = expected; ResultSet ac = actual) {
-            assertResultSetMetaData(ex, ac, logger, lenientDataType);
+            assertResultSetMetadata(ex, ac, logger, lenientDataType);
             assertResultSetData(ex, ac, logger, lenientDataType, lenientFloatingNumbers);
         }
     }
 
-    public static void assertResultSetMetaData(ResultSet expected, ResultSet actual, Logger logger) throws SQLException {
-        assertResultSetMetaData(expected, actual, logger, false);
+    public static void assertResultSetMetadata(ResultSet expected, ResultSet actual, Logger logger) throws SQLException {
+        assertResultSetMetadata(expected, actual, logger, false);
     }
 
-    // MetaData doesn't consume a ResultSet thus it shouldn't close it
-    public static void assertResultSetMetaData(ResultSet expected, ResultSet actual, Logger logger, boolean lenientDataType)
+    // metadata doesn't consume a ResultSet thus it shouldn't close it
+    public static void assertResultSetMetadata(ResultSet expected, ResultSet actual, Logger logger, boolean lenientDataType)
             throws SQLException {
         ResultSetMetaData expectedMeta = expected.getMetaData();
         ResultSetMetaData actualMeta = actual.getMetaData();
 
         if (logger != null) {
-            logResultSetMetaData(actual, logger);
+            JdbcTestUtils.logResultSetMetadata(actual, logger);
         }
 
         if (expectedMeta.getColumnCount() != actualMeta.getColumnCount()) {
@@ -215,7 +210,7 @@ public class JdbcAssert {
                 assertTrue("Expected more data but no more entries found after [" + count + "]", actual.next());
 
                 if (logger != null) {
-                    logger.info(resultSetCurrentData(actual));
+                    logger.info(JdbcTestUtils.resultSetCurrentData(actual));
                 }
 
                 for (int column = 1; column <= columns; column++) {
@@ -225,7 +220,7 @@ public class JdbcAssert {
                         String columnClassName = metaData.getColumnClassName(column);
 
                         // fix for CSV which returns the shortName not fully-qualified name
-                        if (columnClassName != null && !columnClassName.contains(".")) {
+                        if (!columnClassName.contains(".")) {
                             switch (columnClassName) {
                                 case "Date":
                                     columnClassName = "java.sql.Date";
@@ -245,17 +240,13 @@ public class JdbcAssert {
                             }
                         }
 
-                        if (columnClassName != null) {
-                            expectedColumnClass = Class.forName(columnClassName);
-                        }
+                        expectedColumnClass = Class.forName(columnClassName);
                     } catch (ClassNotFoundException cnfe) {
                         throw new SQLException(cnfe);
                     }
 
                     Object expectedObject = expected.getObject(column);
-                    Object actualObject = (lenientDataType && expectedColumnClass != null)
-                            ? actual.getObject(column, expectedColumnClass)
-                            : actual.getObject(column);
+                    Object actualObject = lenientDataType ? actual.getObject(column, expectedColumnClass) : actual.getObject(column);
 
                     String msg = format(Locale.ROOT, "Different result for column [%s], entry [%d]",
                         metaData.getColumnName(column), count + 1);
@@ -272,10 +263,6 @@ public class JdbcAssert {
                     // then timestamp
                     else if (type == Types.TIMESTAMP || type == Types.TIMESTAMP_WITH_TIMEZONE) {
                         assertEquals(msg, expected.getTimestamp(column), actual.getTimestamp(column));
-                    }
-                    // then date
-                    else if (type == Types.DATE) {
-                        assertEquals(msg, convertDateToSystemTimezone(expected.getDate(column)), actual.getDate(column));
                     }
                     // and floats/doubles
                     else if (type == Types.DOUBLE) {
@@ -314,14 +301,14 @@ public class JdbcAssert {
         } catch (AssertionError ae) {
             if (logger != null && actual.next()) {
                 logger.info("^^^ Assertion failure ^^^");
-                logger.info(resultSetCurrentData(actual));
+                logger.info(JdbcTestUtils.resultSetCurrentData(actual));
             }
             throw ae;
         }
 
         if (actual.next()) {
             fail("Elasticsearch [" + actual + "] still has data after [" + count + "] entries:\n"
-                    + resultSetCurrentData(actual));
+                    + JdbcTestUtils.resultSetCurrentData(actual));
         }
     }
 
@@ -340,10 +327,5 @@ public class JdbcAssert {
         }
 
         return columnType;
-    }
-
-    // Used to convert the DATE read from CSV file to a java.sql.Date at the System's timezone (-Dtests.timezone=XXXX)
-    private static Date convertDateToSystemTimezone(Date date) {
-        return new Date(date.toLocalDate().atStartOfDay(UTC).toInstant().toEpochMilli());
     }
 }

@@ -19,40 +19,35 @@
 
 package org.elasticsearch.common.settings;
 
-import joptsimple.OptionSet;
-import joptsimple.OptionSpec;
-import org.elasticsearch.cli.ExitCodes;
-import org.elasticsearch.cli.Terminal;
-import org.elasticsearch.cli.UserException;
-import org.elasticsearch.common.CheckedFunction;
-import org.elasticsearch.env.Environment;
-
 import java.io.BufferedReader;
 import java.io.CharArrayWriter;
-import java.io.Closeable;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.List;
+
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+import org.elasticsearch.cli.EnvironmentAwareCommand;
+import org.elasticsearch.cli.ExitCodes;
+import org.elasticsearch.cli.Terminal;
+import org.elasticsearch.cli.UserException;
+import org.elasticsearch.env.Environment;
 
 /**
  * A subcommand for the keystore cli which adds a string setting.
  */
-class AddStringKeyStoreCommand extends BaseKeyStoreCommand {
+class AddStringKeyStoreCommand extends EnvironmentAwareCommand {
 
     private final OptionSpec<Void> stdinOption;
+    private final OptionSpec<Void> forceOption;
     private final OptionSpec<String> arguments;
 
     AddStringKeyStoreCommand() {
-        super("Add string settings to the keystore", false);
-        this.stdinOption = parser.acceptsAll(Arrays.asList("x", "stdin"), "Read setting values from stdin");
-        this.forceOption = parser.acceptsAll(
-            Arrays.asList("f", "force"),
-            "Overwrite existing setting without prompting, creating keystore if necessary"
-        );
-        this.arguments = parser.nonOptions("setting names");
+        super("Add a string setting to the keystore");
+        this.stdinOption = parser.acceptsAll(Arrays.asList("x", "stdin"), "Read setting value from stdin");
+        this.forceOption = parser.acceptsAll(Arrays.asList("f", "force"), "Overwrite existing setting without prompting");
+        this.arguments = parser.nonOptions("setting name");
     }
 
     // pkg private so tests can manipulate
@@ -61,54 +56,54 @@ class AddStringKeyStoreCommand extends BaseKeyStoreCommand {
     }
 
     @Override
-    protected void executeCommand(Terminal terminal, OptionSet options, Environment env) throws Exception {
-        final List<String> settings = arguments.values(options);
-        if (settings.isEmpty()) {
-            throw new UserException(ExitCodes.USAGE, "the setting names can not be empty");
-        }
-
-        final KeyStoreWrapper keyStore = getKeyStore();
-
-        final Closeable closeable;
-        final CheckedFunction<String, char[], IOException> valueSupplier;
-        if (options.has(stdinOption)) {
-            final BufferedReader stdinReader = new BufferedReader(new InputStreamReader(getStdin(), StandardCharsets.UTF_8));
-            valueSupplier = s -> {
-                try (CharArrayWriter writer = new CharArrayWriter()) {
-                    int c;
-                    while ((c = stdinReader.read()) != -1) {
-                        if ((char) c == '\r' || (char) c == '\n') {
-                            break;
-                        }
-                        writer.write((char) c);
-                    }
-                    return writer.toCharArray();
-                }
-            };
-            closeable = stdinReader;
+    protected void execute(Terminal terminal, OptionSet options, Environment env) throws Exception {
+        KeyStoreWrapper keystore = KeyStoreWrapper.load(env.configFile());
+        if (keystore == null) {
+            if (options.has(forceOption) == false &&
+                terminal.promptYesNo("The elasticsearch keystore does not exist. Do you want to create it?", false) == false) {
+                terminal.println("Exiting without creating keystore.");
+                return;
+            }
+            keystore = KeyStoreWrapper.create();
+            keystore.save(env.configFile(), new char[0] /* always use empty passphrase for auto created keystore */);
+            terminal.println("Created elasticsearch keystore in " + env.configFile());
         } else {
-            valueSupplier = s -> terminal.readSecret("Enter value for " + s + ": ");
-            closeable = () -> {};
+            keystore.decrypt(new char[0] /* TODO: prompt for password when they are supported */);
         }
 
-        try (closeable) {
-            for (final String setting : settings) {
-                if (keyStore.getSettingNames().contains(setting) && options.has(forceOption) == false) {
-                    if (terminal.promptYesNo("Setting " + setting + " already exists. Overwrite?", false) == false) {
-                        terminal.println("Exiting without modifying keystore.");
-                        return;
-                    }
-                }
-
-                try {
-                    keyStore.setString(setting, valueSupplier.apply(setting));
-                } catch (final IllegalArgumentException e) {
-                    throw new UserException(ExitCodes.DATA_ERROR, e.getMessage());
-                }
+        String setting = arguments.value(options);
+        if (setting == null) {
+            throw new UserException(ExitCodes.USAGE, "The setting name can not be null");
+        }
+        if (keystore.getSettingNames().contains(setting) && options.has(forceOption) == false) {
+            if (terminal.promptYesNo("Setting " + setting + " already exists. Overwrite?", false) == false) {
+                terminal.println("Exiting without modifying keystore.");
+                return;
             }
         }
 
-        keyStore.save(env.configFile(), getKeyStorePassword().getChars());
-    }
+        final char[] value;
+        if (options.has(stdinOption)) {
+            try (BufferedReader stdinReader = new BufferedReader(new InputStreamReader(getStdin(), StandardCharsets.UTF_8));
+                 CharArrayWriter writer = new CharArrayWriter()) {
+                int charInt;
+                while ((charInt = stdinReader.read()) != -1) {
+                    if ((char) charInt == '\r' || (char) charInt == '\n') {
+                        break;
+                    }
+                    writer.write((char) charInt);
+                }
+                value = writer.toCharArray();
+            }
+        } else {
+            value = terminal.readSecret("Enter value for " + setting + ": ");
+        }
 
+        try {
+            keystore.setString(setting, value);
+        } catch (final IllegalArgumentException e) {
+            throw new UserException(ExitCodes.DATA_ERROR, e.getMessage());
+        }
+        keystore.save(env.configFile(), new char[0]);
+    }
 }

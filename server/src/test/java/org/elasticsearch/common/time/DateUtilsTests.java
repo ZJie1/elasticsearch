@@ -35,7 +35,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import static org.elasticsearch.common.time.DateUtils.clampToNanosRange;
 import static org.elasticsearch.common.time.DateUtils.toInstant;
 import static org.elasticsearch.common.time.DateUtils.toLong;
 import static org.elasticsearch.common.time.DateUtils.toMilliSeconds;
@@ -85,8 +84,8 @@ public class DateUtilsTests extends ESTestCase {
     }
 
     public void testInstantToLongMax() {
-        Instant tooLateInstant = ZonedDateTime.parse("2262-04-11T23:47:16.854775808Z").toInstant();
-        IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> toLong(tooLateInstant));
+        Instant tooEarlyInstant = ZonedDateTime.parse("2262-04-11T23:47:16.854775808Z").toInstant();
+        IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> toLong(tooEarlyInstant));
         assertThat(e.getMessage(), containsString("is after"));
     }
 
@@ -108,25 +107,6 @@ public class DateUtilsTests extends ESTestCase {
 
         assertThat(toInstant(Long.MAX_VALUE),
             is(ZonedDateTime.parse("2262-04-11T23:47:16.854775807Z").toInstant()));
-    }
-
-    public void testClampToNanosRange() {
-        assertThat(clampToNanosRange(Instant.EPOCH), equalTo(Instant.EPOCH));
-
-        Instant instant = createRandomInstant();
-        assertThat(clampToNanosRange(instant), equalTo(instant));
-    }
-
-    public void testClampToNanosRangeMin() {
-        assertThat(clampToNanosRange(Instant.EPOCH.minusMillis(1)), equalTo(Instant.EPOCH));
-
-        Instant tooEarlyInstant = ZonedDateTime.parse("1677-09-21T00:12:43.145224191Z").toInstant();
-        assertThat(clampToNanosRange(tooEarlyInstant), equalTo(Instant.EPOCH));
-    }
-
-    public void testClampToNanosRangeMax() {
-        Instant tooLateInstant = ZonedDateTime.parse("2262-04-11T23:47:16.854775808Z").toInstant();
-        assertThat(clampToNanosRange(tooLateInstant), equalTo(DateUtils.MAX_NANOSECOND_INSTANT));
     }
 
     public void testNanosToMillis() {

@@ -14,7 +14,7 @@ efficient as it performs both steps in a single pass.
 [float]
 === Example output
 
-[source,console]
+[source,js]
 ---------------------------
 POST _analyze
 {
@@ -22,10 +22,11 @@ POST _analyze
   "text": "The 2 QUICK Brown-Foxes jumped over the lazy dog's bone."
 }
 ---------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -109,6 +110,7 @@ POST _analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 

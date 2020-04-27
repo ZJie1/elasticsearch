@@ -28,12 +28,16 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.search.DocValueFormat;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregatorFactory;
+import org.elasticsearch.search.aggregations.PipelineAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramInterval;
 import org.elasticsearch.search.aggregations.pipeline.BucketHelpers.GapPolicy;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -125,7 +129,7 @@ public class DerivativePipelineAggregationBuilder extends AbstractPipelineAggreg
     }
 
     @Override
-    protected PipelineAggregator createInternal(Map<String, Object> metadata) {
+    protected PipelineAggregator createInternal(Map<String, Object> metaData) {
         DocValueFormat formatter;
         if (format != null) {
             formatter = new DocValueFormat.Decimal(format);
@@ -144,17 +148,18 @@ public class DerivativePipelineAggregationBuilder extends AbstractPipelineAggreg
                 }
             }
         }
-        return new DerivativePipelineAggregator(name, bucketsPaths, formatter, gapPolicy, xAxisUnits, metadata);
+        return new DerivativePipelineAggregator(name, bucketsPaths, formatter, gapPolicy, xAxisUnits, metaData);
     }
 
     @Override
-    protected void validate(ValidationContext context) {
+    public void doValidate(AggregatorFactory parent, Collection<AggregationBuilder> aggFactories,
+            Collection<PipelineAggregationBuilder> pipelineAggregatoractories) {
         if (bucketsPaths.length != 1) {
-            context.addValidationError(PipelineAggregator.Parser.BUCKETS_PATH.getPreferredName()
+            throw new IllegalStateException(PipelineAggregator.Parser.BUCKETS_PATH.getPreferredName()
                     + " must contain a single entry for aggregation [" + name + "]");
         }
-
-        context.validateParentAggSequentiallyOrdered(NAME, name);
+        
+        validateSequentiallyOrderedParentAggs(parent, NAME, name);
     }
 
     @Override

@@ -26,6 +26,7 @@ import org.gradle.api.logging.Logging;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.SkipWhenEmpty;
 import org.gradle.api.tasks.StopExecutionException;
 import org.gradle.api.tasks.TaskAction;
 
@@ -65,6 +66,7 @@ public class ExportElasticsearchBuildResourcesTask extends DefaultTask {
     }
 
     @Input
+    @SkipWhenEmpty
     public Set<String> getResources() {
         return Collections.unmodifiableSet(resources);
     }
@@ -76,14 +78,14 @@ public class ExportElasticsearchBuildResourcesTask extends DefaultTask {
         return System.getProperty("java.class.path");
     }
 
-    public void setOutputDir(File outputDir) {
-        this.outputDir.set(outputDir);
+    public void setOutputDir(DirectoryProperty outputDir) {
+        this.outputDir = outputDir;
     }
 
     public File copy(String resource) {
         if (getState().getExecuted() || getState().getExecuting()) {
-            throw new GradleException(
-                "buildResources can't be configured after the task ran. " + "Make sure task is not used after configuration time"
+            throw new GradleException("buildResources can't be configured after the task ran. " +
+                "Make sure task is not used after configuration time"
             );
         }
         resources.add(resource);
@@ -93,21 +95,21 @@ public class ExportElasticsearchBuildResourcesTask extends DefaultTask {
     @TaskAction
     public void doExport() {
         if (resources.isEmpty()) {
-            setDidWork(false);
             throw new StopExecutionException();
         }
-        resources.stream().parallel().forEach(resourcePath -> {
-            Path destination = outputDir.get().file(resourcePath).getAsFile().toPath();
-            try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
-                Files.createDirectories(destination.getParent());
-                if (is == null) {
-                    throw new GradleException("Can't export `" + resourcePath + "` from build-tools: not found");
+        resources.stream().parallel()
+            .forEach(resourcePath -> {
+                Path destination = outputDir.get().file(resourcePath).getAsFile().toPath();
+                try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+                    Files.createDirectories(destination.getParent());
+                    if (is == null) {
+                        throw new GradleException("Can't export `" + resourcePath + "` from build-tools: not found");
+                    }
+                    Files.copy(is, destination, StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    throw new GradleException("Can't write resource `" + resourcePath + "` to " + destination, e);
                 }
-                Files.copy(is, destination, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                throw new GradleException("Can't write resource `" + resourcePath + "` to " + destination, e);
-            }
-        });
+            });
     }
 
 }

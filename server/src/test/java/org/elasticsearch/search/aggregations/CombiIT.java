@@ -60,14 +60,14 @@ public class CombiIT extends ESIntegTestCase {
             String name = "name_" + randomIntBetween(1, 10);
             if (rarely()) {
                 missingValues++;
-                builders[i] = client().prepareIndex("idx").setSource(jsonBuilder()
+                builders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                         .startObject()
                         .field("name", name)
                         .endObject());
             } else {
                 int value = randomIntBetween(1, 10);
                 values.put(value, values.getOrDefault(value, 0) + 1);
-                builders[i] = client().prepareIndex("idx").setSource(jsonBuilder()
+                builders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                         .startObject()
                         .field("name", name)
                         .field("value", value)
@@ -111,9 +111,9 @@ public class CombiIT extends ESIntegTestCase {
      */
     public void testSubAggregationForTopAggregationOnUnmappedField() throws Exception {
 
-        prepareCreate("idx").setMapping(jsonBuilder()
+        prepareCreate("idx").addMapping("type", jsonBuilder()
                 .startObject()
-                .startObject("_doc").startObject("properties")
+                .startObject("type").startObject("properties")
                     .startObject("name").field("type", "keyword").endObject()
                     .startObject("value").field("type", "integer").endObject()
                 .endObject().endObject()

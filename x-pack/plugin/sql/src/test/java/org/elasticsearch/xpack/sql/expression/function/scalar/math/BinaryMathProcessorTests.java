@@ -8,14 +8,13 @@ package org.elasticsearch.xpack.sql.expression.function.scalar.math;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.io.stream.Writeable.Reader;
 import org.elasticsearch.test.AbstractWireSerializingTestCase;
-import org.elasticsearch.xpack.ql.expression.Literal;
-import org.elasticsearch.xpack.ql.expression.gen.processor.ConstantProcessor;
-import org.elasticsearch.xpack.ql.expression.gen.processor.Processor;
 import org.elasticsearch.xpack.sql.SqlIllegalArgumentException;
-import org.elasticsearch.xpack.sql.SqlTestUtils;
+import org.elasticsearch.xpack.sql.expression.Literal;
 import org.elasticsearch.xpack.sql.expression.function.scalar.Processors;
+import org.elasticsearch.xpack.sql.expression.gen.processor.ConstantProcessor;
+import org.elasticsearch.xpack.sql.expression.gen.processor.Processor;
 
-import static org.elasticsearch.xpack.ql.tree.Source.EMPTY;
+import static org.elasticsearch.xpack.sql.tree.Source.EMPTY;
 
 public class BinaryMathProcessorTests extends AbstractWireSerializingTestCase<BinaryMathProcessor> {
     public static BinaryMathProcessor randomProcessor() {
@@ -119,6 +118,6 @@ public class BinaryMathProcessorTests extends AbstractWireSerializingTestCase<Bi
     }
     
     private static Literal l(Object value) {
-        return SqlTestUtils.literal(value);
+        return Literal.of(EMPTY, value);
     }
 }

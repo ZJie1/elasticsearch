@@ -29,12 +29,12 @@ public class TextTemplate implements ToXContent {
 
     private final Script script;
     private final String inlineTemplate;
-    private final boolean mayRequireCompilation;
+    private final boolean isUsingMustache;
 
     public TextTemplate(String template) {
         this.script = null;
         this.inlineTemplate = template;
-        this.mayRequireCompilation = template.contains("{{");
+        this.isUsingMustache = template.contains("{{");
     }
 
     public TextTemplate(String template, @Nullable XContentType contentType, ScriptType type,
@@ -50,14 +50,14 @@ public class TextTemplate implements ToXContent {
             params = new HashMap<>();
         }
         this.script = new Script(type, type == ScriptType.STORED ? null : Script.DEFAULT_TEMPLATE_LANG, template, options, params);
+        this.isUsingMustache = template.contains("{{");
         this.inlineTemplate = null;
-        this.mayRequireCompilation = script.getType() == ScriptType.STORED || script.getIdOrCode().contains("{{");
     }
 
     public TextTemplate(Script script) {
         this.script = script;
         this.inlineTemplate = null;
-        this.mayRequireCompilation = script.getType() == ScriptType.STORED || script.getIdOrCode().contains("{{");
+        this.isUsingMustache = script.getIdOrCode().contains("{{");
     }
 
     public Script getScript() {
@@ -68,14 +68,8 @@ public class TextTemplate implements ToXContent {
         return script != null ? script.getIdOrCode() : inlineTemplate;
     }
 
-    /**
-     * Check if compilation may be required.
-     * If a stored script is used, we cannot tell at this stage, so we always assume
-     * that stored scripts require compilation.
-     * If an inline script is used, we checked for the mustache opening brackets
-     */
-    public boolean mayRequireCompilation() {
-        return mayRequireCompilation;
+    public boolean isUsingMustache() {
+        return isUsingMustache;
     }
 
     public XContentType getContentType() {

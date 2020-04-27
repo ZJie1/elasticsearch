@@ -6,10 +6,10 @@
 package org.elasticsearch.xpack.sql.execution.search;
 
 import org.elasticsearch.common.io.stream.Writeable.Reader;
-import org.elasticsearch.xpack.ql.execution.search.extractor.BucketExtractor;
-import org.elasticsearch.xpack.ql.execution.search.extractor.ConstantExtractorTests;
 import org.elasticsearch.xpack.sql.AbstractSqlWireSerializingTestCase;
+import org.elasticsearch.xpack.sql.execution.search.extractor.BucketExtractor;
 import org.elasticsearch.xpack.sql.execution.search.extractor.CompositeKeyExtractorTests;
+import org.elasticsearch.xpack.sql.execution.search.extractor.ConstantExtractorTests;
 import org.elasticsearch.xpack.sql.execution.search.extractor.MetricAggExtractorTests;
 
 import java.io.IOException;
@@ -19,8 +19,8 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.function.Supplier;
 
-public class CompositeAggregationCursorTests extends AbstractSqlWireSerializingTestCase<CompositeAggCursor> {
-    public static CompositeAggCursor randomCompositeCursor() {
+public class CompositeAggregationCursorTests extends AbstractSqlWireSerializingTestCase<CompositeAggregationCursor> {
+    public static CompositeAggregationCursor randomCompositeCursor() {
         int extractorsSize = between(1, 20);
         ZoneId id = randomSafeZone();
         List<BucketExtractor> extractors = new ArrayList<>(extractorsSize);
@@ -28,7 +28,7 @@ public class CompositeAggregationCursorTests extends AbstractSqlWireSerializingT
             extractors.add(randomBucketExtractor(id));
         }
 
-        return new CompositeAggCursor(new byte[randomInt(256)], extractors, randomBitSet(extractorsSize),
+        return new CompositeAggregationCursor(new byte[randomInt(256)], extractors, randomBitSet(extractorsSize),
                 randomIntBetween(10, 1024), randomBoolean(), randomAlphaOfLength(5));
     }
 
@@ -41,8 +41,8 @@ public class CompositeAggregationCursorTests extends AbstractSqlWireSerializingT
     }
 
     @Override
-    protected CompositeAggCursor mutateInstance(CompositeAggCursor instance) throws IOException {
-        return new CompositeAggCursor(instance.next(), instance.extractors(),
+    protected CompositeAggregationCursor mutateInstance(CompositeAggregationCursor instance) throws IOException {
+        return new CompositeAggregationCursor(instance.next(), instance.extractors(),
                 randomValueOtherThan(instance.mask(), () -> randomBitSet(instance.extractors().size())),
                 randomValueOtherThan(instance.limit(), () -> randomIntBetween(1, 512)),
                 !instance.includeFrozen(),
@@ -50,17 +50,17 @@ public class CompositeAggregationCursorTests extends AbstractSqlWireSerializingT
     }
 
     @Override
-    protected CompositeAggCursor createTestInstance() {
+    protected CompositeAggregationCursor createTestInstance() {
         return randomCompositeCursor();
     }
 
     @Override
-    protected Reader<CompositeAggCursor> instanceReader() {
-        return CompositeAggCursor::new;
+    protected Reader<CompositeAggregationCursor> instanceReader() {
+        return CompositeAggregationCursor::new;
     }
 
     @Override
-    protected ZoneId instanceZoneId(CompositeAggCursor instance) {
+    protected ZoneId instanceZoneId(CompositeAggregationCursor instance) {
         List<BucketExtractor> extractors = instance.extractors();
         for (BucketExtractor bucketExtractor : extractors) {
             ZoneId zoneId = MetricAggExtractorTests.extractZoneId(bucketExtractor);

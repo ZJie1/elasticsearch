@@ -68,7 +68,7 @@ class ExpressionScoreScript implements ScoreScript.LeafFactory {
             });
 
             @Override
-            public double execute(ExplanationHolder explanation) {
+            public double execute() {
                 try {
                     return values.doubleValue();
                 } catch (Exception exception) {

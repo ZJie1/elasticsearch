@@ -5,10 +5,8 @@
  */
 package org.elasticsearch.xpack.sql.expression;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.expression.NameId;
-import org.elasticsearch.xpack.ql.plan.logical.LogicalPlan;
-import org.elasticsearch.xpack.ql.tree.Source;
+import org.elasticsearch.xpack.sql.plan.logical.LogicalPlan;
+import org.elasticsearch.xpack.sql.tree.Source;
 
 import java.util.Collections;
 import java.util.List;
@@ -17,16 +15,16 @@ import java.util.Objects;
 public abstract class SubQueryExpression extends Expression {
 
     private final LogicalPlan query;
-    private final NameId id;
+    private final ExpressionId id;
 
     public SubQueryExpression(Source source, LogicalPlan query) {
         this(source, query, null);
     }
 
-    public SubQueryExpression(Source source, LogicalPlan query, NameId id) {
+    public SubQueryExpression(Source source, LogicalPlan query, ExpressionId id) {
         super(source, Collections.emptyList());
         this.query = query;
-        this.id = id == null ? new NameId() : id;
+        this.id = id == null ? new ExpressionId() : id;
     }
 
     @Override
@@ -38,7 +36,7 @@ public abstract class SubQueryExpression extends Expression {
         return query;
     }
 
-    public NameId id() {
+    public ExpressionId id() {
         return id;
     }
 

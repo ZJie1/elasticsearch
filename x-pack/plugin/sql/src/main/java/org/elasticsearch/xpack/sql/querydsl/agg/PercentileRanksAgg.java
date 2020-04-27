@@ -5,24 +5,28 @@
  */
 package org.elasticsearch.xpack.sql.querydsl.agg;
 
-import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 
 import java.util.List;
-import java.util.function.Function;
 
 import static org.elasticsearch.search.aggregations.AggregationBuilders.percentileRanks;
 
-public class PercentileRanksAgg extends DefaultAggSourceLeafAgg {
+public class PercentileRanksAgg extends LeafAgg {
 
     private final List<Double> values;
 
-    public PercentileRanksAgg(String id, AggSource source, List<Double> values) {
-        super(id, source);
+    public PercentileRanksAgg(String id, String fieldName, List<Double> values) {
+        super(id, fieldName);
         this.values = values;
     }
 
+    public List<Double> percents() {
+        return values;
+    }
+
     @Override
-    Function<String, ValuesSourceAggregationBuilder<?>> builder() {
-        return s -> percentileRanks(s, values.stream().mapToDouble(Double::doubleValue).toArray());
+    AggregationBuilder toBuilder() {
+        return percentileRanks(id(), values.stream().mapToDouble(Double::doubleValue).toArray())
+                .field(fieldName());
     }
 }

@@ -34,7 +34,7 @@ A `percentiles_bucket` aggregation looks like this in isolation:
 
 The following snippet calculates the percentiles for the total monthly `sales` buckets:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /sales/_search
 {
@@ -62,6 +62,7 @@ POST /sales/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 
 <1> `buckets_path` instructs this percentiles_bucket aggregation that we want to calculate percentiles for
@@ -70,7 +71,7 @@ the `sales` aggregation in the `sales_per_month` date histogram.
 
 And the following may be the response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
    "took": 11,

@@ -13,7 +13,7 @@ Retrieves information about all follower indices.
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /follower_index/_ccr/follow?wait_for_active_shards=1
 {
@@ -21,28 +21,32 @@ PUT /follower_index/_ccr/follow?wait_for_active_shards=1
   "leader_index" : "leader_index"
 }
 --------------------------------------------------
+// CONSOLE
 // TESTSETUP
 // TEST[setup:remote_cluster_and_leader_index]
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /follower_index/_ccr/pause_follow
 --------------------------------------------------
+// CONSOLE
 // TEARDOWN
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /<index>/_ccr/info
 --------------------------------------------------
+// CONSOLE
 // TEST[s/<index>/follower_index/]
 
 [[ccr-get-follow-info-prereqs]]
 ==== {api-prereq-title}
 
 * If the {es} {security-features} are enabled, you must have `monitor` cluster
-privileges. For more information, see <<security-privileges>>.
+privileges. For more information, see
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ccr-get-follow-info-desc]]
 ==== {api-description-title}
@@ -57,98 +61,92 @@ replication options and whether the follower indices are active or paused.
 `<index>`::
   (Required, string) A comma-delimited list of follower index patterns.
 
-[role="child_attributes"]
 [[ccr-get-follow-info-response-body]]
 ==== {api-response-body-title}
 
-//Begin follower_indices
+This API returns the following information:
+
 `follower_indices`::
-(array) An array of follower index statistics.
-+
-.Properties of objects in `follower_indices`
-[%collapsible%open]
-====
-`follower_index`::
-(string) The name of the follower index.
+  (array) An array of follower index statistics.
 
-`leader_index`::
-(string) The name of the index in the leader cluster that is followed.
+The `indices` array consists of objects containing several fields:
 
-//Begin parameters
-`parameters`::
-(object) An object that encapsulates {ccr} parameters.
-+
-.Properties of `parameters`
-[%collapsible%open]
-=====
-`max_outstanding_read_requests`::
-(long) The maximum number of outstanding read requests from the remote cluster.
+`indices[].follower_index`::
+  (string) The name of the follower index.
 
-`max_outstanding_write_requests`::
-(integer) The maximum number of outstanding write requests on the follower.
+`indices[].remote_cluster`::
+  (string) The <<modules-remote-clusters,remote cluster>> that contains the
+  leader index.
 
-`max_read_request_operation_count`::
-(integer) The maximum number of operations to pull per read from the remote
-cluster.
+`indices[].leader_index`::
+  (string) The name of the index in the leader cluster that is followed.
 
-`max_read_request_size`::
-(<<byte-units,byte value>>) The maximum size in bytes of per read of a batch of
-operations pulled from the remote cluster.
+`indices[].status`::
+  (string) Whether index following is `active` or `paused`. 
 
-`max_retry_delay`::
-(<<time-units,time value>>) The maximum time to wait before retrying an
-operation that failed exceptionally. An exponential backoff strategy is employed
-when retrying.
+`indices[].parameters`::
+  (object) An object that encapsulates {ccr} parameters.
 
-`max_write_buffer_count`::
-(integer) The maximum number of operations that can be queued for writing. When
-this limit is reached, reads from the remote cluster are deferred until the
-number of queued operations goes below the limit.
+The `parameters` contains the following fields:
 
-`max_write_buffer_size`::
-(<<byte-units,byte value>>) The maximum total bytes of operations that can be
-queued for writing. When this limit is reached, reads from the remote cluster
-are deferred until the total bytes of queued operations goes below the limit.
+`indices[].parameters.max_read_request_operation_count`::
+  (integer) The maximum number of operations to pull per read from the remote
+  cluster.
 
-`max_write_request_operation_count`::
-(integer) The maximum number of operations per bulk write request executed on
-the follower.
+`indices[].parameters.max_outstanding_read_requests`::
+  (long) The maximum number of outstanding read requests from the remote cluster.
 
-`max_write_request_size`::
-(<<byte-units,byte value>>) The maximum total bytes of operations per bulk write
-request executed on the follower.
+`indices[].parameters.max_read_request_size`::
+  (<<byte-units,byte value>>) The maximum size in bytes of per read of a batch
+  of operations pulled from the remote cluster.
 
-`read_poll_timeout`::
-(<<time-units,time value>>) The maximum time to wait for new operations on the
-remote cluster when the follower index is synchronized with the leader index.
-When the timeout has elapsed, the poll for operations returns to the follower so
-that it can update some statistics, then the follower immediately attempts
-to read from the leader again.
-=====
-//End parameters
+`indices[].parameters.max_write_request_operation_count`::
+  (integer) The maximum number of operations per bulk write request executed on
+  the follower.
 
-`remote_cluster`::
-(string) The <<modules-remote-clusters,remote cluster>> that contains the
-leader index.
+`indices[].parameters.max_write_request_size`::
+  (<<byte-units,byte value>>) The maximum total bytes of operations per bulk
+  write request executed on the follower.
 
-`status`::
-(string) Whether index following is `active` or `paused`. 
-====
-//End follower_indices
+`indices[].parameters.max_outstanding_write_requests`::
+  (integer) The maximum number of outstanding write requests on the follower.
+
+`indices[].parameters.max_write_buffer_count`::
+  (integer) The maximum number of operations that can be queued for writing.
+  When this limit is reached, reads from the remote cluster are deferred until
+  the number of queued operations goes below the limit.
+
+`indices[].parameters.max_write_buffer_size`::
+  (<<byte-units,byte value>>) The maximum total bytes of operations that can be
+  queued for writing. When this limit is reached, reads from the remote cluster
+  are deferred until the total bytes of queued operations goes below the limit.
+
+`indices[].parameters.max_retry_delay`::
+  (<<time-units,time value>>) The maximum time to wait before retrying an
+  operation that failed exceptionally. An exponential backoff strategy is
+  employed when retrying.
+
+`indices[].parameters.read_poll_timeout`::
+  (<<time-units,time value>>) The maximum time to wait for new operations on the
+  remote cluster when the follower index is synchronized with the leader index.
+  When the timeout has elapsed, the poll for operations returns to the follower
+  so that it can update some statistics, then the follower immediately attempts
+  to read from the leader again.
 
 [[ccr-get-follow-info-examples]]
 ==== {api-examples-title}
 
 This example retrieves follower info:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /follower_index/_ccr/info
 --------------------------------------------------
+// CONSOLE
 
 The API returns the following results:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     "follower_indices" : [
@@ -173,3 +171,4 @@ The API returns the following results:
     ]
 }
 --------------------------------------------------
+// TESTRESPONSE

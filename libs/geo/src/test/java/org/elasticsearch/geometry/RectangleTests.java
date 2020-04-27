@@ -37,11 +37,11 @@ public class RectangleTests extends BaseGeometryTestCase<Rectangle> {
 
     public void testBasicSerialization() throws IOException, ParseException {
         WellKnownText wkt = new WellKnownText(true, new GeographyValidator(true));
-        assertEquals("BBOX (10.0, 20.0, 40.0, 30.0)", wkt.toWKT(new Rectangle(10, 20, 40, 30)));
-        assertEquals(new Rectangle(10, 20, 40, 30), wkt.fromWKT("BBOX (10.0, 20.0, 40.0, 30.0)"));
+        assertEquals("bbox (10.0, 20.0, 40.0, 30.0)", wkt.toWKT(new Rectangle(10, 20, 40, 30)));
+        assertEquals(new Rectangle(10, 20, 40, 30), wkt.fromWKT("bbox (10.0, 20.0, 40.0, 30.0)"));
 
-        assertEquals("BBOX EMPTY", wkt.toWKT(Rectangle.EMPTY));
-        assertEquals(Rectangle.EMPTY, wkt.fromWKT("BBOX EMPTY)"));
+        assertEquals("bbox EMPTY", wkt.toWKT(Rectangle.EMPTY));
+        assertEquals(Rectangle.EMPTY, wkt.fromWKT("bbox EMPTY)"));
     }
 
     public void testInitValidation() {

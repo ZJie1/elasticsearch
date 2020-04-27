@@ -1,11 +1,10 @@
-[role="xpack"]
 [[actions-index]]
-=== Index action
+=== Index Action
 
 Use the `index` action to index data into Elasticsearch.
 See <<index-action-attributes>> for the supported attributes.
 
-==== Configuring index actions
+==== Configuring Index Actions
 
 The following snippet shows a simple `index` action definition:
 
@@ -24,14 +23,14 @@ The following snippet shows a simple `index` action definition:
 --------------------------------------------------
 // NOTCONSOLE
 <1> The id of the action
-<2> An optional <<condition,condition>> to restrict action execution
-<3> An optional <<transform,transform>> to transform the payload and prepare the data that should be indexed
+<2> An optional <<condition, condition>> to restrict action execution
+<3> An optional <<transform, transform>> to transform the payload and prepare the data that should be indexed
 <4> The elasticsearch index to store the data to
 <5> An optional `_id` for the document, if it should always be the same document.
 
 
 [[index-action-attributes]]
-==== Index action attributes
+==== Index Action Attributes
 
 [options="header"]
 |======
@@ -56,7 +55,7 @@ The following snippet shows a simple `index` action definition:
 |======
 
 [[anatomy-actions-index-multi-doc-support]]
-==== Multi-document support
+==== Multi-Document Support
 
 Like with all other actions, you can use a <<transform, transform>> to replace
 the current execution context payload with another and by that change the document

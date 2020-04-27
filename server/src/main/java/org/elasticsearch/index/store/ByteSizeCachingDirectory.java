@@ -160,7 +160,7 @@ final class ByteSizeCachingDirectory extends FilterDirectory {
                 try {
                     super.close();
                 } finally {
-                    synchronized (ByteSizeCachingDirectory.this) {
+                    synchronized (this) {
                         numOpenOutputs--;
                         modCount++;
                     }

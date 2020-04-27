@@ -19,25 +19,20 @@
 
 package org.elasticsearch.join.aggregations;
 
-import org.elasticsearch.common.ParseField;
-import org.elasticsearch.common.xcontent.NamedXContentRegistry.Entry;
-import org.elasticsearch.join.ParentJoinPlugin;
-import org.elasticsearch.plugins.SearchPlugin;
-import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.InternalSingleBucketAggregationTestCase;
-import org.elasticsearch.search.aggregations.bucket.ParsedSingleBucketAggregation;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class InternalParentTests extends InternalSingleBucketAggregationTestCase<InternalParent> {
+import org.elasticsearch.common.ParseField;
+import org.elasticsearch.common.io.stream.Writeable.Reader;
+import org.elasticsearch.common.xcontent.NamedXContentRegistry.Entry;
+import org.elasticsearch.search.aggregations.Aggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.InternalSingleBucketAggregationTestCase;
+import org.elasticsearch.search.aggregations.bucket.ParsedSingleBucketAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
-    @Override
-    protected SearchPlugin registerPlugin() {
-        return new ParentJoinPlugin();
-    }
+public class InternalParentTests extends InternalSingleBucketAggregationTestCase<InternalParent> {
 
     @Override
     protected List<Entry> getNamedXContents() {
@@ -49,13 +44,18 @@ public class InternalParentTests extends InternalSingleBucketAggregationTestCase
 
     @Override
     protected InternalParent createTestInstance(String name, long docCount, InternalAggregations aggregations,
-            Map<String, Object> metadata) {
-        return new InternalParent(name, docCount, aggregations, metadata);
+            List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData) {
+        return new InternalParent(name, docCount, aggregations, pipelineAggregators, metaData);
     }
 
     @Override
     protected void extraAssertReduced(InternalParent reduced, List<InternalParent> inputs) {
         // Nothing extra to assert
+    }
+
+    @Override
+    protected Reader<InternalParent> instanceReader() {
+        return InternalParent::new;
     }
 
     @Override

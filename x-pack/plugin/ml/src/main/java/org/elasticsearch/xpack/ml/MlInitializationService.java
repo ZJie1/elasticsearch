@@ -19,7 +19,6 @@ import org.elasticsearch.gateway.GatewayService;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.xpack.core.ml.annotations.AnnotationIndex;
 
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 class MlInitializationService implements LocalNodeMasterListener, ClusterStateListener {
@@ -30,20 +29,16 @@ class MlInitializationService implements LocalNodeMasterListener, ClusterStateLi
     private final ThreadPool threadPool;
     private final ClusterService clusterService;
     private final Client client;
-    private final MlAssignmentNotifier mlAssignmentNotifier;
     private final AtomicBoolean isIndexCreationInProgress = new AtomicBoolean(false);
 
     private volatile MlDailyMaintenanceService mlDailyMaintenanceService;
 
-    MlInitializationService(Settings settings, ThreadPool threadPool, ClusterService clusterService, Client client,
-                            MlAssignmentNotifier mlAssignmentNotifier) {
-        this.settings = Objects.requireNonNull(settings);
-        this.threadPool = Objects.requireNonNull(threadPool);
-        this.clusterService = Objects.requireNonNull(clusterService);
-        this.client = Objects.requireNonNull(client);
-        this.mlAssignmentNotifier = Objects.requireNonNull(mlAssignmentNotifier);
+    MlInitializationService(Settings settings, ThreadPool threadPool, ClusterService clusterService, Client client) {
+        this.settings = settings;
+        this.threadPool = threadPool;
+        this.clusterService = clusterService;
+        this.client = client;
         clusterService.addListener(this);
-        clusterService.addLocalNodeMasterListener(this);
     }
 
     @Override
@@ -66,7 +61,7 @@ class MlInitializationService implements LocalNodeMasterListener, ClusterStateLi
         // The atomic flag prevents multiple simultaneous attempts to create the
         // index if there is a flurry of cluster state updates in quick succession
         if (event.localNodeMaster() && isIndexCreationInProgress.compareAndSet(false, true)) {
-            AnnotationIndex.createAnnotationsIndexIfNecessary(client, event.state(), ActionListener.wrap(
+            AnnotationIndex.createAnnotationsIndexIfNecessary(settings, client, event.state(), ActionListener.wrap(
                 r -> {
                     isIndexCreationInProgress.set(false);
                     if (r) {
@@ -85,10 +80,9 @@ class MlInitializationService implements LocalNodeMasterListener, ClusterStateLi
         return ThreadPool.Names.GENERIC;
     }
 
-    private synchronized void installDailyMaintenanceService() {
+    private void installDailyMaintenanceService() {
         if (mlDailyMaintenanceService == null) {
-            mlDailyMaintenanceService =
-                new MlDailyMaintenanceService(clusterService.getClusterName(), threadPool, client, clusterService, mlAssignmentNotifier);
+            mlDailyMaintenanceService = new MlDailyMaintenanceService(clusterService.getClusterName(), threadPool, client);
             mlDailyMaintenanceService.start();
             clusterService.addLifecycleListener(new LifecycleListener() {
                 @Override
@@ -99,7 +93,7 @@ class MlInitializationService implements LocalNodeMasterListener, ClusterStateLi
         }
     }
 
-    private synchronized void uninstallDailyMaintenanceService() {
+    private void uninstallDailyMaintenanceService() {
         if (mlDailyMaintenanceService != null) {
             mlDailyMaintenanceService.stop();
             mlDailyMaintenanceService = null;
@@ -112,7 +106,7 @@ class MlInitializationService implements LocalNodeMasterListener, ClusterStateLi
     }
 
     /** For testing */
-    synchronized void setDailyMaintenanceService(MlDailyMaintenanceService service) {
+    void setDailyMaintenanceService(MlDailyMaintenanceService service) {
         mlDailyMaintenanceService = service;
     }
 }

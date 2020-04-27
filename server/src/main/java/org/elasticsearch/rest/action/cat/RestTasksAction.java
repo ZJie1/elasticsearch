@@ -28,6 +28,7 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.Table;
 import org.elasticsearch.common.time.DateFormatter;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.action.RestResponseListener;
@@ -49,13 +50,9 @@ import static org.elasticsearch.rest.action.admin.cluster.RestListTasksAction.ge
 public class RestTasksAction extends AbstractCatAction {
     private final Supplier<DiscoveryNodes> nodesInCluster;
 
-    public RestTasksAction(Supplier<DiscoveryNodes> nodesInCluster) {
+    public RestTasksAction(RestController controller, Supplier<DiscoveryNodes> nodesInCluster) {
+        controller.registerHandler(GET, "/_cat/tasks", this);
         this.nodesInCluster = nodesInCluster;
-    }
-
-    @Override
-    public List<Route> routes() {
-        return List.of(new Route(GET, "/_cat/tasks"));
     }
 
     @Override
@@ -144,7 +141,7 @@ public class RestTasksAction extends AbstractCatAction {
         table.addCell(taskInfo.getStartTime());
         table.addCell(FORMATTER.format(Instant.ofEpochMilli(taskInfo.getStartTime())));
         table.addCell(taskInfo.getRunningTimeNanos());
-        table.addCell(TimeValue.timeValueNanos(taskInfo.getRunningTimeNanos()));
+        table.addCell(TimeValue.timeValueNanos(taskInfo.getRunningTimeNanos()).toString());
 
         // Node information. Note that the node may be null because it has left the cluster between when we got this response and now.
         table.addCell(fullId ? nodeId : Strings.substring(nodeId, 0, 4));

@@ -28,12 +28,12 @@ import org.elasticsearch.Version;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ThreadedActionListener;
 import org.elasticsearch.cluster.node.DiscoveryNode;
+import org.elasticsearch.common.Booleans;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.breaker.CircuitBreaker;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
-import org.elasticsearch.common.component.Lifecycle;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.metrics.MeanMetric;
@@ -76,6 +76,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -83,7 +84,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -101,19 +101,16 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
     // This is the number of bytes necessary to read the message size
     private static final int BYTES_NEEDED_FOR_MESSAGE_SIZE = TcpHeader.MARKER_BYTES_SIZE + TcpHeader.MESSAGE_LENGTH_SIZE;
     private static final long THIRTY_PER_HEAP_SIZE = (long) (JvmInfo.jvmInfo().getMem().getHeapMax().getBytes() * 0.3);
-
-    final StatsTracker statsTracker = new StatsTracker();
+    private static final BytesReference EMPTY_BYTES_REFERENCE = new BytesArray(new byte[0]);
 
     // this limit is per-address
     private static final int LIMIT_LOCAL_PORTS_COUNT = 6;
 
     protected final Settings settings;
-    private final Version version;
     protected final ThreadPool threadPool;
     protected final PageCacheRecycler pageCacheRecycler;
     protected final NetworkService networkService;
     protected final Set<ProfileSettings> profileSettings;
-    private final CircuitBreakerService circuitBreakerService;
 
     private final ConcurrentMap<String, BoundTransportAddress> profileBoundAddresses = newConcurrentMap();
     private final Map<String, List<TcpServerChannel>> serverChannels = newConcurrentMap();
@@ -128,46 +125,42 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
     private final TransportKeepAlive keepAlive;
     private final OutboundHandler outboundHandler;
     private final InboundHandler inboundHandler;
-    private final ResponseHandlers responseHandlers = new ResponseHandlers();
-    private final RequestHandlers requestHandlers = new RequestHandlers();
 
     public TcpTransport(Settings settings, Version version, ThreadPool threadPool, PageCacheRecycler pageCacheRecycler,
                         CircuitBreakerService circuitBreakerService, NamedWriteableRegistry namedWriteableRegistry,
                         NetworkService networkService) {
         this.settings = settings;
         this.profileSettings = getProfileSettings(settings);
-        this.version = version;
         this.threadPool = threadPool;
         this.pageCacheRecycler = pageCacheRecycler;
-        this.circuitBreakerService = circuitBreakerService;
         this.networkService = networkService;
         String nodeName = Node.NODE_NAME_SETTING.get(settings);
+        final Settings defaultFeatures = TransportSettings.DEFAULT_FEATURES_SETTING.get(settings);
+        String[] features;
+        if (defaultFeatures == null) {
+            features = new String[0];
+        } else {
+            defaultFeatures.names().forEach(key -> {
+                if (Booleans.parseBoolean(defaultFeatures.get(key)) == false) {
+                    throw new IllegalArgumentException("feature settings must have default [true] value");
+                }
+            });
+            // use a sorted set to present the features in a consistent order
+            features = new TreeSet<>(defaultFeatures.names()).toArray(new String[defaultFeatures.names().size()]);
+        }
         BigArrays bigArrays = new BigArrays(pageCacheRecycler, circuitBreakerService, CircuitBreaker.IN_FLIGHT_REQUESTS);
 
-        this.outboundHandler = new OutboundHandler(nodeName, version, statsTracker, threadPool, bigArrays);
+        this.outboundHandler = new OutboundHandler(nodeName, version, threadPool, bigArrays);
         this.handshaker = new TransportHandshaker(version, threadPool,
             (node, channel, requestId, v) -> outboundHandler.sendRequest(node, channel, requestId,
                 TransportHandshaker.HANDSHAKE_ACTION_NAME, new TransportHandshaker.HandshakeRequest(version),
-                TransportRequestOptions.EMPTY, v, false, true));
+                TransportRequestOptions.EMPTY, v, false, true),
+            (v, channel, response, requestId) -> outboundHandler.sendResponse(v, channel, requestId,
+                TransportHandshaker.HANDSHAKE_ACTION_NAME, response, false, true));
+        InboundMessage.Reader reader = new InboundMessage.Reader(version, namedWriteableRegistry, threadPool.getThreadContext());
         this.keepAlive = new TransportKeepAlive(threadPool, this.outboundHandler::sendBytes);
-        this.inboundHandler = new InboundHandler(threadPool, outboundHandler, namedWriteableRegistry, handshaker, keepAlive,
-            requestHandlers, responseHandlers);
-    }
-
-    public Version getVersion() {
-        return version;
-    }
-
-    public StatsTracker getStatsTracker() {
-        return statsTracker;
-    }
-
-    public ThreadPool getThreadPool() {
-        return threadPool;
-    }
-
-    public Supplier<CircuitBreaker> getInflightBreaker() {
-        return () -> circuitBreakerService.getBreaker(CircuitBreaker.IN_FLIGHT_REQUESTS);
+        this.inboundHandler = new InboundHandler(threadPool, outboundHandler, reader, circuitBreakerService, handshaker,
+            keepAlive);
     }
 
     @Override
@@ -178,6 +171,11 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
     public synchronized void setMessageListener(TransportMessageListener listener) {
         outboundHandler.setMessageListener(listener);
         inboundHandler.setMessageListener(listener);
+    }
+
+    @Override
+    public synchronized <Request extends TransportRequest> void registerRequestHandler(RequestHandlerRegistry<Request> reg) {
+        inboundHandler.registerRequestHandler(reg);
     }
 
     public final class NodeChannels extends CloseableConnection {
@@ -388,10 +386,7 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
                 return true;
             });
             if (!success) {
-                throw new BindTransportException(
-                    "Failed to bind to " + NetworkAddress.format(hostAddress, portsRange),
-                    lastException.get()
-                );
+                throw new BindTransportException("Failed to bind to [" + port + "]", lastException.get());
             }
         } finally {
             closeLock.writeLock().unlock();
@@ -582,11 +577,6 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
     }
 
     public void onException(TcpChannel channel, Exception e) {
-        handleException(channel, e, lifecycle, outboundHandler);
-    }
-
-    // exposed for tests
-    static void handleException(TcpChannel channel, Exception e, Lifecycle lifecycle, OutboundHandler outboundHandler) {
         if (!lifecycle.started()) {
             // just close and ignore - we are already stopped and just need to make sure we release all resources
             CloseableChannel.closeChannel(channel);
@@ -594,24 +584,24 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
         }
 
         if (isCloseConnectionException(e)) {
-            logger.debug(() -> new ParameterizedMessage(
+            logger.trace(() -> new ParameterizedMessage(
                 "close connection exception caught on transport layer [{}], disconnecting from relevant node", channel), e);
             // close the channel, which will cause a node to be disconnected if relevant
             CloseableChannel.closeChannel(channel);
         } else if (isConnectException(e)) {
-            logger.debug(() -> new ParameterizedMessage("connect exception caught on transport layer [{}]", channel), e);
+            logger.trace(() -> new ParameterizedMessage("connect exception caught on transport layer [{}]", channel), e);
             // close the channel as safe measure, which will cause a node to be disconnected if relevant
             CloseableChannel.closeChannel(channel);
         } else if (e instanceof BindException) {
-            logger.debug(() -> new ParameterizedMessage("bind exception caught on transport layer [{}]", channel), e);
+            logger.trace(() -> new ParameterizedMessage("bind exception caught on transport layer [{}]", channel), e);
             // close the channel as safe measure, which will cause a node to be disconnected if relevant
             CloseableChannel.closeChannel(channel);
         } else if (e instanceof CancelledKeyException) {
-            logger.debug(() -> new ParameterizedMessage(
+            logger.trace(() -> new ParameterizedMessage(
                 "cancelled key exception caught on transport layer [{}], disconnecting from relevant node", channel), e);
             // close the channel as safe measure, which will cause a node to be disconnected if relevant
             CloseableChannel.closeChannel(channel);
-        } else if (e instanceof HttpRequestOnTransportException) {
+        } else if (e instanceof TcpTransport.HttpOnTransportException) {
             // in case we are able to return data, serialize the exception content and sent it back to the client
             if (channel.isOpen()) {
                 BytesArray message = new BytesArray(e.getMessage().getBytes(StandardCharsets.UTF_8));
@@ -628,11 +618,7 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
     }
 
     protected void onServerException(TcpServerChannel channel, Exception e) {
-        if (e instanceof BindException) {
-            logger.debug(() -> new ParameterizedMessage("bind exception from server channel caught on transport layer [{}]", channel), e);
-        } else {
-            logger.error(new ParameterizedMessage("exception from server channel caught on transport layer [{}]", channel), e);
-        }
+        logger.error(new ParameterizedMessage("exception from server channel caught on transport layer [channel={}]", channel), e);
     }
 
     protected void serverAcceptedChannel(TcpChannel channel) {
@@ -672,11 +658,61 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
      * @param channel the channel the message is from
      * @param message the message
      */
-    public void inboundMessage(TcpChannel channel, InboundMessage message) {
+    public void inboundMessage(TcpChannel channel, BytesReference message) {
         try {
             inboundHandler.inboundMessage(channel, message);
         } catch (Exception e) {
             onException(channel, e);
+        }
+    }
+
+    /**
+     * Consumes bytes that are available from network reads. This method returns the number of bytes consumed
+     * in this call.
+     *
+     * @param channel        the channel read from
+     * @param bytesReference the bytes available to consume
+     * @return the number of bytes consumed
+     * @throws StreamCorruptedException              if the message header format is not recognized
+     * @throws TcpTransport.HttpOnTransportException if the message header appears to be an HTTP message
+     * @throws IllegalArgumentException              if the message length is greater that the maximum allowed frame size.
+     *                                               This is dependent on the available memory.
+     */
+    public int consumeNetworkReads(TcpChannel channel, BytesReference bytesReference) throws IOException {
+        BytesReference message = decodeFrame(bytesReference);
+
+        if (message == null) {
+            return 0;
+        } else {
+            inboundMessage(channel, message);
+            return message.length() + BYTES_NEEDED_FOR_MESSAGE_SIZE;
+        }
+    }
+
+    /**
+     * Attempts to a decode a message from the provided bytes. If a full message is not available, null is
+     * returned. If the message is a ping, an empty {@link BytesReference} will be returned.
+     *
+     * @param networkBytes the will be read
+     * @return the message decoded
+     * @throws StreamCorruptedException              if the message header format is not recognized
+     * @throws TcpTransport.HttpOnTransportException if the message header appears to be an HTTP message
+     * @throws IllegalArgumentException              if the message length is greater that the maximum allowed frame size.
+     *                                               This is dependent on the available memory.
+     */
+    static BytesReference decodeFrame(BytesReference networkBytes) throws IOException {
+        int messageLength = readMessageLength(networkBytes);
+        if (messageLength == -1) {
+            return null;
+        } else {
+            int totalLength = messageLength + BYTES_NEEDED_FOR_MESSAGE_SIZE;
+            if (totalLength > networkBytes.length()) {
+                return null;
+            } else if (totalLength == 6) {
+                return EMPTY_BYTES_REFERENCE;
+            } else {
+                return networkBytes.slice(BYTES_NEEDED_FOR_MESSAGE_SIZE, messageLength);
+            }
         }
     }
 
@@ -687,7 +723,7 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
      * @param networkBytes the will be read
      * @return the length of the message
      * @throws StreamCorruptedException              if the message header format is not recognized
-     * @throws HttpRequestOnTransportException       if the message header appears to be an HTTP message
+     * @throws TcpTransport.HttpOnTransportException if the message header appears to be an HTTP message
      * @throws IllegalArgumentException              if the message length is greater that the maximum allowed frame size.
      *                                               This is dependent on the available memory.
      */
@@ -701,13 +737,8 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
 
     private static int readHeaderBuffer(BytesReference headerBuffer) throws IOException {
         if (headerBuffer.get(0) != 'E' || headerBuffer.get(1) != 'S') {
-            if (appearsToBeHTTPRequest(headerBuffer)) {
-                throw new HttpRequestOnTransportException("This is not an HTTP port");
-            }
-
-            if (appearsToBeHTTPResponse(headerBuffer)) {
-                throw new StreamCorruptedException("received HTTP response on transport port, ensure that transport port (not " +
-                        "HTTP port) of a remote node is specified in the configuration");
+            if (appearsToBeHTTP(headerBuffer)) {
+                throw new TcpTransport.HttpOnTransportException("This is not an HTTP port");
             }
 
             String firstBytes = "("
@@ -741,20 +772,16 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
         return messageLength;
     }
 
-    private static boolean appearsToBeHTTPRequest(BytesReference headerBuffer) {
-        return bufferStartsWith(headerBuffer, "GET")
-            || bufferStartsWith(headerBuffer, "POST")
-            || bufferStartsWith(headerBuffer, "PUT")
-            || bufferStartsWith(headerBuffer, "HEAD")
-            || bufferStartsWith(headerBuffer, "DELETE")
+    private static boolean appearsToBeHTTP(BytesReference headerBuffer) {
+        return bufferStartsWith(headerBuffer, "GET") ||
+            bufferStartsWith(headerBuffer, "POST") ||
+            bufferStartsWith(headerBuffer, "PUT") ||
+            bufferStartsWith(headerBuffer, "HEAD") ||
+            bufferStartsWith(headerBuffer, "DELETE") ||
             // Actually 'OPTIONS'. But we are only guaranteed to have read six bytes at this point.
-            || bufferStartsWith(headerBuffer, "OPTION")
-            || bufferStartsWith(headerBuffer, "PATCH")
-            || bufferStartsWith(headerBuffer, "TRACE");
-    }
-
-    private static boolean appearsToBeHTTPResponse(BytesReference headerBuffer) {
-        return bufferStartsWith(headerBuffer, "HTTP");
+            bufferStartsWith(headerBuffer, "OPTION") ||
+            bufferStartsWith(headerBuffer, "PATCH") ||
+            bufferStartsWith(headerBuffer, "TRACE");
     }
 
     private static boolean appearsToBeTLS(BytesReference headerBuffer) {
@@ -775,9 +802,9 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
      * A helper exception to mark an incoming connection as potentially being HTTP
      * so an appropriate error code can be returned
      */
-    public static class HttpRequestOnTransportException extends ElasticsearchException {
+    public static class HttpOnTransportException extends ElasticsearchException {
 
-        HttpRequestOnTransportException(String msg) {
+        private HttpOnTransportException(String msg) {
             super(msg);
         }
 
@@ -786,13 +813,13 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
             return RestStatus.BAD_REQUEST;
         }
 
-        public HttpRequestOnTransportException(StreamInput in) throws IOException {
+        public HttpOnTransportException(StreamInput in) throws IOException {
             super(in);
         }
     }
 
     public void executeHandshake(DiscoveryNode node, TcpChannel channel, ConnectionProfile profile, ActionListener<Version> listener) {
-        long requestId = responseHandlers.newRequestId();
+        long requestId = inboundHandler.getResponseHandlers().newRequestId();
         handshaker.sendHandshake(requestId, node, channel, profile.getHandshakeTimeout(), listener);
     }
 
@@ -825,12 +852,10 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
 
     @Override
     public final TransportStats getStats() {
-        final MeanMetric writeBytesMetric = statsTracker.getWriteBytes();
-        final long bytesWritten = statsTracker.getBytesWritten();
-        final long messagesSent = statsTracker.getMessagesSent();
-        final long messagesReceived = statsTracker.getMessagesReceived();
-        final long bytesRead = statsTracker.getBytesRead();
-        return new TransportStats(acceptedChannels.size(), messagesReceived, bytesRead, messagesSent, bytesWritten);
+        MeanMetric transmittedBytes = outboundHandler.getTransmittedBytes();
+        MeanMetric readBytes = inboundHandler.getReadBytes();
+        return new TransportStats(acceptedChannels.size(), readBytes.count(), readBytes.sum(), transmittedBytes.count(),
+            transmittedBytes.sum());
     }
 
     /**
@@ -896,12 +921,12 @@ public abstract class TcpTransport extends AbstractLifecycleComponent implements
 
     @Override
     public final ResponseHandlers getResponseHandlers() {
-        return responseHandlers;
+        return inboundHandler.getResponseHandlers();
     }
 
     @Override
-    public final RequestHandlers getRequestHandlers() {
-        return requestHandlers;
+    public final RequestHandlerRegistry<? extends TransportRequest> getRequestHandler(String action) {
+        return inboundHandler.getRequestHandler(action);
     }
 
     private final class ChannelsConnectedListener implements ActionListener<Void> {

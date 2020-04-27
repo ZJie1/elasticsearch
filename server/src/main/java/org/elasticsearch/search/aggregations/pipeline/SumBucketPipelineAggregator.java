@@ -19,18 +19,33 @@
 
 package org.elasticsearch.search.aggregations.pipeline;
 
+import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.pipeline.BucketHelpers.GapPolicy;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 public class SumBucketPipelineAggregator extends BucketMetricsPipelineAggregator {
     private double sum = 0;
 
     SumBucketPipelineAggregator(String name, String[] bucketsPaths, GapPolicy gapPolicy, DocValueFormat formatter,
-            Map<String, Object> metadata) {
-        super(name, bucketsPaths, gapPolicy, formatter, metadata);
+            Map<String, Object> metaData) {
+        super(name, bucketsPaths, gapPolicy, formatter, metaData);
+    }
+
+    /**
+     * Read from a stream.
+     */
+    public SumBucketPipelineAggregator(StreamInput in) throws IOException {
+        super(in);
+    }
+
+    @Override
+    public String getWriteableName() {
+        return SumBucketPipelineAggregationBuilder.NAME;
     }
 
     @Override
@@ -44,8 +59,8 @@ public class SumBucketPipelineAggregator extends BucketMetricsPipelineAggregator
     }
 
     @Override
-    protected InternalAggregation buildAggregation(Map<String, Object> metadata) {
-        return new InternalSimpleValue(name(), sum, format, metadata);
+    protected InternalAggregation buildAggregation(List<PipelineAggregator> pipelineAggregators, Map<String, Object> metadata) {
+        return new InternalSimpleValue(name(), sum, format, pipelineAggregators, metadata);
     }
 
 }

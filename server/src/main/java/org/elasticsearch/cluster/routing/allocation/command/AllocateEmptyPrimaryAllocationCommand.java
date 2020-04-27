@@ -38,7 +38,6 @@ import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.index.shard.ShardNotFoundException;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -140,7 +139,7 @@ public class AllocateEmptyPrimaryAllocationCommand extends BasePrimaryAllocation
                 ", " + shardRouting.unassignedInfo().getMessage();
             unassignedInfoToUpdate = new UnassignedInfo(UnassignedInfo.Reason.FORCED_EMPTY_PRIMARY, unassignedInfoMessage,
                 shardRouting.unassignedInfo().getFailure(), 0, System.nanoTime(), System.currentTimeMillis(), false,
-                shardRouting.unassignedInfo().getLastAllocationStatus(), Collections.emptySet());
+                shardRouting.unassignedInfo().getLastAllocationStatus());
         }
 
         initializeUnassignedShard(allocation, routingNodes, routingNode, shardRouting, unassignedInfoToUpdate,

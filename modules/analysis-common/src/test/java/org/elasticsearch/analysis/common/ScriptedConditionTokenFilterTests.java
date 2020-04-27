@@ -20,7 +20,7 @@
 package org.elasticsearch.analysis.common;
 
 import org.elasticsearch.Version;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.env.TestEnvironment;
@@ -43,9 +43,9 @@ public class ScriptedConditionTokenFilterTests extends ESTokenStreamTestCase {
             .put(Environment.PATH_HOME_SETTING.getKey(), createTempDir().toString())
             .build();
         Settings indexSettings = Settings.builder()
-            .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+            .put(IndexMetaData.SETTING_VERSION_CREATED, Version.CURRENT)
             .put("index.analysis.filter.cond.type", "condition")
-            .put("index.analysis.filter.cond.script.source", "token.getPosition() > 1")
+            .put("index.analysis.filter.cond.script.source", "token.getTerm().length() > 5")
             .putList("index.analysis.filter.cond.filter", "uppercase")
             .put("index.analysis.analyzer.myAnalyzer.type", "custom")
             .put("index.analysis.analyzer.myAnalyzer.tokenizer", "standard")
@@ -56,7 +56,7 @@ public class ScriptedConditionTokenFilterTests extends ESTokenStreamTestCase {
         AnalysisPredicateScript.Factory factory = () -> new AnalysisPredicateScript() {
             @Override
             public boolean execute(Token token) {
-                return token.getPosition() > 1;
+                return token.getTerm().length() > 5;
             }
         };
 
@@ -65,13 +65,13 @@ public class ScriptedConditionTokenFilterTests extends ESTokenStreamTestCase {
             @Override
             public <FactoryType> FactoryType compile(Script script, ScriptContext<FactoryType> context) {
                 assertEquals(context, AnalysisPredicateScript.CONTEXT);
-                assertEquals(new Script("token.getPosition() > 1"), script);
+                assertEquals(new Script("token.getTerm().length() > 5"), script);
                 return (FactoryType) factory;
             }
         };
 
         CommonAnalysisPlugin plugin = new CommonAnalysisPlugin();
-        plugin.createComponents(null, null, null, null, scriptService, null, null, null, null, null, null);
+        plugin.createComponents(null, null, null, null, scriptService, null, null, null, null);
         AnalysisModule module
             = new AnalysisModule(TestEnvironment.newEnvironment(settings), Collections.singletonList(plugin));
 
@@ -80,7 +80,7 @@ public class ScriptedConditionTokenFilterTests extends ESTokenStreamTestCase {
         try (NamedAnalyzer analyzer = analyzers.get("myAnalyzer")) {
             assertNotNull(analyzer);
             assertAnalyzesTo(analyzer, "Vorsprung Durch Technik", new String[]{
-                "Vorsprung", "Durch", "TECHNIK"
+                "VORSPRUNG", "Durch", "TECHNIK"
             });
         }
 

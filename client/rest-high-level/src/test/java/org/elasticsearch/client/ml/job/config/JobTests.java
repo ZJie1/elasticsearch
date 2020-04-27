@@ -159,9 +159,6 @@ public class JobTests extends AbstractXContentTestCase<Job> {
         if (randomBoolean()) {
             builder.setDeleting(randomBoolean());
         }
-        if (randomBoolean()) {
-            builder.setAllowLazyOpen(randomBoolean());
-        }
         return builder;
     }
 

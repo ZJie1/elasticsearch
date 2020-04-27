@@ -20,6 +20,7 @@
 package org.elasticsearch.test.disruption;
 
 import com.carrotsearch.randomizedtesting.generators.RandomPicks;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.cluster.ClusterState;
@@ -39,6 +40,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.BiConsumer;
+
+import static org.junit.Assert.assertFalse;
 
 /**
  * Network disruptions are modeled using two components:
@@ -116,7 +119,10 @@ public class NetworkDisruption implements ServiceDisruptionScheme {
     }
 
     protected void ensureNodeCount(InternalTestCluster cluster) {
-        cluster.validateClusterFormed();
+        assertFalse("cluster failed to form after disruption was healed", cluster.client().admin().cluster().prepareHealth()
+            .setWaitForNodes(String.valueOf(cluster.size()))
+            .setWaitForNoRelocatingShards(true)
+            .get().isTimedOut());
     }
 
     @Override
@@ -405,7 +411,7 @@ public class NetworkDisruption implements ServiceDisruptionScheme {
          * @param targetTransportService target transport service to which requests are sent
          */
         public void removeDisruption(MockTransportService sourceTransportService, MockTransportService targetTransportService) {
-            sourceTransportService.clearOutboundRules(targetTransportService);
+            sourceTransportService.clearRule(targetTransportService);
         }
 
         /**

@@ -20,7 +20,6 @@
 package org.elasticsearch.repositories.azure;
 
 import com.microsoft.azure.storage.StorageException;
-import org.apache.logging.log4j.core.util.Throwables;
 import org.elasticsearch.SpecialPermission;
 
 import java.io.IOException;
@@ -45,9 +44,7 @@ public final class SocketAccess {
         try {
             return AccessController.doPrivileged(operation);
         } catch (PrivilegedActionException e) {
-            Throwables.rethrow(e.getCause());
-            assert false : "always throws";
-            return null;
+            throw (IOException) e.getCause();
         }
     }
 
@@ -56,9 +53,7 @@ public final class SocketAccess {
         try {
             return AccessController.doPrivileged(operation);
         } catch (PrivilegedActionException e) {
-            Throwables.rethrow(e.getCause());
-            assert false : "always throws";
-            return null;
+            throw (StorageException) e.getCause();
         }
     }
 
@@ -70,7 +65,12 @@ public final class SocketAccess {
                 return null;
             });
         } catch (PrivilegedActionException e) {
-            Throwables.rethrow(e.getCause());
+            Throwable cause = e.getCause();
+            if (cause instanceof StorageException) {
+                throw (StorageException) cause;
+            } else {
+                throw (URISyntaxException) cause;
+            }
         }
     }
 

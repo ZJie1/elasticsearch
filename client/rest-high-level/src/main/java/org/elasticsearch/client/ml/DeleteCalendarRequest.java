@@ -19,14 +19,15 @@
 
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 
 import java.util.Objects;
 
 /**
  * Request to delete a Machine Learning Calendar
  */
-public class DeleteCalendarRequest implements Validatable {
+public class DeleteCalendarRequest extends ActionRequest {
 
     private final String calendarId;
 
@@ -40,6 +41,11 @@ public class DeleteCalendarRequest implements Validatable {
 
     public String getCalendarId() {
         return calendarId;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

@@ -14,7 +14,7 @@ excluding them from the search results.
 [[boosting-query-ex-request]]
 ==== Example request
 
-[source,console]
+[source,js]
 ----
 GET /_search
 {
@@ -35,6 +35,7 @@ GET /_search
     }
 }
 ----
+// CONSOLE
 
 [[boosting-top-level-params]]
 ==== Top-level parameters for `boosting`

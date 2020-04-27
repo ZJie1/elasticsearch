@@ -46,7 +46,8 @@ public class IsolateDatafeedAction extends ActionType<IsolateDatafeedAction.Resp
 
     public static class Request extends BaseTasksRequest<Request> implements ToXContentObject {
 
-        public static final ObjectParser<Request, Void> PARSER = new ObjectParser<>(NAME, Request::new);
+        public static ObjectParser<Request, Void> PARSER = new ObjectParser<>(NAME, Request::new);
+
         static {
             PARSER.declareString((request, datafeedId) -> request.datafeedId = datafeedId, DatafeedConfig.ID);
         }

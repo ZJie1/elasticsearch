@@ -203,7 +203,7 @@ class BulkByScrollParallelizationHelper {
                 if (request.source().slice() != null) {
                     throw new IllegalStateException("Can't slice a request that already has a slice configuration");
                 }
-                slicedSource = request.source().shallowCopy().slice(sliceBuilder);
+                slicedSource = request.source().copyWithNewSlice(sliceBuilder);
             }
             SearchRequest searchRequest = new SearchRequest(request);
             searchRequest.source(slicedSource);

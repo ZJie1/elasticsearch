@@ -20,13 +20,15 @@ package org.elasticsearch.client.indices;
 
 import org.elasticsearch.ElasticsearchGenerationException;
 import org.elasticsearch.ElasticsearchParseException;
+import org.elasticsearch.action.ActionRequestValidationException;
+import org.elasticsearch.action.IndicesRequest;
 import org.elasticsearch.action.admin.indices.alias.Alias;
-import org.elasticsearch.client.TimedRequest;
+import org.elasticsearch.action.support.IndicesOptions;
+import org.elasticsearch.action.support.master.MasterNodeRequest;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.DeprecationHandler;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.common.xcontent.ToXContentFragment;
@@ -48,12 +50,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.elasticsearch.action.ValidateActions.addValidationError;
 import static org.elasticsearch.common.settings.Settings.Builder.EMPTY_SETTINGS;
 
 /**
  * A request to create an index template.
  */
-public class PutIndexTemplateRequest extends TimedRequest implements ToXContentFragment {
+public class PutIndexTemplateRequest extends MasterNodeRequest<PutIndexTemplateRequest> implements IndicesRequest, ToXContentFragment {
 
     private String name;
 
@@ -74,11 +77,19 @@ public class PutIndexTemplateRequest extends TimedRequest implements ToXContentF
     private Integer version;
 
     /**
-     * Constructs a new put index template request with the provided name and patterns.
+     * Constructs a new put index template request with the provided name.
      */
-    public PutIndexTemplateRequest(String name, List<String> indexPatterns) {
+    public PutIndexTemplateRequest(String name) {
         this.name(name);
-        this.patterns(indexPatterns);
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        ActionRequestValidationException validationException = null;
+        if (indexPatterns == null || indexPatterns.size() == 0) {
+            validationException = addValidationError("index patterns are missing", validationException);
+        }
+        return validationException;
     }
 
     /**
@@ -100,9 +111,6 @@ public class PutIndexTemplateRequest extends TimedRequest implements ToXContentF
     }
 
     public PutIndexTemplateRequest patterns(List<String> indexPatterns) {
-        if (indexPatterns == null || indexPatterns.size() == 0) {
-            throw new IllegalArgumentException("index patterns are missing");
-        }
         this.indexPatterns = indexPatterns;
         return this;
     }
@@ -278,14 +286,18 @@ public class PutIndexTemplateRequest extends TimedRequest implements ToXContentF
         Map<String, Object> source = templateSource;
         for (Map.Entry<String, Object> entry : source.entrySet()) {
             String name = entry.getKey();
-            if (name.equals("index_patterns")) {
+            if (name.equals("template")) {
+                if(entry.getValue() instanceof String) {
+                    patterns(Collections.singletonList((String) entry.getValue()));
+                }
+            } else if (name.equals("index_patterns")) {
                 if(entry.getValue() instanceof String) {
                     patterns(Collections.singletonList((String) entry.getValue()));
                 } else if (entry.getValue() instanceof List) {
                     List<String> elements = ((List<?>) entry.getValue()).stream().map(Object::toString).collect(Collectors.toList());
                     patterns(elements);
                 } else {
-                    throw new IllegalArgumentException("Malformed [index_patterns] value, should be a string or a list of strings");
+                    throw new IllegalArgumentException("Malformed [template] value, should be a string or a list of strings");
                 }
             } else if (name.equals("order")) {
                 order(XContentMapValues.nodeIntegerValue(entry.getValue(), order()));
@@ -400,21 +412,14 @@ public class PutIndexTemplateRequest extends TimedRequest implements ToXContentF
         return this;
     }
 
-    /**
-     * @deprecated Use {@link #setMasterTimeout(TimeValue)} instead
-     */
-    @Deprecated
-    public final PutIndexTemplateRequest masterNodeTimeout(TimeValue timeout) {
-        setMasterTimeout(timeout);
-        return this;
+    @Override
+    public String[] indices() {
+        return indexPatterns.toArray(new String[indexPatterns.size()]);
     }
 
-    /**
-     * @deprecated Use {@link #setMasterTimeout(TimeValue)} instead
-     */
-    @Deprecated
-    public final PutIndexTemplateRequest masterNodeTimeout(String timeout) {
-        return masterNodeTimeout(TimeValue.parseTimeValue(timeout, null, getClass().getSimpleName() + ".masterNodeTimeout"));
+    @Override
+    public IndicesOptions indicesOptions() {
+        return IndicesOptions.strictExpand();
     }
 
     @Override

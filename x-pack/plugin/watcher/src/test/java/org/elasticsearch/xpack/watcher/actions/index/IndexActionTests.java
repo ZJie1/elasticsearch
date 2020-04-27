@@ -105,8 +105,26 @@ public class IndexActionTests extends ESTestCase {
         assertThat(executable.action().timeout, equalTo(writeTimeout));
     }
 
+    public void testDeprecationTypes() throws Exception {
+        XContentBuilder builder = jsonBuilder();
+        builder.startObject();
+        builder.field(IndexAction.Field.DOC_TYPE.getPreferredName(), "test-type");
+        builder.endObject();
+        IndexActionFactory actionParser = new IndexActionFactory(Settings.EMPTY, client);
+        XContentParser parser = createParser(builder);
+        parser.nextToken();
+        ExecutableIndexAction executable = actionParser.parseExecutable(randomAlphaOfLength(5), randomAlphaOfLength(3), parser);
+        assertThat(executable.action().docType, equalTo("test-type"));
+        assertWarnings(IndexAction.TYPES_DEPRECATION_MESSAGE);
+    }
+
     public void testParserFailure() throws Exception {
         // wrong type for field
+        expectParseFailure(jsonBuilder()
+                .startObject()
+                .field(IndexAction.Field.DOC_TYPE.getPreferredName(), 1234)
+                .endObject());
+
         expectParseFailure(jsonBuilder()
                 .startObject()
                 .field(IndexAction.Field.TIMEOUT.getPreferredName(), "1234")
@@ -143,7 +161,7 @@ public class IndexActionTests extends ESTestCase {
     }
 
     public void testUsingParameterIdWithBulkOrIdFieldThrowsIllegalState() {
-        final IndexAction action = new IndexAction("test-index", "123", null, null, null, refreshPolicy);
+        final IndexAction action = new IndexAction("test-index", "test-type", "123", null, null, null, refreshPolicy);
         final ExecutableIndexAction executable = new ExecutableIndexAction(action, logger, client,
                 TimeValue.timeValueSeconds(30), TimeValue.timeValueSeconds(30));
         final Map<String, Object> docWithId = Map.of(
@@ -178,18 +196,23 @@ public class IndexActionTests extends ESTestCase {
 
     public void testThatIndexTypeIdDynamically() throws Exception {
         boolean configureIndexDynamically = randomBoolean();
-        boolean configureIdDynamically = configureIndexDynamically == false || randomBoolean();
+        boolean configureTypeDynamically = randomBoolean();
+        boolean configureIdDynamically = (configureTypeDynamically == false && configureIndexDynamically == false) || randomBoolean();
 
         var entries = new ArrayList<Map.Entry<String, Object>>(4);
         entries.add(entry("foo", "bar"));
         if (configureIdDynamically) {
             entries.add(entry("_id", "my_dynamic_id"));
         }
+        if (configureTypeDynamically) {
+            entries.add(entry("_type", "my_dynamic_type"));
+        }
         if (configureIndexDynamically) {
             entries.add(entry("_index", "my_dynamic_index"));
         }
 
         final IndexAction action = new IndexAction(configureIndexDynamically ? null : "my_index",
+                configureTypeDynamically ? null : "my_type",
                 configureIdDynamically ? null : "my_id",
                 null, null, null, refreshPolicy);
         final ExecutableIndexAction executable = new ExecutableIndexAction(action, logger, client,
@@ -199,7 +222,7 @@ public class IndexActionTests extends ESTestCase {
 
         ArgumentCaptor<IndexRequest> captor = ArgumentCaptor.forClass(IndexRequest.class);
         PlainActionFuture<IndexResponse> listener = PlainActionFuture.newFuture();
-        listener.onResponse(new IndexResponse(new ShardId(new Index("foo", "bar"), 0), "whatever", 1, 1, 1, true));
+        listener.onResponse(new IndexResponse(new ShardId(new Index("foo", "bar"), 0), "whatever", "whatever", 1, 1, 1, true));
         when(client.index(captor.capture())).thenReturn(listener);
         Action.Result result = executable.execute("_id", ctx, ctx.payload());
 
@@ -207,11 +230,12 @@ public class IndexActionTests extends ESTestCase {
         assertThat(captor.getAllValues(), hasSize(1));
 
         assertThat(captor.getValue().index(), is(configureIndexDynamically ? "my_dynamic_index" : "my_index"));
+        assertThat(captor.getValue().type(), is(configureTypeDynamically ? "my_dynamic_type" : "my_type"));
         assertThat(captor.getValue().id(), is(configureIdDynamically ? "my_dynamic_id" : "my_id"));
     }
 
     public void testThatIndexActionCanBeConfiguredWithDynamicIndexNameAndBulk() throws Exception {
-        final IndexAction action = new IndexAction(null, null, null, null, null, refreshPolicy);
+        final IndexAction action = new IndexAction(null, "my-type", null, null, null, null, refreshPolicy);
         final ExecutableIndexAction executable = new ExecutableIndexAction(action, logger, client,
                 TimeValue.timeValueSeconds(30), TimeValue.timeValueSeconds(30));
 
@@ -222,7 +246,7 @@ public class IndexActionTests extends ESTestCase {
 
         ArgumentCaptor<BulkRequest> captor = ArgumentCaptor.forClass(BulkRequest.class);
         PlainActionFuture<BulkResponse> listener = PlainActionFuture.newFuture();
-        IndexResponse indexResponse = new IndexResponse(new ShardId(new Index("foo", "bar"), 0), "whatever", 1, 1, 1, true);
+        IndexResponse indexResponse = new IndexResponse(new ShardId(new Index("foo", "bar"), 0), "whatever", "whatever", 1, 1, 1, true);
         BulkItemResponse response = new BulkItemResponse(0, DocWriteRequest.OpType.INDEX, indexResponse);
         BulkResponse bulkResponse = new BulkResponse(new BulkItemResponse[]{response}, 1);
         listener.onResponse(bulkResponse);
@@ -232,13 +256,16 @@ public class IndexActionTests extends ESTestCase {
         assertThat(result.status(), is(Status.SUCCESS));
         assertThat(captor.getAllValues(), hasSize(1));
         assertThat(captor.getValue().requests(), hasSize(2));
+        assertThat(captor.getValue().requests().get(0).type(), is("my-type"));
         assertThat(captor.getValue().requests().get(0).index(), is("my-index"));
+        assertThat(captor.getValue().requests().get(1).type(), is("my-type"));
         assertThat(captor.getValue().requests().get(1).index(), is("my-other-index"));
     }
 
     public void testConfigureIndexInMapAndAction() {
-        String fieldName = "_index";
-        final IndexAction action = new IndexAction("my_index",
+        String fieldName = randomFrom("_index", "_type");
+        final IndexAction action = new IndexAction(fieldName.equals("_index") ? "my_index" : null,
+                fieldName.equals("_type") ? "my_type" : null,
                 null,null, null, null, refreshPolicy);
         final ExecutableIndexAction executable = new ExecutableIndexAction(action, logger, client,
                 TimeValue.timeValueSeconds(30), TimeValue.timeValueSeconds(30));
@@ -258,7 +285,7 @@ public class IndexActionTests extends ESTestCase {
         String docId = randomAlphaOfLength(5);
         String timestampField = randomFrom("@timestamp", null);
 
-        IndexAction action = new IndexAction("test-index", docIdAsParam ? docId : null, timestampField, null, null,
+        IndexAction action = new IndexAction("test-index", "test-type", docIdAsParam ? docId : null, timestampField, null, null,
                 refreshPolicy);
         ExecutableIndexAction executable = new ExecutableIndexAction(action, logger, client, TimeValue.timeValueSeconds(30),
                 TimeValue.timeValueSeconds(30));
@@ -276,7 +303,7 @@ public class IndexActionTests extends ESTestCase {
 
         ArgumentCaptor<IndexRequest> captor = ArgumentCaptor.forClass(IndexRequest.class);
         PlainActionFuture<IndexResponse> listener = PlainActionFuture.newFuture();
-        listener.onResponse(new IndexResponse(new ShardId(new Index("test-index", "uuid"), 0), docId, 1, 1, 1, true));
+        listener.onResponse(new IndexResponse(new ShardId(new Index("test-index", "uuid"), 0), "test-type", docId, 1, 1, 1, true));
         when(client.index(captor.capture())).thenReturn(listener);
 
         Action.Result result = executable.execute("_id", ctx, ctx.payload());
@@ -287,6 +314,7 @@ public class IndexActionTests extends ESTestCase {
         XContentSource response = successResult.response();
         assertThat(response.getValue("created"), equalTo((Object)Boolean.TRUE));
         assertThat(response.getValue("version"), equalTo((Object) 1));
+        assertThat(response.getValue("type").toString(), equalTo("test-type"));
         assertThat(response.getValue("index").toString(), equalTo("test-index"));
 
         assertThat(captor.getAllValues(), hasSize(1));
@@ -308,7 +336,7 @@ public class IndexActionTests extends ESTestCase {
     }
 
     public void testFailureResult() throws Exception {
-        IndexAction action = new IndexAction("test-index", null, "@timestamp", null, null, refreshPolicy);
+        IndexAction action = new IndexAction("test-index", "test-type", null, "@timestamp", null, null, refreshPolicy);
         ExecutableIndexAction executable = new ExecutableIndexAction(action, logger, client,
                 TimeValue.timeValueSeconds(30), TimeValue.timeValueSeconds(30));
 
@@ -324,13 +352,13 @@ public class IndexActionTests extends ESTestCase {
 
         ArgumentCaptor<BulkRequest> captor = ArgumentCaptor.forClass(BulkRequest.class);
         PlainActionFuture<BulkResponse> listener = PlainActionFuture.newFuture();
-        BulkItemResponse.Failure failure = new BulkItemResponse.Failure("test-index", "anything",
+        BulkItemResponse.Failure failure = new BulkItemResponse.Failure("test-index", "test-type", "anything",
                 new ElasticsearchException("anything"));
         BulkItemResponse firstResponse = new BulkItemResponse(0, DocWriteRequest.OpType.INDEX, failure);
         BulkItemResponse secondResponse;
         if (isPartialFailure) {
             ShardId shardId = new ShardId(new Index("foo", "bar"), 0);
-            IndexResponse indexResponse = new IndexResponse(shardId, "whatever", 1, 1, 1, true);
+            IndexResponse indexResponse = new IndexResponse(shardId, "whatever", "whatever", 1, 1, 1, true);
             secondResponse = new BulkItemResponse(1, DocWriteRequest.OpType.INDEX, indexResponse);
         } else {
             secondResponse = new BulkItemResponse(1, DocWriteRequest.OpType.INDEX, failure);

@@ -5,9 +5,12 @@
  */
 package org.elasticsearch.xpack.ml.rest.modelsnapshots;
 
+import org.apache.logging.log4j.LogManager;
 import org.elasticsearch.client.node.NodeClient;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.rest.BaseRestHandler;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.action.RestToXContentListener;
 import org.elasticsearch.xpack.core.action.util.PageParams;
@@ -17,8 +20,6 @@ import org.elasticsearch.xpack.core.ml.job.config.Job;
 import org.elasticsearch.xpack.ml.MachineLearning;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 
 import static org.elasticsearch.rest.RestRequest.Method.GET;
 import static org.elasticsearch.rest.RestRequest.Method.POST;
@@ -35,32 +36,34 @@ public class RestGetModelSnapshotsAction extends BaseRestHandler {
     private static final String DEFAULT_END = null;
     private static final boolean DEFAULT_DESC_ORDER = true;
 
-    @Override
-    public List<Route> routes() {
-        return Collections.emptyList();
-    }
+    private static final DeprecationLogger deprecationLogger =
+        new DeprecationLogger(LogManager.getLogger(RestGetModelSnapshotsAction.class));
 
-    @Override
-    public List<ReplacedRoute> replacedRoutes() {
+    public RestGetModelSnapshotsAction(RestController controller) {
         // TODO: remove deprecated endpoint in 8.0.0
-        return List.of(
-            new ReplacedRoute(GET, MachineLearning.BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}",
-                GET, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}"),
-            new ReplacedRoute(POST, MachineLearning.BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}",
-                POST, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}"),
-            new ReplacedRoute(GET, MachineLearning.BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots",
-                GET, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots"),
-            new ReplacedRoute(POST, MachineLearning.BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots",
-                POST, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
-                + Job.ID.getPreferredName() + "}/model_snapshots")
-        );
+        controller.registerWithDeprecatedHandler(
+            GET, MachineLearning.BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}", this,
+            GET, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}", deprecationLogger);
+        // endpoints that support body parameters must also accept POST
+        controller.registerWithDeprecatedHandler(
+            POST, MachineLearning.BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}", this,
+            POST, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots/{" + Request.SNAPSHOT_ID.getPreferredName() + "}", deprecationLogger);
+
+        controller.registerWithDeprecatedHandler(
+            GET, MachineLearning.BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots", this,
+            GET, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots", deprecationLogger);
+        // endpoints that support body parameters must also accept POST
+        controller.registerWithDeprecatedHandler(
+            POST, MachineLearning.BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots", this,
+            POST, MachineLearning.PRE_V7_BASE_PATH + "anomaly_detectors/{"
+                + Job.ID.getPreferredName() + "}/model_snapshots", deprecationLogger);
     }
 
     @Override

@@ -23,6 +23,7 @@ import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
+import org.elasticsearch.index.mapper.DocumentMapper;
 import org.elasticsearch.index.mapper.IdFieldMapper;
 import org.elasticsearch.index.mapper.IgnoredFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
@@ -31,6 +32,7 @@ import org.elasticsearch.index.mapper.RoutingFieldMapper;
 import org.elasticsearch.index.mapper.SourceFieldMapper;
 import org.elasticsearch.index.mapper.Uid;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,7 +57,7 @@ public class FieldsVisitor extends StoredFieldVisitor {
     private final String sourceFieldName;
     private final Set<String> requiredFields;
     protected BytesReference source;
-    protected String id;
+    protected String type, id;
     protected Map<String, List<Object>> fieldsValues;
 
     public FieldsVisitor(boolean loadSource) {
@@ -70,7 +72,7 @@ public class FieldsVisitor extends StoredFieldVisitor {
     }
 
     @Override
-    public Status needsField(FieldInfo fieldInfo) {
+    public Status needsField(FieldInfo fieldInfo) throws IOException {
         if (requiredFields.remove(fieldInfo.name)) {
             return Status.YES;
         }
@@ -88,8 +90,12 @@ public class FieldsVisitor extends StoredFieldVisitor {
     }
 
     public void postProcess(MapperService mapperService) {
+        final DocumentMapper mapper = mapperService.documentMapper();
+        if (mapper != null) {
+            type = mapper.type();
+        }
         for (Map.Entry<String, List<Object>> entry : fields().entrySet()) {
-            MappedFieldType fieldType = mapperService.fieldType(entry.getKey());
+            MappedFieldType fieldType = mapperService.fullName(entry.getKey());
             if (fieldType == null) {
                 throw new IllegalStateException("Field [" + entry.getKey()
                     + "] exists in the index but not in mappings");
@@ -102,60 +108,53 @@ public class FieldsVisitor extends StoredFieldVisitor {
     }
 
     @Override
-    public void binaryField(FieldInfo fieldInfo, byte[] value) {
-        binaryField(fieldInfo, new BytesRef(value));
-    }
-
-    public void binaryField(FieldInfo fieldInfo, BytesRef value) {
+    public void binaryField(FieldInfo fieldInfo, byte[] value) throws IOException {
         if (sourceFieldName.equals(fieldInfo.name)) {
             source = new BytesArray(value);
         } else if (IdFieldMapper.NAME.equals(fieldInfo.name)) {
-            id = Uid.decodeId(value.bytes, value.offset, value.length);
+            id = Uid.decodeId(value);
         } else {
-            addValue(fieldInfo.name, value);
+            addValue(fieldInfo.name, new BytesRef(value));
         }
     }
 
     @Override
-    public void stringField(FieldInfo fieldInfo, byte[] bytes) {
-        assert IdFieldMapper.NAME.equals(fieldInfo.name) == false : "_id field must go through binaryField";
-        assert sourceFieldName.equals(fieldInfo.name) == false : "source field must go through binaryField";
+    public void stringField(FieldInfo fieldInfo, byte[] bytes) throws IOException {
         final String value = new String(bytes, StandardCharsets.UTF_8);
         addValue(fieldInfo.name, value);
     }
 
     @Override
-    public void intField(FieldInfo fieldInfo, int value) {
+    public void intField(FieldInfo fieldInfo, int value) throws IOException {
         addValue(fieldInfo.name, value);
     }
 
     @Override
-    public void longField(FieldInfo fieldInfo, long value) {
+    public void longField(FieldInfo fieldInfo, long value) throws IOException {
         addValue(fieldInfo.name, value);
     }
 
     @Override
-    public void floatField(FieldInfo fieldInfo, float value) {
+    public void floatField(FieldInfo fieldInfo, float value) throws IOException {
         addValue(fieldInfo.name, value);
     }
 
     @Override
-    public void doubleField(FieldInfo fieldInfo, double value) {
+    public void doubleField(FieldInfo fieldInfo, double value) throws IOException {
         addValue(fieldInfo.name, value);
-    }
-
-    public void objectField(FieldInfo fieldInfo, Object object) {
-        assert IdFieldMapper.NAME.equals(fieldInfo.name) == false : "_id field must go through binaryField";
-        assert sourceFieldName.equals(fieldInfo.name) == false : "source field must go through binaryField";
-        addValue(fieldInfo.name, object);
     }
 
     public BytesReference source() {
         return source;
     }
 
-    public String id() {
-        return id;
+    public Uid uid() {
+        if (id == null) {
+            return null;
+        } else if (type == null) {
+            throw new IllegalStateException("Call postProcess before getting the uid");
+        }
+        return new Uid(type, id);
     }
 
     public String routing() {
@@ -177,6 +176,7 @@ public class FieldsVisitor extends StoredFieldVisitor {
     public void reset() {
         if (fieldsValues != null) fieldsValues.clear();
         source = null;
+        type = null;
         id = null;
 
         requiredFields.addAll(BASE_REQUIRED_FIELDS);

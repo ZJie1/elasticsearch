@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.calendars.Calendar;
 import org.elasticsearch.client.ml.calendars.ScheduledEvent;
 import org.elasticsearch.common.ParseField;
@@ -34,7 +35,7 @@ import java.util.Objects;
 /**
  * Request to add a ScheduledEvent to a Machine Learning calendar
  */
-public class PostCalendarEventRequest implements Validatable, ToXContentObject {
+public class PostCalendarEventRequest extends ActionRequest implements ToXContentObject {
 
     private final String calendarId;
     private final List<ScheduledEvent> scheduledEvents;
@@ -75,6 +76,11 @@ public class PostCalendarEventRequest implements Validatable, ToXContentObject {
 
     public List<ScheduledEvent> getScheduledEvents() {
         return scheduledEvents;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

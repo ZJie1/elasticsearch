@@ -46,7 +46,8 @@ public class PercentilesTests extends BaseAggregationTestCase<PercentilesAggrega
         }
         if (randomBoolean()) {
             factory.numberOfSignificantValueDigits(randomIntBetween(0, 5));
-        } else if (randomBoolean()) {
+        }
+        if (randomBoolean()) {
             factory.compression(randomIntBetween(1, 50000));
         }
         String field = randomNumericField();
@@ -69,21 +70,6 @@ public class PercentilesTests extends BaseAggregationTestCase<PercentilesAggrega
         assertEquals("[percents] must not be empty: [testAgg]", ex.getMessage());
     }
 
-    public void testOutOfRangePercentilesThrows() throws IOException {
-        PercentilesAggregationBuilder builder = new PercentilesAggregationBuilder("testAgg");
-        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> builder.percentiles(-0.4));
-        assertEquals("percent must be in [0,100], got [-0.4]: [testAgg]", ex.getMessage());
-
-        ex = expectThrows(IllegalArgumentException.class, () -> builder.percentiles(104));
-        assertEquals("percent must be in [0,100], got [104.0]: [testAgg]", ex.getMessage());
-    }
-
-    public void testDuplicatePercentilesThrows() throws IOException {
-        PercentilesAggregationBuilder builder = new PercentilesAggregationBuilder("testAgg");
-        IllegalArgumentException ex = expectThrows(IllegalArgumentException.class, () -> builder.percentiles(5, 42, 10, 99, 42, 87));
-        assertEquals("percent [42.0] has been specified twice: [testAgg]", ex.getMessage());
-    }
-
     public void testExceptionMultipleMethods() throws IOException {
         final String illegalAgg = "{\n" +
             "       \"percentiles\": {\n" +
@@ -101,7 +87,7 @@ public class PercentilesTests extends BaseAggregationTestCase<PercentilesAggrega
         assertEquals(XContentParser.Token.START_OBJECT, parser.nextToken());
         assertEquals(XContentParser.Token.FIELD_NAME, parser.nextToken());
         XContentParseException e = expectThrows(XContentParseException.class,
-                () -> PercentilesAggregationBuilder.PARSER.parse(parser, "myPercentiles"));
+                () -> PercentilesAggregationBuilder.parse("myPercentiles", parser));
         assertThat(e.getMessage(), containsString("[percentiles] failed to parse field [hdr]"));
     }
 }

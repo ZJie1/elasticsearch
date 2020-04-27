@@ -45,7 +45,7 @@ public abstract class StringSortScript extends AbstractSortScript {
     /**
      * A factory to construct stateful {@link StringSortScript} factories for a specific index.
      */
-    public interface Factory extends ScriptFactory {
+    public interface Factory {
         LeafFactory newFactory(Map<String, Object> params, SearchLookup lookup);
     }
 }

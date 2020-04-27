@@ -18,14 +18,15 @@
  */
 package org.elasticsearch.search.aggregations.metrics;
 
+import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.PointValues;
 import org.apache.lucene.search.CollectionTerminatedException;
 import org.apache.lucene.search.MatchAllDocsQuery;
-import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.search.ScoreMode;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.DoubleArray;
@@ -40,11 +41,13 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.LeafBucketCollector;
 import org.elasticsearch.search.aggregations.LeafBucketCollectorBase;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.aggregations.support.ValuesSourceConfig;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -60,12 +63,13 @@ class MinAggregator extends NumericMetricsAggregator.SingleValue {
     DoubleArray mins;
 
     MinAggregator(String name,
-                    ValuesSourceConfig config,
+                    ValuesSourceConfig<ValuesSource.Numeric> config,
                     ValuesSource.Numeric valuesSource,
                     SearchContext context,
                     Aggregator parent,
-                    Map<String, Object> metadata) throws IOException {
-        super(name, context, parent, metadata);
+                    List<PipelineAggregator> pipelineAggregators,
+                    Map<String, Object> metaData) throws IOException {
+        super(name, context, parent, pipelineAggregators, metaData);
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
             mins = context.bigArrays().newDoubleArray(1, false);
@@ -99,7 +103,7 @@ class MinAggregator extends NumericMetricsAggregator.SingleValue {
         if (pointConverter != null) {
             Number segMin = findLeafMinValue(ctx.reader(), pointField, pointConverter);
             if (segMin != null) {
-                /*
+                /**
                  * There is no parent aggregator (see {@link MinAggregator#getPointReaderOrNull}
                  * so the ordinal for the bucket is always 0.
                  */
@@ -146,12 +150,12 @@ class MinAggregator extends NumericMetricsAggregator.SingleValue {
         if (valuesSource == null || bucket >= mins.size()) {
             return buildEmptyAggregation();
         }
-        return new InternalMin(name, mins.get(bucket), format, metadata());
+        return new InternalMin(name, mins.get(bucket), format, pipelineAggregators(), metaData());
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new InternalMin(name, Double.POSITIVE_INFINITY, format, metadata());
+        return new InternalMin(name, Double.POSITIVE_INFINITY, format, pipelineAggregators(), metaData());
     }
 
     @Override
@@ -169,7 +173,7 @@ class MinAggregator extends NumericMetricsAggregator.SingleValue {
      * @param config The config for the values source metric.
      */
     static Function<byte[], Number> getPointReaderOrNull(SearchContext context, Aggregator parent,
-                                                                ValuesSourceConfig config) {
+                                                                ValuesSourceConfig<ValuesSource.Numeric> config) {
         if (context.query() != null &&
                 context.query().getClass() != MatchAllDocsQuery.class) {
             return null;
@@ -177,7 +181,7 @@ class MinAggregator extends NumericMetricsAggregator.SingleValue {
         if (parent != null) {
             return null;
         }
-        if (config.fieldContext() != null && config.script() == null && config.missing() == null) {
+        if (config.fieldContext() != null && config.script() == null) {
             MappedFieldType fieldType = config.fieldContext().fieldType();
             if (fieldType == null || fieldType.indexOptions() == IndexOptions.NONE) {
                 return null;
@@ -186,8 +190,7 @@ class MinAggregator extends NumericMetricsAggregator.SingleValue {
             if (fieldType instanceof NumberFieldMapper.NumberFieldType) {
                 converter = ((NumberFieldMapper.NumberFieldType) fieldType)::parsePoint;
             } else if (fieldType.getClass() == DateFieldMapper.DateFieldType.class) {
-                DateFieldMapper.DateFieldType dft = (DateFieldMapper.DateFieldType) fieldType;
-                converter = dft.resolution()::parsePointAsMillis;
+                converter = (in) -> LongPoint.decodeDimension(in, 0);
             }
             return converter;
         }

@@ -14,7 +14,6 @@ import org.elasticsearch.client.Response;
 import org.elasticsearch.client.ResponseException;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.xcontent.XContentHelper;
-import org.elasticsearch.common.xcontent.cbor.CborXContent;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
 import org.elasticsearch.test.NotEqualMessageBuilder;
 import org.hamcrest.Matcher;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
 
 import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.mode;
 import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.randomMode;
-import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.version;
 import static org.elasticsearch.xpack.sql.qa.rest.RestSqlTestCase.SQL_QUERY_REST_ENDPOINT;
 import static org.elasticsearch.xpack.sql.qa.rest.RestSqlTestCase.columnInfo;
 import static org.hamcrest.Matchers.containsString;
@@ -71,11 +69,11 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
         public void expectScrollMatchesAdmin(String adminSql, String user, String userSql) throws Exception {
             String mode = randomMode();
             Map<String, Object> adminResponse = runSql(null,
-                    new StringEntity("{\"query\": \"" + adminSql + "\", \"fetch_size\": 1" + mode(mode) + version(mode) + "}",
-                            ContentType.APPLICATION_JSON), mode);
+                    new StringEntity("{\"query\": \"" + adminSql + "\", \"fetch_size\": 1" + mode(mode) + "}",
+                            ContentType.APPLICATION_JSON));
             Map<String, Object> otherResponse = runSql(user,
-                    new StringEntity("{\"query\": \"" + adminSql + "\", \"fetch_size\": 1" + mode(mode) + version(mode) + "}",
-                            ContentType.APPLICATION_JSON), mode);
+                    new StringEntity("{\"query\": \"" + adminSql + "\", \"fetch_size\": 1" + mode(mode) + "}",
+                            ContentType.APPLICATION_JSON));
 
             String adminCursor = (String) adminResponse.remove("cursor");
             String otherCursor = (String) otherResponse.remove("cursor");
@@ -84,11 +82,9 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
             assertResponse(adminResponse, otherResponse);
             while (true) {
                 adminResponse = runSql(null,
-                        new StringEntity("{\"cursor\": \"" + adminCursor + "\"" + mode(mode) + version(mode) + "}",
-                            ContentType.APPLICATION_JSON), mode);
+                        new StringEntity("{\"cursor\": \"" + adminCursor + "\"" + mode(mode) + "}", ContentType.APPLICATION_JSON));
                 otherResponse = runSql(user,
-                        new StringEntity("{\"cursor\": \"" + otherCursor + "\"" + mode(mode) + version(mode) + "}",
-                            ContentType.APPLICATION_JSON), mode);
+                        new StringEntity("{\"cursor\": \"" + otherCursor + "\"" + mode(mode) + "}", ContentType.APPLICATION_JSON));
                 adminCursor = (String) adminResponse.remove("cursor");
                 otherCursor = (String) otherResponse.remove("cursor");
                 assertResponse(adminResponse, otherResponse);
@@ -133,7 +129,7 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
             for (String table : tables) {
                 List<String> fields = new ArrayList<>();
                 fields.add(table);
-                fields.add("TABLE");
+                fields.add("BASE TABLE");
                 fields.add("INDEX");
                 rows.add(fields);
             }
@@ -183,11 +179,10 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
         }
 
         private static Map<String, Object> runSql(@Nullable String asUser, String mode, String sql) throws IOException {
-            return runSql(asUser, new StringEntity("{\"query\": \"" + sql + "\"" + mode(mode) + version(mode) + "}",
-                ContentType.APPLICATION_JSON), mode);
+            return runSql(asUser, new StringEntity("{\"query\": \"" + sql + "\"" + mode(mode) + "}", ContentType.APPLICATION_JSON));
         }
 
-        private static Map<String, Object> runSql(@Nullable String asUser, HttpEntity entity, String mode) throws IOException {
+        private static Map<String, Object> runSql(@Nullable String asUser, HttpEntity entity) throws IOException {
             Request request = new Request("POST", SQL_QUERY_REST_ENDPOINT);
             if (asUser != null) {
                 RequestOptions.Builder options = request.getOptions().toBuilder();
@@ -195,7 +190,7 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
                 request.setOptions(options);
             }
             request.setEntity(entity);
-            return toMap(client().performRequest(request), mode);
+            return toMap(client().performRequest(request));
         }
 
         private static void assertResponse(Map<String, Object> expected, Map<String, Object> actual) {
@@ -206,13 +201,9 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
             }
         }
 
-        private static Map<String, Object> toMap(Response response, String mode) throws IOException {
+        private static Map<String, Object> toMap(Response response) throws IOException {
             try (InputStream content = response.getEntity().getContent()) {
-                if (mode.equalsIgnoreCase("jdbc")) {
-                    return XContentHelper.convertToMap(CborXContent.cborXContent, content, false);
-                } else {
-                    return XContentHelper.convertToMap(JsonXContent.jsonXContent, content, false);
-                }
+                return XContentHelper.convertToMap(JsonXContent.jsonXContent, content, false);
             }
         }
     }
@@ -234,18 +225,16 @@ public class RestSqlSecurityIT extends SqlSecurityTestCase {
      */
     public void testHijackScrollFails() throws Exception {
         createUser("full_access", "rest_minimal");
-        final String mode = randomMode();
 
         Map<String, Object> adminResponse = RestActions.runSql(null,
-                new StringEntity("{\"query\": \"SELECT * FROM test\", \"fetch_size\": 1" + mode(mode) + version(mode) + "}",
-                        ContentType.APPLICATION_JSON), mode);
+                new StringEntity("{\"query\": \"SELECT * FROM test\", \"fetch_size\": 1" + mode(randomMode()) + "}",
+                        ContentType.APPLICATION_JSON));
 
         String cursor = (String) adminResponse.remove("cursor");
         assertNotNull(cursor);
 
         ResponseException e = expectThrows(ResponseException.class, () -> RestActions.runSql("full_access",
-                new StringEntity("{\"cursor\":\"" + cursor + "\"" + mode(mode) + version(mode) + "}", ContentType.APPLICATION_JSON),
-                mode));
+                new StringEntity("{\"cursor\":\"" + cursor + "\"" + mode(randomMode()) + "}", ContentType.APPLICATION_JSON)));
         // TODO return a better error message for bad scrolls
         assertThat(e.getMessage(), containsString("No search context found for id"));
         assertEquals(404, e.getResponse().getStatusLine().getStatusCode());

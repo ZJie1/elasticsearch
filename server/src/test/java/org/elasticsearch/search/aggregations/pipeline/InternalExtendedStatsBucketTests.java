@@ -19,11 +19,16 @@
 
 package org.elasticsearch.search.aggregations.pipeline;
 
+import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.ParsedAggregation;
-import org.elasticsearch.search.aggregations.metrics.InternalExtendedStats;
 import org.elasticsearch.search.aggregations.metrics.InternalExtendedStatsTests;
+import org.elasticsearch.search.aggregations.metrics.InternalExtendedStats;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
+import org.elasticsearch.search.aggregations.pipeline.InternalExtendedStatsBucket;
+import org.elasticsearch.search.aggregations.pipeline.ParsedExtendedStatsBucket;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -33,18 +38,26 @@ public class InternalExtendedStatsBucketTests extends InternalExtendedStatsTests
     protected InternalExtendedStatsBucket createInstance(String name, long count, double sum, double min,
                                                          double max, double sumOfSqrs,
                                                          double sigma, DocValueFormat formatter,
-                                                         Map<String, Object> metadata) {
-        return new InternalExtendedStatsBucket(name, count, sum, min, max, sumOfSqrs, sigma, formatter, metadata);
+                                                         List<PipelineAggregator> pipelineAggregators,
+                                                         Map<String, Object> metaData) {
+        return new InternalExtendedStatsBucket(name, count, sum, min, max, sumOfSqrs, sigma, formatter, pipelineAggregators,
+                Collections.emptyMap());
     }
 
     @Override
     public void testReduceRandom() {
-        expectThrows(UnsupportedOperationException.class, () -> createTestInstance("name", null).reduce(null, null));
+        expectThrows(UnsupportedOperationException.class,
+                () -> createTestInstance("name", Collections.emptyList(), null).reduce(null, null));
     }
 
     @Override
     protected void assertReduced(InternalExtendedStats reduced, List<InternalExtendedStats> inputs) {
         // no test since reduce operation is unsupported
+    }
+
+    @Override
+    protected Writeable.Reader<InternalExtendedStats> instanceReader() {
+        return InternalExtendedStatsBucket::new;
     }
 
     @Override

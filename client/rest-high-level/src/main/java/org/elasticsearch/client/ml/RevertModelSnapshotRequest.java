@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.job.config.Job;
 import org.elasticsearch.client.ml.job.process.ModelSnapshot;
 import org.elasticsearch.common.ParseField;
@@ -32,7 +33,7 @@ import java.util.Objects;
 /**
  * A request to revert to a specific model snapshot for a given job
  */
-public class RevertModelSnapshotRequest implements Validatable, ToXContentObject {
+public class RevertModelSnapshotRequest extends ActionRequest implements ToXContentObject {
 
 
     public static final ParseField DELETE_INTERVENING = new ParseField("delete_intervening_results");
@@ -79,6 +80,11 @@ public class RevertModelSnapshotRequest implements Validatable, ToXContentObject
      */
     public void setDeleteInterveningResults(Boolean deleteInterveningResults) {
         this.deleteInterveningResults = deleteInterveningResults;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

@@ -44,7 +44,6 @@ import org.elasticsearch.client.security.user.privileges.IndicesPrivilegesTests;
 import org.elasticsearch.client.security.user.privileges.Role;
 import org.elasticsearch.common.CharArrays;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -72,8 +71,10 @@ public class SecurityIT extends ESRestHighLevelClientTestCase {
         final PutUserResponse updateUserResponse = execute(updateUserRequest, securityClient::putUser, securityClient::putUserAsync);
         // assert user not created
         assertThat(updateUserResponse.isCreated(), is(false));
-        // cleanup
-        deleteUser(putUserRequest.getUser());
+        // delete user
+        final Request deleteUserRequest = new Request(HttpDelete.METHOD_NAME,
+            "/_security/user/" + putUserRequest.getUser().getUsername());
+        highLevelClient().getLowLevelClient().performRequest(deleteUserRequest);
     }
 
     public void testGetUser() throws Exception {
@@ -90,8 +91,6 @@ public class SecurityIT extends ESRestHighLevelClientTestCase {
         ArrayList<User> users = new ArrayList<>();
         users.addAll(getUsersResponse.getUsers());
         assertThat(users.get(0), is(putUserRequest.getUser()));
-
-        deleteUser(putUserRequest.getUser());
     }
 
     public void testAuthenticate() throws Exception {
@@ -162,17 +161,12 @@ public class SecurityIT extends ESRestHighLevelClientTestCase {
         assertThat(deleteRoleResponse.isFound(), is(true));
     }
 
-    private void deleteUser(User user) throws IOException {
-        final Request deleteUserRequest = new Request(HttpDelete.METHOD_NAME, "/_security/user/" + user.getUsername());
-        highLevelClient().getLowLevelClient().performRequest(deleteUserRequest);
-    }
-
-    private User randomUser() {
+    private static User randomUser() {
         final String username = randomAlphaOfLengthBetween(1, 4);
         return randomUser(username);
     }
 
-    private User randomUser(String username) {
+    private static User randomUser(String username) {
         final List<String> roles = Arrays.asList(generateRandomStringArray(3, 3, false, true));
         final String fullName = randomFrom(random(), null, randomAlphaOfLengthBetween(0, 3));
         final String email = randomFrom(random(), null, randomAlphaOfLengthBetween(0, 3));
@@ -188,8 +182,6 @@ public class SecurityIT extends ESRestHighLevelClientTestCase {
         } else {
             metadata.put("string_list", Arrays.asList(generateRandomStringArray(4, 4, false, true)));
         }
-        metadata.put("test-case", getTestName());
-
         return new User(username, roles, metadata, fullName, email);
     }
 
@@ -198,7 +190,7 @@ public class SecurityIT extends ESRestHighLevelClientTestCase {
                 .name(roleName)
                 .clusterPrivileges(randomSubsetOf(randomInt(3), Role.ClusterPrivilegeName.ALL_ARRAY))
                 .indicesPrivileges(
-                        randomArray(3, IndicesPrivileges[]::new, () -> IndicesPrivilegesTests.createNewRandom("{\"match_all\": {}}")))
+                        randomArray(3, IndicesPrivileges[]::new, () -> IndicesPrivilegesTests.createNewRandom(randomAlphaOfLength(3))))
                 .applicationResourcePrivileges(randomArray(3, ApplicationResourcePrivileges[]::new,
                         () -> ApplicationResourcePrivilegesTests.createNewRandom(randomAlphaOfLength(3).toLowerCase(Locale.ROOT))))
                 .runAsPrivilege(randomArray(3, String[]::new, () -> randomAlphaOfLength(3)));
@@ -215,7 +207,7 @@ public class SecurityIT extends ESRestHighLevelClientTestCase {
         return roleBuilder.build();
     }
 
-    private PutUserRequest randomPutUserRequest(boolean enabled) {
+    private static PutUserRequest randomPutUserRequest(boolean enabled) {
         final User user = randomUser();
         return randomPutUserRequest(user, enabled);
     }

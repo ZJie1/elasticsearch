@@ -19,11 +19,14 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.NullSafeSubNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+import org.objectweb.asm.Label;
+
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -31,11 +34,10 @@ import static java.util.Objects.requireNonNull;
  * Implements a call who's value is null if the prefix is null rather than throwing an NPE.
  */
 public class PSubNullSafeCallInvoke extends AExpression {
-
     /**
-     * The expression guarded by the null check. Required at construction time and replaced at analysis time.
+     * The expression gaurded by the null check. Required at construction time and replaced at analysis time.
      */
-    protected final AExpression guarded;
+    private AExpression guarded;
 
     public PSubNullSafeCallInvoke(Location location, AExpression guarded) {
         super(location);
@@ -43,24 +45,37 @@ public class PSubNullSafeCallInvoke extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        throw createError(new IllegalStateException("illegal tree structure"));
+    }
 
-        Output guardedOutput = guarded.analyze(classNode, scriptRoot, scope, new Input());
-        output.actual = guardedOutput.actual;
-        if (output.actual.isPrimitive()) {
+    @Override
+    void extractVariables(Set<String> variables) {
+        throw createError(new IllegalStateException("illegal tree structure"));
+    }
+
+    @Override
+    void analyze(Locals locals) {
+        guarded.analyze(locals);
+        actual = guarded.actual;
+        if (actual.isPrimitive()) {
             throw new IllegalArgumentException("Result of null safe operator must be nullable");
         }
+    }
 
-        NullSafeSubNode nullSafeSubNode = new NullSafeSubNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
 
-        nullSafeSubNode.setChildNode(guardedOutput.expressionNode);
+        Label end = new Label();
+        writer.dup();
+        writer.ifNull(end);
+        guarded.write(writer, globals);
+        writer.mark(end);
+    }
 
-        nullSafeSubNode.setLocation(location);
-        nullSafeSubNode.setExpressionType(output.actual);
-
-        output.expressionNode = nullSafeSubNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString(guarded);
     }
 }

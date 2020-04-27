@@ -5,12 +5,10 @@
  */
 package org.elasticsearch.xpack.sql.expression;
 
-import org.elasticsearch.xpack.ql.expression.NameId;
-import org.elasticsearch.xpack.ql.expression.Nullability;
-import org.elasticsearch.xpack.ql.plan.logical.LogicalPlan;
-import org.elasticsearch.xpack.ql.tree.NodeInfo;
-import org.elasticsearch.xpack.ql.tree.Source;
-import org.elasticsearch.xpack.ql.type.DataType;
+import org.elasticsearch.xpack.sql.plan.logical.LogicalPlan;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.tree.NodeInfo;
+import org.elasticsearch.xpack.sql.type.DataType;
 
 public class ScalarSubquery extends SubQueryExpression {
 
@@ -18,7 +16,7 @@ public class ScalarSubquery extends SubQueryExpression {
         this(source, query, null);
     }
 
-    public ScalarSubquery(Source source, LogicalPlan query, NameId id) {
+    public ScalarSubquery(Source source, LogicalPlan query, ExpressionId id) {
         super(source, query, id);
     }
 

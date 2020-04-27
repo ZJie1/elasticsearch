@@ -264,7 +264,7 @@ public class AnalyzeAction extends ActionType<AnalyzeAction.Response> {
             return request;
         }
 
-        private static final ObjectParser<Request, Void> PARSER = new ObjectParser<>("analyze_request");
+        private static final ObjectParser<Request, Void> PARSER = new ObjectParser<>("analyze_request", null);
         static {
             PARSER.declareStringArray(Request::text, new ParseField("text"));
             PARSER.declareString(Request::analyzer, new ParseField("analyzer"));

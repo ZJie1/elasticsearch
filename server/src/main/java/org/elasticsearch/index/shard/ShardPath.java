@@ -19,9 +19,8 @@
 package org.elasticsearch.index.shard;
 
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.util.Strings;
 import org.elasticsearch.core.internal.io.IOUtils;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.env.NodeEnvironment;
 import org.elasticsearch.env.ShardLock;
@@ -115,13 +114,13 @@ public final class ShardPath {
     /**
      * This method walks through the nodes shard paths to find the data and state path for the given shard. If multiple
      * directories with a valid shard state exist the one with the highest version will be used.
-     * <b>Note:</b> this method resolves custom data locations for the shard if such a custom data path is provided.
+     * <b>Note:</b> this method resolves custom data locations for the shard.
      */
     public static ShardPath loadShardPath(Logger logger, NodeEnvironment env,
-                                          ShardId shardId, String customDataPath) throws IOException {
+                                                ShardId shardId, IndexSettings indexSettings) throws IOException {
         final Path[] paths = env.availableShardPaths(shardId);
         final Path sharedDataPath = env.sharedDataPath();
-        return loadShardPath(logger, shardId, customDataPath, paths, sharedDataPath);
+        return loadShardPath(logger, shardId, indexSettings, paths, sharedDataPath);
     }
 
     /**
@@ -129,15 +128,15 @@ public final class ShardPath {
      * directories with a valid shard state exist the one with the highest version will be used.
      * <b>Note:</b> this method resolves custom data locations for the shard.
      */
-    public static ShardPath loadShardPath(Logger logger, ShardId shardId, String customDataPath, Path[] availableShardPaths,
+    public static ShardPath loadShardPath(Logger logger, ShardId shardId, IndexSettings indexSettings, Path[] availableShardPaths,
                                           Path sharedDataPath) throws IOException {
-        final String indexUUID = shardId.getIndex().getUUID();
+        final String indexUUID = indexSettings.getUUID();
         Path loadedPath = null;
         for (Path path : availableShardPaths) {
             // EMPTY is safe here because we never call namedObject
-            ShardStateMetadata load = ShardStateMetadata.FORMAT.loadLatestState(logger, NamedXContentRegistry.EMPTY, path);
+            ShardStateMetaData load = ShardStateMetaData.FORMAT.loadLatestState(logger, NamedXContentRegistry.EMPTY, path);
             if (load != null) {
-                if (load.indexUUID.equals(indexUUID) == false && IndexMetadata.INDEX_UUID_NA_VALUE.equals(load.indexUUID) == false) {
+                if (load.indexUUID.equals(indexUUID) == false && IndexMetaData.INDEX_UUID_NA_VALUE.equals(load.indexUUID) == false) {
                     logger.warn("{} found shard on path: [{}] with a different index UUID - this "
                         + "shard seems to be leftover from a different index with the same name. "
                         + "Remove the leftover shard in order to reuse the path with the current index", shardId, path);
@@ -157,14 +156,13 @@ public final class ShardPath {
         } else {
             final Path dataPath;
             final Path statePath = loadedPath;
-            final boolean hasCustomDataPath = Strings.isNotEmpty(customDataPath);
-            if (hasCustomDataPath) {
-                dataPath = NodeEnvironment.resolveCustomLocation(customDataPath, shardId, sharedDataPath);
+            if (indexSettings.hasCustomDataPath()) {
+                dataPath = NodeEnvironment.resolveCustomLocation(indexSettings, shardId, sharedDataPath);
             } else {
                 dataPath = statePath;
             }
             logger.debug("{} loaded data path [{}], state path [{}]", shardId, dataPath, statePath);
-            return new ShardPath(hasCustomDataPath, dataPath, statePath, shardId);
+            return new ShardPath(indexSettings.hasCustomDataPath(), dataPath, statePath, shardId);
         }
     }
 
@@ -178,9 +176,9 @@ public final class ShardPath {
         final Path[] paths = env.availableShardPaths(lock.getShardId());
         for (Path path : paths) {
             // EMPTY is safe here because we never call namedObject
-            ShardStateMetadata load = ShardStateMetadata.FORMAT.loadLatestState(logger, NamedXContentRegistry.EMPTY, path);
+            ShardStateMetaData load = ShardStateMetaData.FORMAT.loadLatestState(logger, NamedXContentRegistry.EMPTY, path);
             if (load != null) {
-                if (load.indexUUID.equals(indexUUID) == false && IndexMetadata.INDEX_UUID_NA_VALUE.equals(load.indexUUID) == false) {
+                if (load.indexUUID.equals(indexUUID) == false && IndexMetaData.INDEX_UUID_NA_VALUE.equals(load.indexUUID) == false) {
                     logger.warn("{} deleting leftover shard on path: [{}] with a different index UUID", lock.getShardId(), path);
                     assert Files.isDirectory(path) : path + " is not a directory";
                     NodeEnvironment.acquireFSLockForPaths(indexSettings, paths);
@@ -197,7 +195,7 @@ public final class ShardPath {
         final Path statePath;
 
         if (indexSettings.hasCustomDataPath()) {
-            dataPath = env.resolveCustomLocation(indexSettings.customDataPath(), shardId);
+            dataPath = env.resolveCustomLocation(indexSettings, shardId);
             statePath = env.nodePaths()[0].resolve(shardId);
         } else {
             BigInteger totFreeSpace = BigInteger.ZERO;

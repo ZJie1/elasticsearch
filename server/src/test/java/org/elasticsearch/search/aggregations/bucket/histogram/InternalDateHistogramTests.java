@@ -20,11 +20,13 @@
 package org.elasticsearch.search.aggregations.bucket.histogram;
 
 import org.elasticsearch.common.Rounding;
+import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.BucketOrder;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.ParsedMultiBucketAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.test.InternalMultiBucketAggregationTestCase;
 
 import java.time.ZonedDateTime;
@@ -78,7 +80,8 @@ public class InternalDateHistogramTests extends InternalMultiBucketAggregationTe
 
     @Override
     protected InternalDateHistogram createTestInstance(String name,
-                                                       Map<String, Object> metadata,
+                                                       List<PipelineAggregator> pipelineAggregators,
+                                                       Map<String, Object> metaData,
                                                        InternalAggregations aggregations) {
         int nbBuckets = randomNumberOfBuckets();
         List<InternalDateHistogram.Bucket> buckets = new ArrayList<>(nbBuckets);
@@ -92,7 +95,8 @@ public class InternalDateHistogramTests extends InternalMultiBucketAggregationTe
             }
         }
         BucketOrder order = BucketOrder.key(randomBoolean());
-        return new InternalDateHistogram(name, buckets, order, minDocCount, 0L, emptyBucketInfo, format, keyed, metadata);
+        return new InternalDateHistogram(name, buckets, order, minDocCount, 0L, emptyBucketInfo, format, keyed,
+            pipelineAggregators, metaData);
     }
 
     @Override
@@ -142,6 +146,11 @@ public class InternalDateHistogramTests extends InternalMultiBucketAggregationTe
     }
 
     @Override
+    protected Writeable.Reader<InternalDateHistogram> instanceReader() {
+        return InternalDateHistogram::new;
+    }
+
+    @Override
     protected Class<? extends ParsedMultiBucketAggregation> implementationClass() {
         return ParsedDateHistogram.class;
     }
@@ -153,8 +162,9 @@ public class InternalDateHistogramTests extends InternalMultiBucketAggregationTe
         BucketOrder order = instance.getOrder();
         long minDocCount = instance.getMinDocCount();
         long offset = instance.getOffset();
+        List<PipelineAggregator> pipelineAggregators = instance.pipelineAggregators();
         InternalDateHistogram.EmptyBucketInfo emptyBucketInfo = instance.emptyBucketInfo;
-        Map<String, Object> metadata = instance.getMetadata();
+        Map<String, Object> metaData = instance.getMetaData();
         switch (between(0, 5)) {
         case 0:
             name += randomAlphaOfLength(5);
@@ -175,16 +185,17 @@ public class InternalDateHistogramTests extends InternalMultiBucketAggregationTe
             offset += between(1, 20);
             break;
         case 5:
-            if (metadata == null) {
-                metadata = new HashMap<>(1);
+            if (metaData == null) {
+                metaData = new HashMap<>(1);
             } else {
-                metadata = new HashMap<>(instance.getMetadata());
+                metaData = new HashMap<>(instance.getMetaData());
             }
-            metadata.put(randomAlphaOfLength(15), randomInt());
+            metaData.put(randomAlphaOfLength(15), randomInt());
             break;
         default:
             throw new AssertionError("Illegal randomisation branch");
         }
-        return new InternalDateHistogram(name, buckets, order, minDocCount, offset, emptyBucketInfo, format, keyed, metadata);
+        return new InternalDateHistogram(name, buckets, order, minDocCount, offset, emptyBucketInfo, format, keyed, pipelineAggregators,
+                metaData);
     }
 }

@@ -35,7 +35,6 @@ import org.elasticsearch.test.EqualsHashCodeTestUtils.CopyFunction;
 import org.elasticsearch.test.transport.CapturingTransport;
 import org.elasticsearch.test.transport.MockTransport;
 import org.elasticsearch.threadpool.ThreadPool.Names;
-import org.elasticsearch.transport.AbstractSimpleTransportTestCase;
 import org.elasticsearch.transport.ConnectTransportException;
 import org.elasticsearch.transport.TransportException;
 import org.elasticsearch.transport.TransportRequest;
@@ -284,7 +283,7 @@ public class FollowersCheckerTests extends ESTestCase {
         DiscoveryNodes discoveryNodes = DiscoveryNodes.builder().add(localNode).add(otherNode).localNodeId(localNode.getId()).build();
         followersChecker.setCurrentNodes(discoveryNodes);
 
-        AbstractSimpleTransportTestCase.connectToNode(transportService, otherNode);
+        transportService.connectToNode(otherNode);
         transportService.disconnectFromNode(otherNode);
         deterministicTaskQueue.runAllRunnableTasks();
         assertTrue(nodeFailed.get());

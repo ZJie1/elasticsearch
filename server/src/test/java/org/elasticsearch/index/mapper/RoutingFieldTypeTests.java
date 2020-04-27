@@ -25,10 +25,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.util.BytesRef;
-import org.elasticsearch.ElasticsearchException;
 
 public class RoutingFieldTypeTests extends FieldTypeTestCase {
-
     @Override
     protected MappedFieldType createDefaultFieldType() {
         return new RoutingFieldMapper.RoutingFieldType();
@@ -40,12 +38,7 @@ public class RoutingFieldTypeTests extends FieldTypeTestCase {
         ft.setIndexOptions(IndexOptions.DOCS);
 
         Query expected = new PrefixQuery(new Term("field", new BytesRef("foo*")));
-        assertEquals(expected, ft.prefixQuery("foo*", null, MOCK_QSC));
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.prefixQuery("foo*", null, MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[prefix] queries cannot be executed when 'search.allow_expensive_queries' is set to false. " +
-                "For optimised prefix queries on text fields please enable [index_prefixes].", ee.getMessage());
+        assertEquals(expected, ft.prefixQuery("foo*", null, null));
     }
 
     public void testRegexpQuery() {
@@ -54,12 +47,7 @@ public class RoutingFieldTypeTests extends FieldTypeTestCase {
         ft.setIndexOptions(IndexOptions.DOCS);
 
         Query expected = new RegexpQuery(new Term("field", new BytesRef("foo?")));
-        assertEquals(expected, ft.regexpQuery("foo?", 0, 10, null, MOCK_QSC));
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.regexpQuery("foo?", randomInt(10), randomInt(10) + 1, null, MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[regexp] queries cannot be executed when 'search.allow_expensive_queries' is set to false.",
-                ee.getMessage());
+        assertEquals(expected, ft.regexpQuery("foo?", 0, 10, null, null));
     }
 
     public void testWildcardQuery() {
@@ -68,11 +56,6 @@ public class RoutingFieldTypeTests extends FieldTypeTestCase {
         ft.setIndexOptions(IndexOptions.DOCS);
 
         Query expected = new WildcardQuery(new Term("field", new BytesRef("foo*")));
-        assertEquals(expected, ft.wildcardQuery("foo*", null, MOCK_QSC));
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.wildcardQuery("valu*", null, MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[wildcard] queries cannot be executed when 'search.allow_expensive_queries' is set to false.",
-                ee.getMessage());
+        assertEquals(expected, ft.wildcardQuery("foo*", null, null));
     }
 }

@@ -19,9 +19,7 @@
 package org.elasticsearch.script;
 
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.Explanation;
 import org.apache.lucene.search.Scorable;
-import org.elasticsearch.Version;
 import org.elasticsearch.index.fielddata.ScriptDocValues;
 import org.elasticsearch.search.lookup.LeafSearchLookup;
 import org.elasticsearch.search.lookup.SearchLookup;
@@ -37,30 +35,6 @@ import java.util.function.DoubleSupplier;
  */
 public abstract class ScoreScript {
 
-    /** A helper to take in an explanation from a script and turn it into an {@link org.apache.lucene.search.Explanation}  */
-    public static class ExplanationHolder {
-        private String description;
-
-        /**
-         * Explain the current score.
-         *
-         * @param description A textual description of how the score was calculated
-         */
-        public void set(String description) {
-            this.description = description;
-        }
-
-        public Explanation get(double score, Explanation subQueryExplanation) {
-            if (description == null) {
-                return null;
-            }
-            if (subQueryExplanation != null) {
-                return Explanation.match(score, description, subQueryExplanation);
-            }
-            return Explanation.match(score, description);
-        }
-    }
-
     private static final Map<String, String> DEPRECATIONS = Map.of(
             "doc",
             "Accessing variable [doc] via [params.doc] from within a score script "
@@ -68,7 +42,7 @@ public abstract class ScoreScript {
             "_doc", "Accessing variable [doc] via [params._doc] from within a score script "
                     + "is deprecated in favor of directly accessing [doc].");
 
-    public static final String[] PARAMETERS = new String[]{ "explanation" };
+    public static final String[] PARAMETERS = new String[]{};
 
     /** The generic runtime parameters for the script. */
     private final Map<String, Object> params;
@@ -82,7 +56,6 @@ public abstract class ScoreScript {
     private int docId;
     private int shardId = -1;
     private String indexName = null;
-    private Version indexVersion = null;
 
     public ScoreScript(Map<String, Object> params, SearchLookup lookup, LeafReaderContext leafContext) {
         // null check needed b/c of expression engine subclass
@@ -101,7 +74,7 @@ public abstract class ScoreScript {
         }
     }
 
-    public abstract double execute(ExplanationHolder explanation);
+    public abstract double execute();
 
     /** Return the parameters for this script. */
     public Map<String, Object> getParams() {
@@ -109,7 +82,7 @@ public abstract class ScoreScript {
     }
 
     /** The doc lookup for the Lucene segment this script was created for. */
-    public Map<String, ScriptDocValues<?>> getDoc() {
+    public final Map<String, ScriptDocValues<?>> getDoc() {
         return leafLookup.doc();
     }
 
@@ -184,19 +157,6 @@ public abstract class ScoreScript {
 
     /**
      *  Starting a name with underscore, so that the user cannot access this function directly through a script
-     *  It is only used within predefined painless functions.
-     * @return index version or throws an exception if the index version is not set up for this script instance
-     */
-    public Version _getIndexVersion() {
-        if (indexVersion != null) {
-            return indexVersion;
-        } else {
-            throw new IllegalArgumentException("index version can not be looked up!");
-        }
-    }
-
-    /**
-     *  Starting a name with underscore, so that the user cannot access this function directly through a script
      */
     public void _setShard(int shardId) {
         this.shardId = shardId;
@@ -207,13 +167,6 @@ public abstract class ScoreScript {
      */
     public void _setIndexName(String indexName) {
         this.indexName = indexName;
-    }
-
-    /**
-     *  Starting a name with underscore, so that the user cannot access this function directly through a script
-     */
-    public void _setIndexVersion(Version indexVersion) {
-        this.indexVersion = indexVersion;
     }
 
 
@@ -229,7 +182,7 @@ public abstract class ScoreScript {
     }
 
     /** A factory to construct stateful {@link ScoreScript} factories for a specific index. */
-    public interface Factory extends ScriptFactory {
+    public interface Factory {
 
         ScoreScript.LeafFactory newFactory(Map<String, Object> params, SearchLookup lookup);
 

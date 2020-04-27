@@ -19,20 +19,21 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.StaticNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a static type target.
  */
-public class EStatic extends AExpression {
+public final class EStatic extends AExpression {
 
-    protected final String type;
+    private final String type;
 
     public EStatic(Location location, String type) {
         super(location);
@@ -41,29 +42,31 @@ public class EStatic extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException("invalid assignment: cannot write a value to a static type [" + type + "]"));
-        }
+    void storeSettings(CompilerSettings settings) {
+        // do nothing
+    }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException("not a statement: static type [" + type + "] not used"));
-        }
+    @Override
+    void extractVariables(Set<String> variables) {
+        // Do nothing.
+    }
 
-        Output output = new Output();
-        output.actual = scriptRoot.getPainlessLookup().canonicalTypeNameToType(type);
+    @Override
+    void analyze(Locals locals) {
+        actual = locals.getPainlessLookup().canonicalTypeNameToType(type);
 
-        if (output.actual == null) {
+        if (actual == null) {
             throw createError(new IllegalArgumentException("Not a type [" + type + "]."));
         }
+    }
 
-        StaticNode staticNode = new StaticNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        // Do nothing.
+    }
 
-        staticNode.setLocation(location);
-        staticNode.setExpressionType(output.actual);
-
-        output.expressionNode = staticNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString(type);
     }
 }

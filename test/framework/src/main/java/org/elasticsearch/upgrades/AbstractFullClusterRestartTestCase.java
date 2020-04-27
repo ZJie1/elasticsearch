@@ -71,9 +71,4 @@ public abstract class AbstractFullClusterRestartTestCase extends ESRestTestCase 
     protected boolean preserveILMPoliciesUponCompletion() {
         return true;
     }
-
-    @Override
-    protected boolean preserveSLMPoliciesUponCompletion() {
-        return true;
-    }
 }

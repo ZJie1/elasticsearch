@@ -130,7 +130,7 @@ public class ForecastRequestStats implements ToXContentObject, Writeable {
             messages = null;
         }
 
-        if (in.getVersion().onOrAfter(Version.V_7_4_0)) {
+        if (in.getVersion().onOrAfter(Version.CURRENT)) {
             timestamp = in.readInstant();
             startTime = in.readInstant();
             endTime = in.readInstant();
@@ -161,7 +161,7 @@ public class ForecastRequestStats implements ToXContentObject, Writeable {
         } else {
             out.writeBoolean(false);
         }
-        if (out.getVersion().onOrAfter(Version.V_7_4_0)) {
+        if (out.getVersion().onOrAfter(Version.CURRENT)) {
             out.writeInstant(timestamp);
             out.writeInstant(startTime);
             out.writeInstant(endTime);

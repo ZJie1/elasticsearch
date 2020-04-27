@@ -32,8 +32,6 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
-import org.elasticsearch.common.CheckedSupplier;
-import org.elasticsearch.common.bytes.AbstractBytesReference;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.elasticsearch.common.lucene.index.ElasticsearchDirectoryReader;
@@ -50,6 +48,7 @@ import org.elasticsearch.test.ESTestCase;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 public class IndicesRequestCacheTests extends ESTestCase {
 
@@ -331,7 +330,7 @@ public class IndicesRequestCacheTests extends ESTestCase {
             StringField.TYPE_STORED));
     }
 
-    private static class Loader implements CheckedSupplier<BytesReference, IOException> {
+    private static class Loader implements Supplier<BytesReference> {
 
         private final DirectoryReader reader;
         private final int id;
@@ -456,7 +455,7 @@ public class IndicesRequestCacheTests extends ESTestCase {
         assertNotEquals(key1, key5);
     }
 
-    private class TestBytesReference extends AbstractBytesReference {
+    private class TestBytesReference extends BytesReference {
 
         int dummyValue;
         TestBytesReference(int dummyValue) {

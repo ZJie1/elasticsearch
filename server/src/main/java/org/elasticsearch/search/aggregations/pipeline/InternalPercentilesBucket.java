@@ -43,8 +43,9 @@ public class InternalPercentilesBucket extends InternalNumericMetricsAggregation
     private final transient Map<Double, Double> percentileLookups = new HashMap<>();
 
     InternalPercentilesBucket(String name, double[] percents, double[] percentiles, boolean keyed,
-                                     DocValueFormat formatter, Map<String, Object> metadata) {
-        super(name, metadata);
+                                     DocValueFormat formatter, List<PipelineAggregator> pipelineAggregators,
+                                     Map<String, Object> metaData) {
+        super(name, pipelineAggregators, metaData);
         if ((percentiles.length == percents.length) == false) {
             throw new IllegalArgumentException("The number of provided percents and percentiles didn't match. percents: "
                     + Arrays.toString(percents) + ", percentiles: " + Arrays.toString(percentiles));
@@ -118,7 +119,7 @@ public class InternalPercentilesBucket extends InternalNumericMetricsAggregation
     }
 
     @Override
-    public InternalMax reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+    public InternalMax doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
         throw new UnsupportedOperationException("Not supported");
     }
 

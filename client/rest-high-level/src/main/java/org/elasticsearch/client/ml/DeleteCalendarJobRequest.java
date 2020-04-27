@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 
 import java.security.InvalidParameterException;
 import java.util.Arrays;
@@ -28,7 +29,7 @@ import java.util.Objects;
 /**
  * Request class for removing Machine Learning Jobs from an existing calendar
  */
-public class DeleteCalendarJobRequest implements Validatable {
+public class DeleteCalendarJobRequest extends ActionRequest {
 
     private final List<String> jobIds;
     private final String calendarId;
@@ -58,6 +59,11 @@ public class DeleteCalendarJobRequest implements Validatable {
 
     public String getCalendarId() {
         return calendarId;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

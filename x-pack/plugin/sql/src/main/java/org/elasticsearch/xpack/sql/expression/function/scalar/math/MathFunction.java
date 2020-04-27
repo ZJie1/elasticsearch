@@ -5,20 +5,19 @@
  */
 package org.elasticsearch.xpack.sql.expression.function.scalar.math;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.expression.Expressions.ParamOrdinal;
-import org.elasticsearch.xpack.ql.expression.function.scalar.UnaryScalarFunction;
-import org.elasticsearch.xpack.ql.expression.gen.processor.Processor;
-import org.elasticsearch.xpack.ql.tree.Source;
-import org.elasticsearch.xpack.ql.type.DataType;
-import org.elasticsearch.xpack.ql.type.DataTypes;
+import org.elasticsearch.xpack.sql.expression.Expression;
+import org.elasticsearch.xpack.sql.expression.Expressions.ParamOrdinal;
+import org.elasticsearch.xpack.sql.expression.function.scalar.UnaryScalarFunction;
 import org.elasticsearch.xpack.sql.expression.function.scalar.math.MathProcessor.MathOperation;
+import org.elasticsearch.xpack.sql.expression.gen.processor.Processor;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.type.DataType;
 
 import java.util.Locale;
 import java.util.Objects;
 
 import static java.lang.String.format;
-import static org.elasticsearch.xpack.ql.expression.TypeResolutions.isNumeric;
+import static org.elasticsearch.xpack.sql.expression.TypeResolutions.isNumeric;
 
 public abstract class MathFunction extends UnaryScalarFunction {
 
@@ -48,7 +47,7 @@ public abstract class MathFunction extends UnaryScalarFunction {
 
     @Override
     public DataType dataType() {
-        return DataTypes.DOUBLE;
+        return DataType.DOUBLE;
     }
     
     @Override

@@ -37,8 +37,6 @@ import org.elasticsearch.index.fielddata.plain.DocValuesIndexFieldData;
 import org.elasticsearch.index.mapper.ParseContext.Document;
 import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.index.seqno.SequenceNumbers;
-import org.elasticsearch.search.aggregations.support.CoreValuesSourceType;
-import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 
 import java.io.IOException;
 import java.util.List;
@@ -126,7 +124,7 @@ public class SeqNoFieldMapper extends MetadataFieldMapper {
         }
 
         @Override
-        public MetadataFieldMapper getDefault(ParserContext context) {
+        public MetadataFieldMapper getDefault(MappedFieldType fieldType, ParserContext context) {
             final Settings indexSettings = context.mapperService().getIndexSettings().getSettings();
             return new SeqNoFieldMapper(indexSettings);
         }
@@ -220,10 +218,6 @@ public class SeqNoFieldMapper extends MetadataFieldMapper {
             return new DocValuesIndexFieldData.Builder().numericType(NumericType.LONG);
         }
 
-        @Override
-        public ValuesSourceType getValuesSourceType() {
-            return CoreValuesSourceType.NUMERIC;
-        }
     }
 
     public SeqNoFieldMapper(Settings indexSettings) {

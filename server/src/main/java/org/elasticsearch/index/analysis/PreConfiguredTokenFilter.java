@@ -19,9 +19,11 @@
 
 package org.elasticsearch.index.analysis;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.elasticsearch.Version;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.indices.analysis.PreBuiltCacheFactory;
 import org.elasticsearch.indices.analysis.PreBuiltCacheFactory.CachingStrategy;
 
@@ -32,6 +34,9 @@ import java.util.function.Function;
  * Provides pre-configured, shared {@link TokenFilter}s.
  */
 public final class PreConfiguredTokenFilter extends PreConfiguredAnalysisComponent<TokenFilterFactory> {
+
+    private static final DeprecationLogger DEPRECATION_LOGGER
+        = new DeprecationLogger(LogManager.getLogger(PreConfiguredTokenFilter.class));
 
     /**
      * Create a pre-configured token filter that may not vary at all.
@@ -53,6 +58,25 @@ public final class PreConfiguredTokenFilter extends PreConfiguredAnalysisCompone
     }
 
     /**
+     * Create a pre-configured token filter that may vary based on the Elasticsearch version.
+     */
+    public static PreConfiguredTokenFilter singletonWithVersion(String name, boolean useFilterForMultitermQueries,
+            BiFunction<TokenStream, Version, TokenStream> create) {
+        return new PreConfiguredTokenFilter(name, useFilterForMultitermQueries, true, CachingStrategy.ONE,
+                (tokenStream, version) -> create.apply(tokenStream, version));
+    }
+
+    /**
+     * Create a pre-configured token filter that may vary based on the Elasticsearch version.
+     */
+    public static PreConfiguredTokenFilter singletonWithVersion(String name, boolean useFilterForMultitermQueries,
+                                                                boolean useFilterForParsingSynonyms,
+                                                                BiFunction<TokenStream, Version, TokenStream> create) {
+        return new PreConfiguredTokenFilter(name, useFilterForMultitermQueries, useFilterForParsingSynonyms, CachingStrategy.ONE,
+            (tokenStream, version) -> create.apply(tokenStream, version));
+    }
+
+    /**
      * Create a pre-configured token filter that may vary based on the Lucene version.
      */
     public static PreConfiguredTokenFilter luceneVersion(String name, boolean useFilterForMultitermQueries,
@@ -67,16 +91,6 @@ public final class PreConfiguredTokenFilter extends PreConfiguredAnalysisCompone
     public static PreConfiguredTokenFilter elasticsearchVersion(String name, boolean useFilterForMultitermQueries,
             BiFunction<TokenStream, org.elasticsearch.Version, TokenStream> create) {
         return new PreConfiguredTokenFilter(name, useFilterForMultitermQueries, true, CachingStrategy.ELASTICSEARCH, create);
-    }
-
-    /**
-     * Create a pre-configured token filter that may vary based on the Elasticsearch version.
-     */
-    public static PreConfiguredTokenFilter elasticsearchVersion(String name, boolean useFilterForMultitermQueries,
-                                                                boolean useFilterForParsingSynonyms,
-                                                                BiFunction<TokenStream, Version, TokenStream> create) {
-        return new PreConfiguredTokenFilter(name, useFilterForMultitermQueries, useFilterForParsingSynonyms,
-                CachingStrategy.ELASTICSEARCH, create);
     }
 
     private final boolean useFilterForMultitermQueries;

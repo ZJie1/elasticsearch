@@ -5,9 +5,6 @@
  */
 package org.elasticsearch.xpack.ml.datafeed;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedTimingStats;
@@ -23,7 +20,6 @@ import java.util.Objects;
  */
 public class DatafeedTimingStatsReporter {
 
-    private static final Logger LOGGER = LogManager.getLogger(DatafeedTimingStatsReporter.class);
     /** Interface used for persisting current timing stats to the results index. */
     @FunctionalInterface
     public interface DatafeedTimingStatsPersister {
@@ -37,15 +33,12 @@ public class DatafeedTimingStatsReporter {
     private volatile DatafeedTimingStats currentTimingStats;
     /** Object used to persist current timing stats. */
     private final DatafeedTimingStatsPersister persister;
-    /** Whether or not timing stats will be persisted by the persister object. */
-    private volatile boolean allowedPersisting;
 
     public DatafeedTimingStatsReporter(DatafeedTimingStats timingStats, DatafeedTimingStatsPersister persister) {
         Objects.requireNonNull(timingStats);
         this.persistedTimingStats = new DatafeedTimingStats(timingStats);
         this.currentTimingStats = new DatafeedTimingStats(timingStats);
         this.persister = Objects.requireNonNull(persister);
-        this.allowedPersisting = true;
     }
 
     /** Gets current timing stats. */
@@ -86,11 +79,6 @@ public class DatafeedTimingStatsReporter {
         }
     }
 
-    /** Disallows persisting timing stats. After this call finishes, no document will be persisted. */
-    public void disallowPersisting() {
-        allowedPersisting = false;
-    }
-
     private void flushIfDifferSignificantly() {
         if (differSignificantly(currentTimingStats, persistedTimingStats)) {
             flush(WriteRequest.RefreshPolicy.NONE);
@@ -99,16 +87,7 @@ public class DatafeedTimingStatsReporter {
 
     private void flush(WriteRequest.RefreshPolicy refreshPolicy) {
         persistedTimingStats = new DatafeedTimingStats(currentTimingStats);
-        if (allowedPersisting) {
-            try {
-                persister.persistDatafeedTimingStats(persistedTimingStats, refreshPolicy);
-            } catch (Exception ex) {
-                // Since persisting datafeed timing stats is not critical, we just log a warning here.
-                LOGGER.warn(
-                    () -> new ParameterizedMessage("[{}] failed to report datafeed timing stats", currentTimingStats.getJobId()),
-                    ex);
-            }
-        }
+        persister.persistDatafeedTimingStats(persistedTimingStats, refreshPolicy);
     }
 
     /**

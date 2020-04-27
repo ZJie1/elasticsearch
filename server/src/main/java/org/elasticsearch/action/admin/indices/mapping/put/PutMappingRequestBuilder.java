@@ -60,6 +60,14 @@ public class PutMappingRequestBuilder
     }
 
     /**
+     * The type of the mappings.
+     */
+    public PutMappingRequestBuilder setType(String type) {
+        request.type(type);
+        return this;
+    }
+
+    /**
      * The mapping source definition.
      */
     public PutMappingRequestBuilder setSource(XContentBuilder mappingBuilder) {
@@ -87,7 +95,7 @@ public class PutMappingRequestBuilder
      * A specialized simplified mapping source method, takes the form of simple properties definition:
      * ("field1", "type=string,store=true").
      */
-    public PutMappingRequestBuilder setSource(String... source) {
+    public PutMappingRequestBuilder setSource(Object... source) {
         request.source(source);
         return this;
     }

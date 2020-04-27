@@ -113,10 +113,6 @@ public class SearchResponse extends ActionResponse implements StatusToXContentOb
         return RestStatus.status(successfulShards, totalShards, shardFailures);
     }
 
-    public SearchResponseSections getInternalResponse() {
-        return internalResponse;
-    }
-
     /**
      * The search hits.
      */
@@ -260,7 +256,7 @@ public class SearchResponse extends ActionResponse implements StatusToXContentOb
         return innerFromXContent(parser);
     }
 
-    public static SearchResponse innerFromXContent(XContentParser parser) throws IOException {
+    static SearchResponse innerFromXContent(XContentParser parser) throws IOException {
         ensureExpectedToken(Token.FIELD_NAME, parser.currentToken(), parser::getTokenLocation);
         String currentFieldName = parser.currentName();
         SearchHits hits = null;
@@ -413,7 +409,9 @@ public class SearchResponse extends ActionResponse implements StatusToXContentOb
         }
 
         private Clusters(StreamInput in) throws IOException {
-            this(in.readVInt(), in.readVInt(), in.readVInt());
+            this.total = in.readVInt();
+            this.successful = in.readVInt();
+            this.skipped = in.readVInt();
         }
 
         @Override
@@ -425,7 +423,7 @@ public class SearchResponse extends ActionResponse implements StatusToXContentOb
 
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-            if (total > 0) {
+            if (this != EMPTY) {
                 builder.startObject(_CLUSTERS_FIELD.getPreferredName());
                 builder.field(TOTAL_FIELD.getPreferredName(), total);
                 builder.field(SUCCESSFUL_FIELD.getPreferredName(), successful);

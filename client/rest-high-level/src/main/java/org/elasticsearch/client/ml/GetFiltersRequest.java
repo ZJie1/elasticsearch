@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.core.PageParams;
 import org.elasticsearch.client.ml.job.config.MlFilter;
 import org.elasticsearch.common.xcontent.ObjectParser;
@@ -31,7 +32,7 @@ import java.util.Objects;
 /**
  * A request to retrieve {@link MlFilter}s
  */
-public class GetFiltersRequest implements Validatable, ToXContentObject {
+public class GetFiltersRequest extends ActionRequest implements ToXContentObject {
 
     public static final ObjectParser<GetFiltersRequest, Void> PARSER =
         new ObjectParser<>("get_filters_request", GetFiltersRequest::new);
@@ -80,6 +81,11 @@ public class GetFiltersRequest implements Validatable, ToXContentObject {
      */
     public void setSize(Integer size) {
         this.size = size;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

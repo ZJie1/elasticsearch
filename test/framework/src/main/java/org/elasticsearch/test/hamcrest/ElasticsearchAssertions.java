@@ -43,8 +43,7 @@ import org.elasticsearch.action.support.master.AcknowledgedRequestBuilder;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.cluster.block.ClusterBlock;
 import org.elasticsearch.cluster.block.ClusterBlockException;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
-import org.elasticsearch.cluster.metadata.IndexTemplateMetadata;
+import org.elasticsearch.cluster.metadata.IndexTemplateMetaData;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.unit.TimeValue;
@@ -77,8 +76,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import static org.apache.lucene.util.LuceneTestCase.expectThrows;
-import static org.apache.lucene.util.LuceneTestCase.expectThrowsAnyOf;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -151,9 +148,7 @@ public class ElasticsearchAssertions {
             assertNotNull("expected the cause of failure to be a ClusterBlockException but got " + exception.getCause().getMessage(),
                     clusterBlockException);
             assertThat(clusterBlockException.blocks().size(), greaterThan(0));
-
-            RestStatus status = checkRetryableBlock(clusterBlockException.blocks()) ? RestStatus.TOO_MANY_REQUESTS : RestStatus.FORBIDDEN;
-            assertThat(clusterBlockException.status(), CoreMatchers.equalTo(status));
+            assertThat(clusterBlockException.status(), CoreMatchers.equalTo(RestStatus.FORBIDDEN));
         }
     }
 
@@ -169,8 +164,7 @@ public class ElasticsearchAssertions {
             fail("Request executed with success but a ClusterBlockException was expected");
         } catch (ClusterBlockException e) {
             assertThat(e.blocks().size(), greaterThan(0));
-            RestStatus status = checkRetryableBlock(e.blocks()) ? RestStatus.TOO_MANY_REQUESTS : RestStatus.FORBIDDEN;
-            assertThat(e.status(), equalTo(status));
+            assertThat(e.status(), equalTo(RestStatus.FORBIDDEN));
 
             if (expectedBlockId != null) {
                 boolean found = false;
@@ -193,16 +187,6 @@ public class ElasticsearchAssertions {
      */
     public static void assertBlocked(final ActionRequestBuilder builder, @Nullable final ClusterBlock expectedBlock) {
         assertBlocked(builder, expectedBlock != null ? expectedBlock.id() : null);
-    }
-
-    private static boolean checkRetryableBlock(Set<ClusterBlock> clusterBlocks){
-        // check only retryable blocks exist in the set
-        for (ClusterBlock clusterBlock : clusterBlocks) {
-            if (clusterBlock.id() != IndexMetadata.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK.id()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     public static String formatShardStatus(BroadcastResponse response) {
@@ -237,8 +221,8 @@ public class ElasticsearchAssertions {
         Set<String> idsSet = new HashSet<>(Arrays.asList(ids));
         for (SearchHit hit : searchResponse.getHits()) {
             assertThat(
-                    "id [" + hit.getId() + "] was found in search results but wasn't expected (index ["
-                        + hit.getIndex() + "])" + shardStatus, idsSet.remove(hit.getId()),
+                    "id [" + hit.getId() + "] was found in search results but wasn't expected (type [" + hit.getType()
+                        + "], index [" + hit.getIndex() + "])" + shardStatus, idsSet.remove(hit.getId()),
                     equalTo(true));
         }
         assertThat("Some expected ids were not found in search results: " + Arrays.toString(idsSet.toArray(new String[idsSet.size()])) + "."
@@ -273,8 +257,8 @@ public class ElasticsearchAssertions {
     }
 
     public static void assertExists(GetResponse response) {
-        String message = String.format(Locale.ROOT, "Expected %s/%s to exist, but does not",
-                response.getIndex(), response.getId());
+        String message = String.format(Locale.ROOT, "Expected %s/%s/%s to exist, but does not",
+                response.getIndex(), response.getType(), response.getId());
         assertThat(message, response.isExists(), is(true));
     }
 
@@ -449,8 +433,8 @@ public class ElasticsearchAssertions {
      */
     public static void assertIndexTemplateMissing(GetIndexTemplatesResponse templatesResponse, String name) {
         List<String> templateNames = new ArrayList<>();
-        for (IndexTemplateMetadata indexTemplateMetadata : templatesResponse.getIndexTemplates()) {
-            templateNames.add(indexTemplateMetadata.name());
+        for (IndexTemplateMetaData indexTemplateMetaData : templatesResponse.getIndexTemplates()) {
+            templateNames.add(indexTemplateMetaData.name());
         }
         assertThat(templateNames, not(hasItem(name)));
     }
@@ -460,8 +444,8 @@ public class ElasticsearchAssertions {
      */
     public static void assertIndexTemplateExists(GetIndexTemplatesResponse templatesResponse, String name) {
         List<String> templateNames = new ArrayList<>();
-        for (IndexTemplateMetadata indexTemplateMetadata : templatesResponse.getIndexTemplates()) {
-            templateNames.add(indexTemplateMetadata.name());
+        for (IndexTemplateMetaData indexTemplateMetaData : templatesResponse.getIndexTemplates()) {
+            templateNames.add(indexTemplateMetaData.name());
         }
         assertThat(templateNames, hasItem(name));
     }
@@ -472,6 +456,10 @@ public class ElasticsearchAssertions {
      */
     public static Matcher<SearchHit> hasId(final String id) {
         return new ElasticsearchMatchers.SearchHitHasIdMatcher(id);
+    }
+
+    public static Matcher<SearchHit> hasType(final String type) {
+        return new ElasticsearchMatchers.SearchHitHasTypeMatcher(type);
     }
 
     public static Matcher<SearchHit> hasIndex(final String index) {
@@ -509,16 +497,15 @@ public class ElasticsearchAssertions {
     /**
      * Run the request from a given builder and check that it throws an exception of the right type
      */
-    public static <E extends Throwable> void assertRequestBuilderThrows(ActionRequestBuilder<?, ?> builder, Class<E> exceptionClass) {
-        assertFutureThrows(builder.execute(), exceptionClass);
+    public static <E extends Throwable> void assertThrows(ActionRequestBuilder<?, ?> builder, Class<E> exceptionClass) {
+        assertThrows(builder.execute(), exceptionClass);
     }
 
     /**
      * Run the request from a given builder and check that it throws an exception of the right type, with a given {@link RestStatus}
      */
-    public static <E extends Throwable> void assertRequestBuilderThrows(ActionRequestBuilder<?, ?> builder, Class<E> exceptionClass,
-                                                                        RestStatus status) {
-        assertFutureThrows(builder.execute(), exceptionClass, status);
+    public static <E extends Throwable> void assertThrows(ActionRequestBuilder<?, ?> builder, Class<E> exceptionClass, RestStatus status) {
+        assertThrows(builder.execute(), exceptionClass, status);
     }
 
     /**
@@ -526,23 +513,22 @@ public class ElasticsearchAssertions {
      *
      * @param extraInfo extra information to add to the failure message
      */
-    public static <E extends Throwable> void assertRequestBuilderThrows(ActionRequestBuilder<?, ?> builder, Class<E> exceptionClass,
-                                                                        String extraInfo) {
-        assertFutureThrows(builder.execute(), exceptionClass, extraInfo);
+    public static <E extends Throwable> void assertThrows(ActionRequestBuilder<?, ?> builder, Class<E> exceptionClass, String extraInfo) {
+        assertThrows(builder.execute(), exceptionClass, extraInfo);
     }
 
     /**
      * Run future.actionGet() and check that it throws an exception of the right type
      */
-    public static <E extends Throwable> void assertFutureThrows(ActionFuture<?> future, Class<E> exceptionClass) {
-        assertFutureThrows(future, exceptionClass, null, null);
+    public static <E extends Throwable> void assertThrows(ActionFuture future, Class<E> exceptionClass) {
+        assertThrows(future, exceptionClass, null, null);
     }
 
     /**
      * Run future.actionGet() and check that it throws an exception of the right type, with a given {@link RestStatus}
      */
-    public static <E extends Throwable> void assertFutureThrows(ActionFuture<?> future, Class<E> exceptionClass, RestStatus status) {
-        assertFutureThrows(future, exceptionClass, status, null);
+    public static <E extends Throwable> void assertThrows(ActionFuture future, Class<E> exceptionClass, RestStatus status) {
+        assertThrows(future, exceptionClass, status, null);
     }
 
     /**
@@ -550,8 +536,8 @@ public class ElasticsearchAssertions {
      *
      * @param extraInfo extra information to add to the failure message
      */
-    public static <E extends Throwable> void assertFutureThrows(ActionFuture<?> future, Class<E> exceptionClass, String extraInfo) {
-        assertFutureThrows(future, exceptionClass, null, extraInfo);
+    public static <E extends Throwable> void assertThrows(ActionFuture future, Class<E> exceptionClass, String extraInfo) {
+        assertThrows(future, exceptionClass, null, extraInfo);
     }
 
     /**
@@ -561,8 +547,9 @@ public class ElasticsearchAssertions {
      * @param status         {@link org.elasticsearch.rest.RestStatus} to check for. Can be null to disable the check
      * @param extraInfo      extra information to add to the failure message. Can be null.
      */
-    public static <E extends Throwable> void assertFutureThrows(ActionFuture<?> future, Class<E> exceptionClass,
-                                                                @Nullable RestStatus status, @Nullable String extraInfo) {
+    public static <E extends Throwable> void assertThrows(ActionFuture future, Class<E> exceptionClass,
+            @Nullable RestStatus status, @Nullable String extraInfo) {
+        boolean fail = false;
         extraInfo = extraInfo == null || extraInfo.isEmpty() ? "" : extraInfo + ": ";
         extraInfo += "expected a " + exceptionClass + " exception to be thrown";
 
@@ -570,36 +557,54 @@ public class ElasticsearchAssertions {
             extraInfo += " with status [" + status + "]";
         }
 
-        Throwable expected = expectThrowsAnyOf(List.of(exceptionClass, ElasticsearchException.class), future::actionGet);
-        if (expected instanceof ElasticsearchException) {
-            assertThat(extraInfo, ((ElasticsearchException) expected).unwrapCause(), instanceOf(exceptionClass));
-        } else {
-            assertThat(extraInfo, expected, instanceOf(exceptionClass));
+        try {
+            future.actionGet();
+            fail = true;
+
+        } catch (ElasticsearchException esException) {
+            assertThat(extraInfo, esException.unwrapCause(), instanceOf(exceptionClass));
+            if (status != null) {
+                assertThat(extraInfo, ExceptionsHelper.status(esException), equalTo(status));
+            }
+        } catch (Exception e) {
+            assertThat(extraInfo, e, instanceOf(exceptionClass));
+            if (status != null) {
+                assertThat(extraInfo, ExceptionsHelper.status(e), equalTo(status));
+            }
         }
-
-        if (status != null) {
-            assertThat(extraInfo, ExceptionsHelper.status(expected), equalTo(status));
+        // has to be outside catch clause to get a proper message
+        if (fail) {
+            throw new AssertionError(extraInfo);
         }
     }
 
-    public static void assertRequestBuilderThrows(ActionRequestBuilder<?, ?> builder, RestStatus status) {
-        assertFutureThrows(builder.execute(), status);
+    public static <E extends Throwable> void assertThrows(ActionRequestBuilder<?, ?> builder, RestStatus status) {
+        assertThrows(builder.execute(), status);
     }
 
-    public static void assertRequestBuilderThrows(ActionRequestBuilder<?, ?> builder, RestStatus status, String extraInfo) {
-        assertFutureThrows(builder.execute(), status, extraInfo);
+    public static <E extends Throwable> void assertThrows(ActionRequestBuilder<?, ?> builder, RestStatus status, String extraInfo) {
+        assertThrows(builder.execute(), status, extraInfo);
     }
 
-    public static void assertFutureThrows(ActionFuture<?> future, RestStatus status) {
-        assertFutureThrows(future, status, null);
+    public static <E extends Throwable> void assertThrows(ActionFuture future, RestStatus status) {
+        assertThrows(future, status, null);
     }
 
-    public static void assertFutureThrows(ActionFuture<?> future, RestStatus status, String extraInfo) {
+    public static void assertThrows(ActionFuture future, RestStatus status, String extraInfo) {
+        boolean fail = false;
         extraInfo = extraInfo == null || extraInfo.isEmpty() ? "" : extraInfo + ": ";
         extraInfo += "expected a " + status + " status exception to be thrown";
 
-        Exception e = expectThrows(Exception.class, future::actionGet);
-        assertThat(extraInfo, ExceptionsHelper.status(e), equalTo(status));
+        try {
+            future.actionGet();
+            fail = true;
+        } catch (Exception e) {
+            assertThat(extraInfo, ExceptionsHelper.status(e), equalTo(status));
+        }
+        // has to be outside catch clause to get a proper message
+        if (fail) {
+            throw new AssertionError(extraInfo);
+        }
     }
 
     /**

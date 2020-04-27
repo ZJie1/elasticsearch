@@ -5,19 +5,18 @@
  */
 package org.elasticsearch.xpack.sql.querydsl.agg;
 
-import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 
-import java.util.function.Function;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.min;
 
-public class MinAgg extends DefaultAggSourceLeafAgg {
+public class MinAgg extends LeafAgg {
 
-    public MinAgg(String id, AggSource source) {
-        super(id, source);
+    public MinAgg(String id, String fieldName) {
+        super(id, fieldName);
     }
 
     @Override
-    Function<String, ValuesSourceAggregationBuilder<?>> builder() {
-        return AggregationBuilders::min;
+    AggregationBuilder toBuilder() {
+        return min(id()).field(fieldName());
     }
 }

@@ -6,10 +6,11 @@
 
 Closes an index.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /twitter/_close
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 
@@ -43,8 +44,6 @@ or using the <<cluster-update-settings,cluster update settings>> API.
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `true`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +
@@ -62,15 +61,16 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=timeoutparms]
 
 The following example shows how to close an index:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /my_index/_close
 --------------------------------------------------
+// CONSOLE
 // TEST[s/^/PUT my_index\n/]
 
 The API returns following response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     "acknowledged" : true,
@@ -82,3 +82,4 @@ The API returns following response:
     }
 }
 --------------------------------------------------
+// TESTRESPONSE

@@ -19,7 +19,6 @@
 
 package org.elasticsearch.action.delete;
 
-import org.elasticsearch.Version;
 import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.action.CompositeIndicesRequest;
 import org.elasticsearch.action.DocWriteRequest;
@@ -43,7 +42,7 @@ import static org.elasticsearch.index.seqno.SequenceNumbers.UNASSIGNED_SEQ_NO;
  * A request to delete a document from an index based on its type and id. Best created using
  * {@link org.elasticsearch.client.Requests#deleteRequest(String)}.
  * <p>
- * The operation requires the {@link #index()} and {@link #id(String)} to
+ * The operation requires the {@link #index()}, {@link #type(String)} and {@link #id(String)} to
  * be set.
  *
  * @see DeleteResponse
@@ -55,6 +54,8 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
 
     private static final ShardId NO_SHARD_ID = null;
 
+    // Set to null initially so we can know to override in bulk requests that have a default type.
+    private String type;
     private String id;
     @Nullable
     private String routing;
@@ -65,10 +66,7 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
 
     public DeleteRequest(StreamInput in) throws IOException {
         super(in);
-        if (in.getVersion().before(Version.V_8_0_0)) {
-            String type = in.readString();
-            assert MapperService.SINGLE_MAPPING_NAME.equals(type) : "Expected [_doc] but received [" + type + "]";
-        }
+        type = in.readString();
         id = in.readString();
         routing = in.readOptionalString();
         version = in.readLong();
@@ -82,12 +80,29 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
     }
 
     /**
-     * Constructs a new delete request against the specified index. The {@link #id(String)}
+     * Constructs a new delete request against the specified index. The {@link #type(String)} and {@link #id(String)}
      * must be set.
      */
     public DeleteRequest(String index) {
         super(NO_SHARD_ID);
         this.index = index;
+    }
+
+    /**
+     * Constructs a new delete request against the specified index with the type and id.
+     *
+     * @param index The index to get the document from
+     * @param type  The type of the document
+     * @param id    The id of the document
+     *
+     * @deprecated Types are in the process of being removed. Use {@link #DeleteRequest(String, String)} instead.
+     */
+    @Deprecated
+    public DeleteRequest(String index, String type, String id) {
+        super(NO_SHARD_ID);
+        this.index = index;
+        this.type = type;
+        this.id = id;
     }
 
     /**
@@ -105,6 +120,9 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException validationException = super.validate();
+        if (Strings.isEmpty(type())) {
+            validationException = addValidationError("type is missing", validationException);
+        }
         if (Strings.isEmpty(id)) {
             validationException = addValidationError("id is missing", validationException);
         }
@@ -113,6 +131,48 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
 
         return validationException;
     }
+
+    /**
+     * The type of the document to delete.
+     *
+     * @deprecated Types are in the process of being removed.
+     */
+    @Deprecated
+    @Override
+    public String type() {
+        if (type == null) {
+            return MapperService.SINGLE_MAPPING_NAME;                    
+        }
+        return type;
+    }
+
+    /**
+     * Sets the type of the document to delete.
+     *
+     * @deprecated Types are in the process of being removed.
+     */
+    @Deprecated
+    @Override
+    public DeleteRequest type(String type) {
+        this.type = type;
+        return this;
+    }
+    
+    /**
+     * Set the default type supplied to a bulk
+     * request if this individual request's type is null
+     * or empty
+     * 
+     * @deprecated Types are in the process of being removed.
+     */
+    @Deprecated
+    @Override
+    public DeleteRequest defaultTypeIfNull(String defaultType) {
+        if (Strings.isNullOrEmpty(type)) {
+            type = defaultType;
+        }
+        return this;
+    }    
 
     /**
      * The id of the document to delete.
@@ -232,9 +292,9 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        if (out.getVersion().before(Version.V_8_0_0)) {
-            out.writeString(MapperService.SINGLE_MAPPING_NAME);
-        }
+        // A 7.x request allows null types but if deserialized in a 6.x node will cause nullpointer exceptions. 
+        // So we use the type accessor method here to make the type non-null (will default it to "_doc"). 
+        out.writeString(type());
         out.writeString(id);
         out.writeOptionalString(routing());
         out.writeLong(version);
@@ -245,6 +305,6 @@ public class DeleteRequest extends ReplicatedWriteRequest<DeleteRequest>
 
     @Override
     public String toString() {
-        return "delete {[" + index + "][" + id + "]}";
+        return "delete {[" + index + "][" + type() + "][" + id + "]}";
     }
 }

@@ -16,7 +16,7 @@ public class MatrixStatsAgg extends LeafAgg {
     private final List<String> fields;
 
     public MatrixStatsAgg(String id, List<String> fields) {
-        super(id, AggSource.of("<multi-field>"));
+        super(id, "<multi-field>");
         this.fields = fields;
     }
 

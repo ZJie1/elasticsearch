@@ -35,7 +35,6 @@ import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.test.EqualsHashCodeTestUtils;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,7 +45,6 @@ import java.util.Map;
 
 import static org.elasticsearch.test.VersionUtils.randomVersionBetween;
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.Matchers.is;
 
 public class IndicesOptionsTests extends ESTestCase {
 
@@ -56,7 +54,7 @@ public class IndicesOptionsTests extends ESTestCase {
             Version version = randomVersionBetween(random(), Version.V_7_0_0, null);
             IndicesOptions indicesOptions = IndicesOptions.fromOptions(
                 randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(),
-                randomBoolean(), randomBoolean(), randomBoolean());
+                randomBoolean());
 
             BytesStreamOutput output = new BytesStreamOutput();
             output.setVersion(version);
@@ -70,51 +68,36 @@ public class IndicesOptionsTests extends ESTestCase {
             assertThat(indicesOptions2.allowNoIndices(), equalTo(indicesOptions.allowNoIndices()));
             assertThat(indicesOptions2.expandWildcardsOpen(), equalTo(indicesOptions.expandWildcardsOpen()));
             assertThat(indicesOptions2.expandWildcardsClosed(), equalTo(indicesOptions.expandWildcardsClosed()));
-            if (version.before(Version.V_7_7_0)) {
-                assertThat(indicesOptions2.expandWildcardsHidden(), is(true));
-            } else {
-                assertThat(indicesOptions2.expandWildcardsHidden(), equalTo(indicesOptions.expandWildcardsHidden()));
-            }
 
             assertThat(indicesOptions2.forbidClosedIndices(), equalTo(indicesOptions.forbidClosedIndices()));
             assertThat(indicesOptions2.allowAliasesToMultipleIndices(), equalTo(indicesOptions.allowAliasesToMultipleIndices()));
 
             assertEquals(indicesOptions2.ignoreAliases(), indicesOptions.ignoreAliases());
-            if (version.before(Version.V_7_8_0)) {
-                assertThat(indicesOptions2.includeDataStreams(), is(false));
-            } else {
-                assertThat(indicesOptions2.includeDataStreams(), equalTo(indicesOptions.includeDataStreams()));
-            }
         }
     }
 
     public void testFromOptions() {
-        final boolean ignoreUnavailable = randomBoolean();
-        final boolean allowNoIndices = randomBoolean();
-        final boolean expandToOpenIndices = randomBoolean();
-        final boolean expandToClosedIndices = randomBoolean();
-        final boolean expandToHiddenIndices = randomBoolean();
-        final boolean allowAliasesToMultipleIndices = randomBoolean();
-        final boolean forbidClosedIndices = randomBoolean();
-        final boolean ignoreAliases = randomBoolean();
-        final boolean ignoreThrottled = randomBoolean();
-        final boolean includeDataStreams = randomBoolean();
+        boolean ignoreUnavailable = randomBoolean();
+        boolean allowNoIndices = randomBoolean();
+        boolean expandToOpenIndices = randomBoolean();
+        boolean expandToClosedIndices = randomBoolean();
+        boolean allowAliasesToMultipleIndices = randomBoolean();
+        boolean forbidClosedIndices = randomBoolean();
+        boolean ignoreAliases = randomBoolean();
+        boolean ingoreThrottled = randomBoolean();
 
-        IndicesOptions indicesOptions = IndicesOptions.fromOptions(ignoreUnavailable, allowNoIndices, expandToOpenIndices,
-            expandToClosedIndices, expandToHiddenIndices, allowAliasesToMultipleIndices, forbidClosedIndices, ignoreAliases,
-            ignoreThrottled, includeDataStreams);
+        IndicesOptions indicesOptions = IndicesOptions.fromOptions(ignoreUnavailable, allowNoIndices,expandToOpenIndices,
+                expandToClosedIndices, allowAliasesToMultipleIndices, forbidClosedIndices, ignoreAliases, ingoreThrottled);
 
         assertThat(indicesOptions.ignoreUnavailable(), equalTo(ignoreUnavailable));
         assertThat(indicesOptions.allowNoIndices(), equalTo(allowNoIndices));
         assertThat(indicesOptions.expandWildcardsOpen(), equalTo(expandToOpenIndices));
         assertThat(indicesOptions.expandWildcardsClosed(), equalTo(expandToClosedIndices));
-        assertThat(indicesOptions.expandWildcardsHidden(), equalTo(expandToHiddenIndices));
         assertThat(indicesOptions.allowAliasesToMultipleIndices(), equalTo(allowAliasesToMultipleIndices));
         assertThat(indicesOptions.allowAliasesToMultipleIndices(), equalTo(allowAliasesToMultipleIndices));
         assertThat(indicesOptions.forbidClosedIndices(), equalTo(forbidClosedIndices));
         assertEquals(ignoreAliases, indicesOptions.ignoreAliases());
-        assertEquals(ignoreThrottled, indicesOptions.ignoreThrottled());
-        assertThat(indicesOptions.includeDataStreams(), equalTo(includeDataStreams));
+        assertEquals(ingoreThrottled, indicesOptions.ignoreThrottled());
     }
 
     public void testFromOptionsWithDefaultOptions() {
@@ -123,93 +106,104 @@ public class IndicesOptionsTests extends ESTestCase {
         boolean expandToOpenIndices = randomBoolean();
         boolean expandToClosedIndices = randomBoolean();
 
-        IndicesOptions defaultOptions = IndicesOptions.fromOptions(randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(),
-                randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean());
+        IndicesOptions defaultOptions = IndicesOptions.fromOptions(randomBoolean(), randomBoolean(), randomBoolean(),
+                randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean());
 
-        IndicesOptions indicesOptions = IndicesOptions.fromOptions(ignoreUnavailable, allowNoIndices, expandToOpenIndices,
+        IndicesOptions indicesOptions = IndicesOptions.fromOptions(ignoreUnavailable, allowNoIndices,expandToOpenIndices,
                 expandToClosedIndices, defaultOptions);
 
         assertEquals(ignoreUnavailable, indicesOptions.ignoreUnavailable());
         assertEquals(allowNoIndices, indicesOptions.allowNoIndices());
         assertEquals(expandToOpenIndices, indicesOptions.expandWildcardsOpen());
         assertEquals(expandToClosedIndices, indicesOptions.expandWildcardsClosed());
-        assertEquals(defaultOptions.expandWildcardsHidden(), indicesOptions.expandWildcardsHidden());
         assertEquals(defaultOptions.allowAliasesToMultipleIndices(), indicesOptions.allowAliasesToMultipleIndices());
         assertEquals(defaultOptions.forbidClosedIndices(), indicesOptions.forbidClosedIndices());
         assertEquals(defaultOptions.ignoreAliases(), indicesOptions.ignoreAliases());
-        assertEquals(defaultOptions.includeDataStreams(), indicesOptions.includeDataStreams());
     }
 
     public void testFromParameters() {
-        final boolean expandWildcardsOpen = randomBoolean();
-        final boolean expandWildcardsClosed = randomBoolean();
-        final boolean expandWildcardsHidden = randomBoolean();
-        final String expandWildcardsString;
-        if (expandWildcardsOpen && expandWildcardsClosed && expandWildcardsHidden) {
+        boolean expandWildcardsOpen = randomBoolean();
+        boolean expandWildcardsClosed = randomBoolean();
+        String expandWildcardsString;
+        if (expandWildcardsOpen && expandWildcardsClosed) {
             if (randomBoolean()) {
-                expandWildcardsString = "open,closed,hidden";
+                expandWildcardsString = "open,closed";
             } else {
                 expandWildcardsString = "all";
             }
+        } else if (expandWildcardsOpen) {
+            expandWildcardsString = "open";
+        } else if (expandWildcardsClosed) {
+            expandWildcardsString = "closed";
         } else {
-            List<String> values = new ArrayList<>();
-            if (expandWildcardsOpen) {
-                values.add("open");
-            }
-            if (expandWildcardsClosed) {
-                values.add("closed");
-            }
-            if (expandWildcardsHidden) {
-                values.add("hidden");
-            }
-            if (values.isEmpty() && randomBoolean()) {
-                values.add("none");
-            }
-            expandWildcardsString = String.join(",", values);
+            expandWildcardsString = "none";
         }
         boolean ignoreUnavailable = randomBoolean();
         String ignoreUnavailableString = Boolean.toString(ignoreUnavailable);
         boolean ignoreThrottled = randomBoolean();
+        String ignoreThrottledString = Boolean.toString(ignoreThrottled);
         boolean allowNoIndices = randomBoolean();
         String allowNoIndicesString = Boolean.toString(allowNoIndices);
 
         IndicesOptions defaultOptions = IndicesOptions.fromOptions(randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(),
-                randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean());
+                randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean());
 
         IndicesOptions updatedOptions = IndicesOptions.fromParameters(expandWildcardsString, ignoreUnavailableString,
                 allowNoIndicesString, ignoreThrottled, defaultOptions);
 
         assertEquals(expandWildcardsOpen, updatedOptions.expandWildcardsOpen());
         assertEquals(expandWildcardsClosed, updatedOptions.expandWildcardsClosed());
-        assertEquals(expandWildcardsHidden, updatedOptions.expandWildcardsHidden());
         assertEquals(ignoreUnavailable, updatedOptions.ignoreUnavailable());
         assertEquals(allowNoIndices, updatedOptions.allowNoIndices());
         assertEquals(defaultOptions.allowAliasesToMultipleIndices(), updatedOptions.allowAliasesToMultipleIndices());
         assertEquals(defaultOptions.forbidClosedIndices(), updatedOptions.forbidClosedIndices());
         assertEquals(defaultOptions.ignoreAliases(), updatedOptions.ignoreAliases());
-        assertEquals(defaultOptions.includeDataStreams(), updatedOptions.includeDataStreams());
+    }
+
+    public void testSimpleByteBWC() {
+        Map<Byte, IndicesOptions> old = new HashMap<>();
+        // These correspond to each individual option (bit) in the old byte-based IndicesOptions
+        old.put((byte) 0, IndicesOptions.fromOptions(false, false, false, false, true, false, false, false));
+        old.put((byte) 1, IndicesOptions.fromOptions(true, false, false, false, true, false, false, false));
+        old.put((byte) 2, IndicesOptions.fromOptions(false, true, false, false, true, false, false, false));
+        old.put((byte) 4, IndicesOptions.fromOptions(false, false, true, false, true, false, false, false));
+        old.put((byte) 8, IndicesOptions.fromOptions(false, false, false, true, true, false, false, false));
+        old.put((byte) 16, IndicesOptions.fromOptions(false, false, false, false, false, false, false, false));
+        old.put((byte) 32, IndicesOptions.fromOptions(false, false, false, false, true, true, false, false));
+        old.put((byte) 64, IndicesOptions.fromOptions(false, false, false, false, true, false, true, false));
+        // Test a few multi-selected options
+        old.put((byte) 13, IndicesOptions.fromOptions(true, false, true, true, true, false, false, false));
+        old.put((byte) 19, IndicesOptions.fromOptions(true, true, false, false, false, false, false, false));
+        old.put((byte) 24, IndicesOptions.fromOptions(false, false, false, true, false, false, false, false));
+        old.put((byte) 123, IndicesOptions.fromOptions(true, true, false, true, false, true, true, false));
+
+        for (Map.Entry<Byte, IndicesOptions> entry : old.entrySet()) {
+            IndicesOptions indicesOptions2 = IndicesOptions.fromByte(entry.getKey());
+            logger.info("--> 1 {}", entry.getValue().toString());
+            logger.info("--> 2 {}", indicesOptions2.toString());
+            assertThat("IndicesOptions for byte " + entry.getKey() + " differ for conversion",indicesOptions2, equalTo(entry.getValue()));
+        }
     }
 
     public void testEqualityAndHashCode() {
-        IndicesOptions indicesOptions = IndicesOptions.fromOptions(randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(),
-            randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean());
+        IndicesOptions indicesOptions = IndicesOptions.fromOptions(
+            randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(), randomBoolean(),
+            randomBoolean());
 
         EqualsHashCodeTestUtils.checkEqualsAndHashCode(indicesOptions, opts -> {
             return IndicesOptions.fromOptions(opts.ignoreUnavailable(), opts.allowNoIndices(), opts.expandWildcardsOpen(),
-                opts.expandWildcardsClosed(), opts.expandWildcardsHidden(), opts.allowAliasesToMultipleIndices(),
-                opts.forbidClosedIndices(), opts.ignoreAliases(), opts.ignoreThrottled(), opts.includeDataStreams());
+                opts.expandWildcardsClosed(), opts.allowAliasesToMultipleIndices(), opts.forbidClosedIndices(), opts.ignoreAliases(),
+                opts.ignoreThrottled());
         }, opts -> {
             boolean mutated = false;
             boolean ignoreUnavailable = opts.ignoreUnavailable();
             boolean allowNoIndices = opts.allowNoIndices();
             boolean expandOpen = opts.expandWildcardsOpen();
             boolean expandClosed = opts.expandWildcardsClosed();
-            boolean expandHidden = opts.expandWildcardsHidden();
             boolean allowAliasesToMulti = opts.allowAliasesToMultipleIndices();
             boolean forbidClosed = opts.forbidClosedIndices();
             boolean ignoreAliases = opts.ignoreAliases();
             boolean ignoreThrottled = opts.ignoreThrottled();
-            boolean includeDataStreams = opts.includeDataStreams();
             while (mutated == false) {
                 if (randomBoolean()) {
                     ignoreUnavailable = !ignoreUnavailable;
@@ -228,10 +222,6 @@ public class IndicesOptionsTests extends ESTestCase {
                     mutated = true;
                 }
                 if (randomBoolean()) {
-                    expandHidden = !expandHidden;
-                    mutated = true;
-                }
-                if (randomBoolean()) {
                     allowAliasesToMulti = !allowAliasesToMulti;
                     mutated = true;
                 }
@@ -247,20 +237,16 @@ public class IndicesOptionsTests extends ESTestCase {
                     ignoreThrottled = !ignoreThrottled;
                     mutated = true;
                 }
-                if (randomBoolean()) {
-                    includeDataStreams = !includeDataStreams;
-                    mutated = true;
-                }
             }
-            return IndicesOptions.fromOptions(ignoreUnavailable, allowNoIndices, expandOpen, expandClosed, expandHidden,
-                allowAliasesToMulti, forbidClosed, ignoreAliases, ignoreThrottled, includeDataStreams);
+            return IndicesOptions.fromOptions(ignoreUnavailable, allowNoIndices, expandOpen, expandClosed,
+                allowAliasesToMulti, forbidClosed, ignoreAliases, ignoreThrottled);
         });
     }
 
     public void testFromMap() {
         IndicesOptions defaults = IndicesOptions.strictExpandOpen();
         Collection<String> wildcardStates = randomBoolean() ?
-                null : randomSubsetOf(Arrays.asList("open", "closed", "hidden"));
+                null : randomSubsetOf(Arrays.asList("open", "closed"));
         Boolean ignoreUnavailable = randomBoolean() ? null : randomBoolean();
         Boolean allowNoIndices = randomBoolean() ? null : randomBoolean();
         Boolean ignoreThrottled = randomBoolean() ? null : randomBoolean();
@@ -286,15 +272,13 @@ public class IndicesOptionsTests extends ESTestCase {
         IndicesOptions fromMap = IndicesOptions.fromMap(settings, defaults);
 
         boolean open = wildcardStates != null ? wildcardStates.contains("open") : defaults.expandWildcardsOpen();
-        assertEquals(open, fromMap.expandWildcardsOpen());
+        assertEquals(fromMap.expandWildcardsOpen(), open);
         boolean closed = wildcardStates != null ? wildcardStates.contains("closed") : defaults.expandWildcardsClosed();
-        assertEquals(closed, fromMap.expandWildcardsClosed());
-        boolean hidden = wildcardStates != null ? wildcardStates.contains("hidden") : defaults.expandWildcardsHidden();
-        assertEquals(hidden, fromMap.expandWildcardsHidden());
+        assertEquals(fromMap.expandWildcardsClosed(), closed);
 
-        assertEquals(ignoreUnavailable == null ? defaults.ignoreUnavailable() : ignoreUnavailable, fromMap.ignoreUnavailable());
-        assertEquals(allowNoIndices == null ? defaults.allowNoIndices() : allowNoIndices, fromMap.allowNoIndices());
-        assertEquals(ignoreThrottled == null ? defaults.ignoreThrottled() : ignoreThrottled, fromMap.ignoreThrottled());
+        assertEquals(fromMap.ignoreUnavailable(), ignoreUnavailable == null ? defaults.ignoreUnavailable() : ignoreUnavailable);
+        assertEquals(fromMap.allowNoIndices(), allowNoIndices == null ? defaults.allowNoIndices() : allowNoIndices);
+        assertEquals(fromMap.ignoreThrottled(), ignoreThrottled == null ? defaults.ignoreThrottled() : ignoreThrottled);
     }
 
     public void testToXContent() throws IOException {
@@ -325,7 +309,6 @@ public class IndicesOptionsTests extends ESTestCase {
         } else {
             assertFalse(((List<?>) map.get("expand_wildcards")).contains("closed"));
         }
-        assertEquals(wildcardStates.contains(WildcardStates.HIDDEN), ((List<?>) map.get("expand_wildcards")).contains("hidden"));
         assertEquals(map.get("ignore_unavailable"), options.contains(Option.IGNORE_UNAVAILABLE));
         assertEquals(map.get("allow_no_indices"), options.contains(Option.ALLOW_NO_INDICES));
         assertEquals(map.get("ignore_throttled"), options.contains(Option.IGNORE_THROTTLED));

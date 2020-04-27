@@ -66,8 +66,6 @@
         body:
           mappings:
             properties:
-              id:
-                type: keyword
               query:
                 type: percolator
               field1:
@@ -82,7 +80,6 @@
          index: queries
          id: q1
          body:
-          id: q1
           query:
             term:
               field1: value
@@ -92,7 +89,6 @@
         index: queries
         id: q2
         body:
-          id: q2
           query:
             bool:
               must:
@@ -106,7 +102,6 @@
         index: queries
         id: q3
         body:
-          id: q3
           query:
             bool:
               minimum_should_match: 2
@@ -138,7 +133,7 @@
         rest_total_hits_as_int: true
         index: queries
         body:
-          sort: id
+          sort: _id
           query:
             percolate:
               field: query
@@ -154,7 +149,7 @@
         rest_total_hits_as_int: true
         index: queries
         body:
-          sort: id
+          sort: _id
           query:
             percolate:
               field: query

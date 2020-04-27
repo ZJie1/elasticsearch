@@ -19,6 +19,8 @@
 
 package org.elasticsearch.index.mapper;
 
+import org.apache.logging.log4j.LogManager;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.regex.Regex;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -32,6 +34,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class DynamicTemplate implements ToXContentObject {
+
+    private static final DeprecationLogger deprecationLogger = new DeprecationLogger(LogManager.getLogger(DynamicTemplate.class));
 
     public enum MatchType {
         SIMPLE {
@@ -332,18 +336,6 @@ public class DynamicTemplate implements ToXContentObject {
             processedList.add(value);
         }
         return processedList;
-    }
-
-    String getName() {
-        return name;
-    }
-
-    XContentFieldType getXContentFieldType() {
-        return xcontentFieldType;
-    }
-
-    Map<String, Object> getMapping() {
-        return mapping;
     }
 
     @Override

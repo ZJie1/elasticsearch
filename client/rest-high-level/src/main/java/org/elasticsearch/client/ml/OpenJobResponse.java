@@ -33,23 +33,18 @@ import java.util.Objects;
 public class OpenJobResponse implements ToXContentObject {
 
     private static final ParseField OPENED = new ParseField("opened");
-    private static final ParseField NODE = new ParseField("node");
 
     public static final ConstructingObjectParser<OpenJobResponse, Void> PARSER =
-        new ConstructingObjectParser<>("open_job_response", true,
-            (a) -> new OpenJobResponse((Boolean) a[0], (String) a[1]));
+        new ConstructingObjectParser<>("open_job_response", true, (a) -> new OpenJobResponse((Boolean)a[0]));
 
     static {
         PARSER.declareBoolean(ConstructingObjectParser.constructorArg(), OPENED);
-        PARSER.declareString(ConstructingObjectParser.optionalConstructorArg(), NODE);
     }
 
-    private final boolean opened;
-    private final String node;
+    private boolean opened;
 
-    OpenJobResponse(boolean opened, String node) {
+    OpenJobResponse(boolean opened) {
         this.opened = opened;
-        this.node = node;
     }
 
     public static OpenJobResponse fromXContent(XContentParser parser) throws IOException {
@@ -65,18 +60,6 @@ public class OpenJobResponse implements ToXContentObject {
         return opened;
     }
 
-    /**
-     * The node that the job was assigned to
-     *
-     * @return The ID of a node if the job was assigned to a node.  If an empty string is returned
-     *         it means the job was allowed to open lazily and has not yet been assigned to a node.
-     *         If <code>null</code> is returned it means the server version is too old to return node
-     *         information.
-     */
-    public String getNode() {
-        return node;
-    }
-
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -88,22 +71,18 @@ public class OpenJobResponse implements ToXContentObject {
         }
 
         OpenJobResponse that = (OpenJobResponse) other;
-        return opened == that.opened
-            && Objects.equals(node, that.node);
+        return isOpened() == that.isOpened();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(opened, node);
+        return Objects.hash(isOpened());
     }
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
         builder.field(OPENED.getPreferredName(), opened);
-        if (node != null) {
-            builder.field(NODE.getPreferredName(), node);
-        }
         builder.endObject();
         return builder;
     }

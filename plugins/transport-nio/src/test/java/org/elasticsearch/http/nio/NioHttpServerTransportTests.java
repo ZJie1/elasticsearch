@@ -33,9 +33,7 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.bytes.BytesArray;
-import org.elasticsearch.common.network.NetworkAddress;
 import org.elasticsearch.common.network.NetworkService;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.TransportAddress;
@@ -156,8 +154,7 @@ public class NioHttpServerTransportTests extends ESTestCase {
             }
         };
         try (NioHttpServerTransport transport = new NioHttpServerTransport(settings, networkService, bigArrays, pageRecycler, threadPool,
-            xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger),
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+            xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger))) {
             transport.start();
             final TransportAddress remoteAddress = randomFrom(transport.boundAddress().boundAddresses());
             try (NioHttpClient client = new NioHttpClient()) {
@@ -190,22 +187,14 @@ public class NioHttpServerTransportTests extends ESTestCase {
 
     public void testBindUnavailableAddress() {
         try (NioHttpServerTransport transport = new NioHttpServerTransport(Settings.EMPTY, networkService, bigArrays, pageRecycler,
-            threadPool, xContentRegistry(), new NullDispatcher(), new NioGroupFactory(Settings.EMPTY, logger),
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+            threadPool, xContentRegistry(), new NullDispatcher(), new NioGroupFactory(Settings.EMPTY, logger))) {
             transport.start();
             TransportAddress remoteAddress = randomFrom(transport.boundAddress().boundAddresses());
-            Settings settings = Settings.builder()
-                .put("http.port", remoteAddress.getPort())
-                .put("network.host", remoteAddress.getAddress())
-                .build();
+            Settings settings = Settings.builder().put("http.port", remoteAddress.getPort()).build();
             try (NioHttpServerTransport otherTransport = new NioHttpServerTransport(settings, networkService, bigArrays, pageRecycler,
-                threadPool, xContentRegistry(), new NullDispatcher(), new NioGroupFactory(Settings.EMPTY, logger),
-                new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+                threadPool, xContentRegistry(), new NullDispatcher(), new NioGroupFactory(Settings.EMPTY, logger))) {
                 BindHttpException bindHttpException = expectThrows(BindHttpException.class, () -> otherTransport.start());
-                assertEquals(
-                    "Failed to bind to " + NetworkAddress.format(remoteAddress.address()),
-                    bindHttpException.getMessage()
-                );
+                assertEquals("Failed to bind to [" + remoteAddress.getPort() + "]", bindHttpException.getMessage());
             }
         }
     }
@@ -232,8 +221,7 @@ public class NioHttpServerTransportTests extends ESTestCase {
             .put(SETTING_CORS_ALLOW_ORIGIN.getKey(), "elastic.co").build();
 
         try (NioHttpServerTransport transport = new NioHttpServerTransport(settings, networkService, bigArrays, pageRecycler,
-            threadPool, xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger),
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+            threadPool, xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger))) {
             transport.start();
             final TransportAddress remoteAddress = randomFrom(transport.boundAddress().boundAddresses());
 
@@ -303,8 +291,7 @@ public class NioHttpServerTransportTests extends ESTestCase {
         }
 
         try (NioHttpServerTransport transport = new NioHttpServerTransport(settings, networkService, bigArrays, pageRecycler,
-            threadPool, xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger),
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+            threadPool, xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger))) {
             transport.start();
             final TransportAddress remoteAddress = randomFrom(transport.boundAddress().boundAddresses());
 
@@ -349,9 +336,9 @@ public class NioHttpServerTransportTests extends ESTestCase {
             .put(HttpTransportSettings.SETTING_HTTP_READ_TIMEOUT.getKey(), new TimeValue(randomIntBetween(100, 300)))
             .build();
 
+
         try (NioHttpServerTransport transport = new NioHttpServerTransport(settings, networkService, bigArrays, pageRecycler,
-            threadPool, xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger),
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))) {
+            threadPool, xContentRegistry(), dispatcher, new NioGroupFactory(settings, logger))) {
             transport.start();
             final TransportAddress remoteAddress = randomFrom(transport.boundAddress().boundAddresses());
 

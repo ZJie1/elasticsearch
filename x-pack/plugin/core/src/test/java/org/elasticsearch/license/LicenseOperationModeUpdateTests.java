@@ -34,20 +34,16 @@ public class LicenseOperationModeUpdateTests extends ESTestCase {
     }
 
     public void testLicenseOperationModeUpdate() throws Exception {
-        License.LicenseType type = randomFrom(License.LicenseType.values());
-        final License.Builder licenseBuilder = License.builder()
-            .uid("id")
-            .expiryDate(0)
-            .issueDate(0)
-            .issuedTo("elasticsearch")
-            .issuer("issuer")
-            .type(type);
-        if (type == License.LicenseType.ENTERPRISE) {
-            licenseBuilder.maxResourceUnits(1);
-        } else {
-            licenseBuilder.maxNodes(1);
-        }
-        License license = licenseBuilder.build();
+        String type = randomFrom("trial", "basic", "standard", "gold", "platinum");
+        License license = License.builder()
+                .uid("id")
+                .expiryDate(0)
+                .issueDate(0)
+                .issuedTo("elasticsearch")
+                .issuer("issuer")
+                .type(type)
+                .maxNodes(1)
+                .build();
 
         assertThat(license.operationMode(), equalTo(License.OperationMode.resolve(type)));
         OperationModeFileWatcherTests.writeMode("gold", licenseModeFile);

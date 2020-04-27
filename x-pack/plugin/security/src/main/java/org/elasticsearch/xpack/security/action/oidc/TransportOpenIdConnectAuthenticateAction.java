@@ -20,7 +20,6 @@ import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
-import org.elasticsearch.xpack.core.security.SecurityContext;
 import org.elasticsearch.xpack.core.security.action.oidc.OpenIdConnectAuthenticateRequest;
 import org.elasticsearch.xpack.core.security.action.oidc.OpenIdConnectAuthenticateResponse;
 import org.elasticsearch.xpack.core.security.action.oidc.OpenIdConnectAuthenticateAction;
@@ -39,19 +38,17 @@ public class TransportOpenIdConnectAuthenticateAction
     private final ThreadPool threadPool;
     private final AuthenticationService authenticationService;
     private final TokenService tokenService;
-    private final SecurityContext securityContext;
     private static final Logger logger = LogManager.getLogger(TransportOpenIdConnectAuthenticateAction.class);
 
     @Inject
     public TransportOpenIdConnectAuthenticateAction(ThreadPool threadPool, TransportService transportService,
                                                     ActionFilters actionFilters, AuthenticationService authenticationService,
-                                                    TokenService tokenService, SecurityContext securityContext) {
+                                                    TokenService tokenService) {
         super(OpenIdConnectAuthenticateAction.NAME, transportService, actionFilters,
             (Writeable.Reader<OpenIdConnectAuthenticateRequest>) OpenIdConnectAuthenticateRequest::new);
         this.threadPool = threadPool;
         this.authenticationService = authenticationService;
         this.tokenService = tokenService;
-        this.securityContext = securityContext;
     }
 
     @Override
@@ -60,7 +57,7 @@ public class TransportOpenIdConnectAuthenticateAction
         final OpenIdConnectToken token = new OpenIdConnectToken(request.getRedirectUri(), new State(request.getState()),
             new Nonce(request.getNonce()), request.getRealm());
         final ThreadContext threadContext = threadPool.getThreadContext();
-        Authentication originatingAuthentication = securityContext.getAuthentication();
+        Authentication originatingAuthentication = Authentication.getAuthentication(threadContext);
         try (ThreadContext.StoredContext ignore = threadContext.stashContext()) {
             authenticationService.authenticate(OpenIdConnectAuthenticateAction.NAME, request, token, ActionListener.wrap(
                 authentication -> {

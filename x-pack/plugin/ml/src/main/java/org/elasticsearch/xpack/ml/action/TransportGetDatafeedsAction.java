@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.ml.action;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.master.TransportMasterNodeReadAction;
@@ -38,8 +36,6 @@ import java.util.Map;
 import java.util.Set;
 
 public class TransportGetDatafeedsAction extends TransportMasterNodeReadAction<GetDatafeedsAction.Request, GetDatafeedsAction.Response> {
-
-    private static final Logger logger = LogManager.getLogger(TransportGetDatafeedsAction.class);
 
     private final DatafeedConfigProvider datafeedConfigProvider;
 

@@ -9,8 +9,8 @@ import org.elasticsearch.search.aggregations.AggregationBuilder;
 
 public abstract class LeafAgg extends Agg {
 
-    LeafAgg(String id, AggSource source) {
-        super(id, source);
+    LeafAgg(String id, String fieldName) {
+        super(id, fieldName);
     }
 
     abstract AggregationBuilder toBuilder();

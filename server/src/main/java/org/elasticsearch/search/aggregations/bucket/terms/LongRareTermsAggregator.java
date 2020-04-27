@@ -29,6 +29,7 @@ import org.elasticsearch.search.aggregations.AggregatorFactories;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.LeafBucketCollector;
 import org.elasticsearch.search.aggregations.LeafBucketCollectorBase;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.internal.SearchContext;
 
@@ -48,8 +49,10 @@ public class LongRareTermsAggregator extends AbstractRareTermsAggregator<ValuesS
 
     LongRareTermsAggregator(String name, AggregatorFactories factories, ValuesSource.Numeric valuesSource, DocValueFormat format,
                                    SearchContext aggregationContext, Aggregator parent, IncludeExclude.LongFilter longFilter,
-                                   int maxDocCount, double precision, Map<String, Object> metadata) throws IOException {
-        super(name, factories, aggregationContext, parent, metadata, maxDocCount, precision, format, valuesSource, longFilter);
+                                   int maxDocCount, double precision, List<PipelineAggregator> pipelineAggregators,
+                                   Map<String, Object> metaData) throws IOException {
+        super(name, factories, aggregationContext, parent, pipelineAggregators, metaData, maxDocCount, precision,
+            format, valuesSource, longFilter);
         this.bucketOrds = new LongHash(1, aggregationContext.bigArrays());
     }
 
@@ -61,6 +64,9 @@ public class LongRareTermsAggregator extends AbstractRareTermsAggregator<ValuesS
     public LeafBucketCollector getLeafCollector(LeafReaderContext ctx,
                                                 final LeafBucketCollector sub) throws IOException {
         final SortedNumericDocValues values = getValues(valuesSource, ctx);
+        if (subCollectors == null) {
+            subCollectors = sub;
+        }
         return new LeafBucketCollectorBase(sub, values) {
 
             @Override
@@ -72,7 +78,7 @@ public class LongRareTermsAggregator extends AbstractRareTermsAggregator<ValuesS
                         final long val = values.nextValue();
                         if (previous != val || i == 0) {
                             if ((includeExclude == null) || (includeExclude.accept(val))) {
-                                doCollect(sub, val, docId);
+                                doCollect(val, docId);
                             }
                             previous = val;
                         }
@@ -147,13 +153,13 @@ public class LongRareTermsAggregator extends AbstractRareTermsAggregator<ValuesS
             bucket.aggregations = bucketAggregations(bucket.bucketOrd);
         }
 
-        CollectionUtil.introSort(buckets, ORDER.comparator());
-        return new LongRareTerms(name, ORDER, metadata(), format, buckets, maxDocCount, filter);
+        CollectionUtil.introSort(buckets, ORDER.comparator(this));
+        return new LongRareTerms(name, ORDER, pipelineAggregators(), metaData(), format, buckets, maxDocCount, filter);
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new LongRareTerms(name, ORDER, metadata(), format, emptyList(), 0, filter);
+        return new LongRareTerms(name, ORDER, pipelineAggregators(), metaData(), format, emptyList(), 0, filter);
     }
 
     @Override

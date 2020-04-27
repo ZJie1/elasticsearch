@@ -51,6 +51,7 @@ public class KibanaSystemRoleIntegTests extends SecurityIntegTestCase {
                 .filterWithHeader(singletonMap("Authorization", UsernamePasswordToken.basicAuthHeaderValue("kibana_system", USERS_PASSWD)))
                 .prepareIndex()
                 .setIndex(index)
+                .setType("dashboard")
                 .setSource("foo", "bar")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
@@ -58,7 +59,7 @@ public class KibanaSystemRoleIntegTests extends SecurityIntegTestCase {
 
         DeleteResponse deleteResponse = client()
                 .filterWithHeader(singletonMap("Authorization", UsernamePasswordToken.basicAuthHeaderValue("kibana_system", USERS_PASSWD)))
-                .prepareDelete(index, response.getId())
+                .prepareDelete(index, "dashboard", response.getId())
                 .get();
         assertEquals(DocWriteResponse.Result.DELETED, deleteResponse.getResult());
     }

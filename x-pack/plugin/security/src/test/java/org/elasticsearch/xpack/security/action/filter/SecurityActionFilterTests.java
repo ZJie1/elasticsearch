@@ -40,7 +40,6 @@ import org.junit.Before;
 
 import java.util.Collections;
 
-import static org.hamcrest.Matchers.arrayWithSize;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
@@ -65,7 +64,7 @@ public class SecurityActionFilterTests extends ESTestCase {
         authcService = mock(AuthenticationService.class);
         authzService = mock(AuthorizationService.class);
         licenseState = mock(XPackLicenseState.class);
-        when(licenseState.isSecurityEnabled()).thenReturn(true);
+        when(licenseState.isAuthAllowed()).thenReturn(true);
         when(licenseState.isStatsAndHealthAllowed()).thenReturn(true);
         ThreadPool threadPool = mock(ThreadPool.class);
         threadContext = new ThreadContext(Settings.EMPTY);
@@ -93,17 +92,14 @@ public class SecurityActionFilterTests extends ESTestCase {
         Task task = mock(Task.class);
         User user = new User("username", "r1", "r2");
         Authentication authentication = new Authentication(user, new RealmRef("test", "test", "foo"), null);
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener callback =
+                    (ActionListener) i.getArguments()[3];
             callback.onResponse(authentication);
             return Void.TYPE;
         }).when(authcService).authenticate(eq("_action"), eq(request), eq(SystemUser.INSTANCE), any(ActionListener.class));
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener<Void> callback = (ActionListener<Void>) i.getArguments()[3];
             callback.onResponse(null);
             return Void.TYPE;
         }).when(authzService)
@@ -120,19 +116,16 @@ public class SecurityActionFilterTests extends ESTestCase {
         Task task = mock(Task.class);
         User user = new User("username", "r1", "r2");
         Authentication authentication = new Authentication(user, new RealmRef("test", "test", "foo"), null);
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener callback =
+                    (ActionListener) i.getArguments()[3];
             assertNull(threadContext.getTransient(AuthenticationField.AUTHENTICATION_KEY));
             threadContext.putTransient(AuthenticationField.AUTHENTICATION_KEY, authentication);
             callback.onResponse(authentication);
             return Void.TYPE;
         }).when(authcService).authenticate(eq("_action"), eq(request), eq(SystemUser.INSTANCE), any(ActionListener.class));
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener<Void> callback = (ActionListener<Void>) i.getArguments()[3];
             callback.onResponse(null);
             return Void.TYPE;
         }).when(authzService)
@@ -165,10 +158,9 @@ public class SecurityActionFilterTests extends ESTestCase {
         } else {
             assertNull(threadContext.getTransient(AuthenticationField.AUTHENTICATION_KEY));
         }
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener callback =
+                    (ActionListener) i.getArguments()[3];
             callback.onResponse(threadContext.getTransient(AuthenticationField.AUTHENTICATION_KEY));
             return Void.TYPE;
         }).when(authcService).authenticate(eq(action), eq(request), eq(SystemUser.INSTANCE), any(ActionListener.class));
@@ -201,10 +193,9 @@ public class SecurityActionFilterTests extends ESTestCase {
         Task task = mock(Task.class);
         User user = new User("username", "r1", "r2");
         Authentication authentication = new Authentication(user, new RealmRef("test", "test", "foo"), null);
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener callback =
+                    (ActionListener) i.getArguments()[3];
             callback.onResponse(authentication);
             return Void.TYPE;
         }).when(authcService).authenticate(eq(action), eq(request), eq(SystemUser.INSTANCE), any(ActionListener.class));
@@ -232,10 +223,9 @@ public class SecurityActionFilterTests extends ESTestCase {
         Task task = mock(Task.class);
         User user = new User("username", "r1", "r2");
         Authentication authentication = new Authentication(user, new RealmRef("test", "test", "foo"), null);
-        doAnswer(i -> {
-            final Object[] args = i.getArguments();
-            assertThat(args, arrayWithSize(4));
-            ActionListener callback = (ActionListener) args[args.length - 1];
+        doAnswer((i) -> {
+            ActionListener callback =
+                    (ActionListener) i.getArguments()[3];
             callback.onResponse(authentication);
             return Void.TYPE;
         }).when(authcService).authenticate(eq("_action"), eq(request), eq(SystemUser.INSTANCE), any(ActionListener.class));
@@ -250,7 +240,7 @@ public class SecurityActionFilterTests extends ESTestCase {
         ActionListener listener = mock(ActionListener.class);
         ActionFilterChain chain = mock(ActionFilterChain.class);
         Task task = mock(Task.class);
-        when(licenseState.isSecurityEnabled()).thenReturn(false);
+        when(licenseState.isAuthAllowed()).thenReturn(false);
         filter.apply(task, "_action", request, listener, chain);
         verifyZeroInteractions(authcService);
         verifyZeroInteractions(authzService);

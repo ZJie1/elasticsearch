@@ -42,44 +42,48 @@ numeric fields `field_a` and `field_b` multiplied by the parameter param_c:
 --------------------------------------------------
 // NOTCONSOLE
 
-It is possible to use the Script Processor to manipulate document metadata like `_index` during
-ingestion. Here is an example of an Ingest Pipeline that renames the index to `my_index` no matter what
+It is possible to use the Script Processor to manipulate document metadata like `_index` and `_type` during
+ingestion. Here is an example of an Ingest Pipeline that renames the index and type to `my_index` no matter what
 was provided in the original index request:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/my_index
 {
-    "description": "use index:my_index",
+    "description": "use index:my_index and type:_doc",
     "processors": [
       {
         "script": {
           "source": """
             ctx._index = 'my_index';
+            ctx._type = '_doc';
           """
         }
       }
     ]
 }
 --------------------------------------------------
+// CONSOLE
 
 Using the above pipeline, we can attempt to index a document into the `any_index` index.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT any_index/_doc/1?pipeline=my_index
 {
   "message": "text"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 The response from the above index request:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "_index": "my_index",
+  "_type": "_doc",
   "_id": "1",
   "_version": 1,
   "result": "created",

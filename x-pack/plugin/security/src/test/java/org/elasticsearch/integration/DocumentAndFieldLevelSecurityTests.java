@@ -12,7 +12,7 @@ import org.elasticsearch.action.fieldcaps.FieldCapabilities;
 import org.elasticsearch.action.fieldcaps.FieldCapabilitiesRequest;
 import org.elasticsearch.action.fieldcaps.FieldCapabilitiesResponse;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.cluster.metadata.MappingMetadata;
+import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Settings;
@@ -76,7 +76,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                 "    - names: '*'\n" +
                 "      privileges: [ ALL ]\n" +
                 "      field_security:\n" +
-                "         grant: [ field1, id ]\n" +
+                "         grant: [ field1 ]\n" +
                 "      query: '{\"term\" : {\"field1\" : \"value1\"}}'\n" +
                 "role3:\n" +
                 "  cluster: [ all ]\n" +
@@ -84,7 +84,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                 "    - names: '*'\n" +
                 "      privileges: [ ALL ]\n" +
                 "      field_security:\n" +
-                "         grant: [ field2, id ]\n" +
+                "         grant: [ field2 ]\n" +
                 "      query: '{\"term\" : {\"field2\" : \"value2\"}}'\n" +
                 "role4:\n" +
                 "  cluster: [ all ]\n" +
@@ -92,7 +92,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                 "    - names: '*'\n" +
                 "      privileges: [ ALL ]\n" +
                 "      field_security:\n" +
-                "         grant: [ field1, id ]\n" +
+                "         grant: [ field1 ]\n" +
                 "      query: '{\"term\" : {\"field2\" : \"value2\"}}'\n";
     }
 
@@ -106,12 +106,12 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
 
     public void testSimpleQuery() {
         assertAcked(client().admin().indices().prepareCreate("test")
-                        .setMapping("id", "type=keyword", "field1", "type=text", "field2", "type=text")
+                        .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("id", "1", "field1", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("id", "2", "field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -121,22 +121,20 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                 .get();
         assertHitCount(response, 1);
         assertSearchHits(response, "1");
-        assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(2));
+        assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(1));
         assertThat(response.getHits().getAt(0).getSourceAsMap().get("field1").toString(), equalTo("value1"));
-        assertThat(response.getHits().getAt(0).getSourceAsMap().get("id").toString(), equalTo("1"));
 
         response = client().filterWithHeader(Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user2", USERS_PASSWD)))
                 .prepareSearch("test")
                 .get();
         assertHitCount(response, 1);
         assertSearchHits(response, "2");
-        assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(2));
+        assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(1));
         assertThat(response.getHits().getAt(0).getSourceAsMap().get("field2").toString(), equalTo("value2"));
-        assertThat(response.getHits().getAt(0).getSourceAsMap().get("id").toString(), equalTo("2"));
 
         response = client().filterWithHeader(Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user4", USERS_PASSWD)))
                 .prepareSearch("test")
-                .addSort("id", SortOrder.ASC)
+                .addSort("_id", SortOrder.ASC)
                 .get();
         assertHitCount(response, 2);
         assertSearchHits(response, "1", "2");
@@ -146,12 +144,12 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
 
     public void testDLSIsAppliedBeforeFLS() {
         assertAcked(client().admin().indices().prepareCreate("test")
-                .setMapping("field1", "type=text", "field2", "type=text")
+                .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("field1", "value1", "field2", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1", "field2", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("field1", "value2", "field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field1", "value2", "field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -174,12 +172,12 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
     public void testQueryCache() {
         assertAcked(client().admin().indices().prepareCreate("test")
                         .setSettings(Settings.builder().put(IndexModule.INDEX_QUERY_CACHE_EVERYTHING_SETTING.getKey(), true))
-                        .setMapping("id", "type=keyword", "field1", "type=text", "field2", "type=text")
+                        .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("id", "1", "field1", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("id", "2", "field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -192,17 +190,15 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                     .get();
             assertHitCount(response, 1);
             assertThat(response.getHits().getAt(0).getId(), equalTo("1"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(2));
+            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(1));
             assertThat(response.getHits().getAt(0).getSourceAsMap().get("field1"), equalTo("value1"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().get("id"), equalTo("1"));
             response = client().filterWithHeader(Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user2", USERS_PASSWD)))
                     .prepareSearch("test")
                     .get();
             assertHitCount(response, 1);
             assertThat(response.getHits().getAt(0).getId(), equalTo("2"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(2));
+            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(1));
             assertThat(response.getHits().getAt(0).getSourceAsMap().get("field2"), equalTo("value2"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().get("id"), equalTo("2"));
 
             // this is a bit weird the document level permission (all docs with field2:value2) don't match with the field level
             // permissions (field1),
@@ -212,35 +208,32 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                     .get();
             assertHitCount(response, 1);
             assertThat(response.getHits().getAt(0).getId(), equalTo("2"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(1));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().get("id"), equalTo("2"));
+            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(0));
 
             // user4 has all roles
             response = client().filterWithHeader(
                     Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user4", USERS_PASSWD)))
                     .prepareSearch("test")
-                    .addSort("id", SortOrder.ASC)
+                    .addSort("_id", SortOrder.ASC)
                     .get();
             assertHitCount(response, 2);
             assertThat(response.getHits().getAt(0).getId(), equalTo("1"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(2));
+            assertThat(response.getHits().getAt(0).getSourceAsMap().size(), equalTo(1));
             assertThat(response.getHits().getAt(0).getSourceAsMap().get("field1"), equalTo("value1"));
-            assertThat(response.getHits().getAt(0).getSourceAsMap().get("id"), equalTo("1"));
             assertThat(response.getHits().getAt(1).getId(), equalTo("2"));
-            assertThat(response.getHits().getAt(1).getSourceAsMap().size(), equalTo(2));
+            assertThat(response.getHits().getAt(1).getSourceAsMap().size(), equalTo(1));
             assertThat(response.getHits().getAt(1).getSourceAsMap().get("field2"), equalTo("value2"));
-            assertThat(response.getHits().getAt(1).getSourceAsMap().get("id"), equalTo("2"));
         }
     }
 
     public void testGetMappingsIsFiltered() {
         assertAcked(client().admin().indices().prepareCreate("test")
-                .setMapping("field1", "type=text", "field2", "type=text")
+                .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("field1", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -275,12 +268,12 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
 
     public void testGetIndexMappingsIsFiltered() {
         assertAcked(client().admin().indices().prepareCreate("test")
-                .setMapping("field1", "type=text", "field2", "type=text")
+                .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("field1", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -312,12 +305,12 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
 
     public void testGetFieldMappingsIsFiltered() {
         assertAcked(client().admin().indices().prepareCreate("test")
-                .setMapping("field1", "type=text", "field2", "type=text")
+                .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("field1", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -326,7 +319,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                     Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user1", USERS_PASSWD)))
                     .admin().indices().prepareGetFieldMappings("test").setFields("*").get();
 
-            Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetadata>> mappings =
+            Map<String, Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetaData>>> mappings =
                     getFieldMappingsResponse.mappings();
             assertEquals(1, mappings.size());
             assertExpectedFields(mappings.get("test"), "field1");
@@ -336,7 +329,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                     Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user2", USERS_PASSWD)))
                     .admin().indices().prepareGetFieldMappings("test").setFields("*").get();
 
-            Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetadata>> mappings =
+            Map<String, Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetaData>>> mappings =
                     getFieldMappingsResponse.mappings();
             assertEquals(1, mappings.size());
             assertExpectedFields(mappings.get("test"), "field2");
@@ -346,7 +339,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                     Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user3", USERS_PASSWD)))
                     .admin().indices().prepareGetFieldMappings("test").setFields("*").get();
 
-            Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetadata>> mappings =
+            Map<String, Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetaData>>> mappings =
                     getFieldMappingsResponse.mappings();
             assertEquals(1, mappings.size());
             assertExpectedFields(mappings.get("test"), "field1");
@@ -356,7 +349,7 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
                     Collections.singletonMap(BASIC_AUTH_HEADER, basicAuthHeaderValue("user4", USERS_PASSWD)))
                     .admin().indices().prepareGetFieldMappings("test").setFields("*").get();
 
-            Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetadata>> mappings =
+            Map<String, Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetaData>>> mappings =
                     getFieldMappingsResponse.mappings();
             assertEquals(1, mappings.size());
             assertExpectedFields(mappings.get("test"), "field1", "field2");
@@ -365,12 +358,12 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
 
     public void testFieldCapabilitiesIsFiltered() {
         assertAcked(client().admin().indices().prepareCreate("test")
-                .setMapping("field1", "type=text", "field2", "type=text")
+                .addMapping("type1", "field1", "type=text", "field2", "type=text")
         );
-        client().prepareIndex("test").setId("1").setSource("field1", "value1")
+        client().prepareIndex("test", "type1", "1").setSource("field1", "value1")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
-        client().prepareIndex("test").setId("2").setSource("field2", "value2")
+        client().prepareIndex("test", "type1", "2").setSource("field2", "value2")
                 .setRefreshPolicy(IMMEDIATE)
                 .get();
 
@@ -405,9 +398,9 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
     }
 
     @SuppressWarnings("unchecked")
-    private static void assertExpectedFields(ImmutableOpenMap<String, MappingMetadata> mappings,
+    private static void assertExpectedFields(ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings,
                                              String... fields) {
-        Map<String, Object> sourceAsMap = mappings.get("test").getSourceAsMap();
+        Map<String, Object> sourceAsMap = mappings.get("test").get("type1").getSourceAsMap();
         assertEquals(1, sourceAsMap.size());
         Map<String, Object> properties = (Map<String, Object>)sourceAsMap.get("properties");
         assertEquals(fields.length, properties.size());
@@ -418,8 +411,8 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
 
     private static void assertExpectedFields(FieldCapabilitiesResponse fieldCapabilitiesResponse, String... expectedFields) {
         Map<String, Map<String, FieldCapabilities>> responseMap = new HashMap<>(fieldCapabilitiesResponse.get());
-        Set<String> builtInMetadataFields = IndicesModule.getBuiltInMetadataFields();
-        for (String field : builtInMetadataFields) {
+        Set<String> builtInMetaDataFields = IndicesModule.getBuiltInMetaDataFields();
+        for (String field : builtInMetaDataFields) {
             Map<String, FieldCapabilities> remove = responseMap.remove(field);
             assertNotNull(" expected field [" + field + "] not found", remove);
         }
@@ -430,17 +423,18 @@ public class DocumentAndFieldLevelSecurityTests extends SecurityIntegTestCase {
         assertEquals("Some unexpected fields were returned: " + responseMap.keySet(), 0, responseMap.size());
     }
 
-    private static void assertExpectedFields(Map<String, GetFieldMappingsResponse.FieldMappingMetadata> actual,
+    private static void assertExpectedFields(Map<String, Map<String, GetFieldMappingsResponse.FieldMappingMetaData>> mappings,
                                             String... expectedFields) {
-        Set<String> builtInMetadataFields = IndicesModule.getBuiltInMetadataFields();
-        Map<String, GetFieldMappingsResponse.FieldMappingMetadata> fields = new HashMap<>(actual);
-        for (String field : builtInMetadataFields) {
-            GetFieldMappingsResponse.FieldMappingMetadata fieldMappingMetadata = fields.remove(field);
-            assertNotNull(" expected field [" + field + "] not found", fieldMappingMetadata);
+        assertEquals(1, mappings.size());
+        Map<String, GetFieldMappingsResponse.FieldMappingMetaData> fields = new HashMap<>(mappings.get("type1"));
+        Set<String> builtInMetaDataFields = IndicesModule.getBuiltInMetaDataFields();
+        for (String field : builtInMetaDataFields) {
+            GetFieldMappingsResponse.FieldMappingMetaData fieldMappingMetaData = fields.remove(field);
+            assertNotNull(" expected field [" + field + "] not found", fieldMappingMetaData);
         }
         for (String field : expectedFields) {
-            GetFieldMappingsResponse.FieldMappingMetadata fieldMappingMetadata = fields.remove(field);
-            assertNotNull("expected field [" + field + "] not found", fieldMappingMetadata);
+            GetFieldMappingsResponse.FieldMappingMetaData fieldMappingMetaData = fields.remove(field);
+            assertNotNull("expected field [" + field + "] not found", fieldMappingMetaData);
         }
         assertEquals("Some unexpected fields were returned: " + fields.keySet(), 0, fields.size());
     }

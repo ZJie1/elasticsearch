@@ -90,7 +90,7 @@ public class AnalysisLimits implements ToXContentObject, Writeable {
 
     public AnalysisLimits(Long modelMemoryLimit, Long categorizationExamplesLimit) {
         if (modelMemoryLimit != null && modelMemoryLimit < 1) {
-            String msg = Messages.getMessage(Messages.JOB_CONFIG_MODEL_MEMORY_LIMIT_TOO_LOW, modelMemoryLimit, "1 MiB");
+            String msg = Messages.getMessage(Messages.JOB_CONFIG_MODEL_MEMORY_LIMIT_TOO_LOW, modelMemoryLimit);
             throw ExceptionsHelper.badRequestException(msg);
         }
         if (categorizationExamplesLimit != null && categorizationExamplesLimit < 0) {

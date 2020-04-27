@@ -28,23 +28,18 @@ import org.apache.lucene.search.SortField;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.fielddata.AbstractSortedDocValues;
-import org.elasticsearch.index.fielddata.LeafOrdinalsFieldData;
+import org.elasticsearch.index.fielddata.AtomicOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldDataCache;
 import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
-import org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.Nested;
 import org.elasticsearch.index.fielddata.fieldcomparator.BytesRefFieldComparatorSource;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.TextFieldMapper;
 import org.elasticsearch.indices.breaker.CircuitBreakerService;
-import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.MultiValueMode;
-import org.elasticsearch.search.sort.BucketedSort;
-import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -69,11 +64,11 @@ public class ConstantIndexFieldData extends AbstractIndexOrdinalsFieldData {
 
     }
 
-    private static class ConstantLeafFieldData extends AbstractLeafOrdinalsFieldData {
+    private static class ConstantAtomicFieldData extends AbstractAtomicOrdinalsFieldData {
 
         private final String value;
 
-        ConstantLeafFieldData(String value) {
+        ConstantAtomicFieldData(String value) {
             super(DEFAULT_SCRIPT_FUNCTION);
             this.value = value;
         }
@@ -91,9 +86,6 @@ public class ConstantIndexFieldData extends AbstractIndexOrdinalsFieldData {
 
         @Override
         public SortedSetDocValues getOrdinalsValues() {
-            if (value == null) {
-                return DocValues.emptySortedSet();
-            }
             final BytesRef term = new BytesRef(value);
             final SortedDocValues sortedValues = new AbstractSortedDocValues() {
 
@@ -134,14 +126,14 @@ public class ConstantIndexFieldData extends AbstractIndexOrdinalsFieldData {
 
     }
 
-    private final ConstantLeafFieldData atomicFieldData;
+    private final ConstantAtomicFieldData atomicFieldData;
 
     private ConstantIndexFieldData(IndexSettings indexSettings, String name, String value) {
         super(indexSettings, name, null, null,
                 TextFieldMapper.Defaults.FIELDDATA_MIN_FREQUENCY,
                 TextFieldMapper.Defaults.FIELDDATA_MAX_FREQUENCY,
                 TextFieldMapper.Defaults.FIELDDATA_MIN_SEGMENT_SIZE);
-        atomicFieldData = new ConstantLeafFieldData(value);
+        atomicFieldData = new ConstantAtomicFieldData(value);
     }
 
     @Override
@@ -149,12 +141,12 @@ public class ConstantIndexFieldData extends AbstractIndexOrdinalsFieldData {
     }
 
     @Override
-    public final LeafOrdinalsFieldData load(LeafReaderContext context) {
+    public final AtomicOrdinalsFieldData load(LeafReaderContext context) {
         return atomicFieldData;
     }
 
     @Override
-    public LeafOrdinalsFieldData loadDirect(LeafReaderContext context)
+    public AtomicOrdinalsFieldData loadDirect(LeafReaderContext context)
             throws Exception {
         return atomicFieldData;
     }
@@ -164,12 +156,6 @@ public class ConstantIndexFieldData extends AbstractIndexOrdinalsFieldData {
             boolean reverse) {
         final XFieldComparatorSource source = new BytesRefFieldComparatorSource(this, missingValue, sortMode, nested);
         return new SortField(getFieldName(), source, reverse);
-    }
-
-    @Override
-    public BucketedSort newBucketedSort(BigArrays bigArrays, Object missingValue, MultiValueMode sortMode, Nested nested,
-            SortOrder sortOrder, DocValueFormat format, int bucketSize, BucketedSort.ExtraData extra) {
-        throw new IllegalArgumentException("only supported on numeric fields");
     }
 
     @Override

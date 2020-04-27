@@ -21,6 +21,8 @@ package org.elasticsearch.script.expression;
 
 import org.apache.lucene.search.DoubleValues;
 
+import java.io.IOException;
+
 /**
  * A support class for an executable expression script that allows the double returned
  * by a {@link DoubleValues} to be modified.
@@ -33,12 +35,12 @@ final class ReplaceableConstDoubleValues extends DoubleValues {
     }
 
     @Override
-    public double doubleValue() {
+    public double doubleValue() throws IOException {
         return value;
     }
 
     @Override
-    public boolean advanceExact(int doc) {
+    public boolean advanceExact(int doc) throws IOException {
         return true;
     }
 }

@@ -19,19 +19,21 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.ReturnNode;
+import org.elasticsearch.painless.MethodWriter;
 import org.elasticsearch.painless.lookup.PainlessLookupUtility;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+
+import java.util.Set;
 
 /**
  * Represents a return statement.
  */
-public class SReturn extends AStatement {
+public final class SReturn extends AStatement {
 
-    protected final AExpression expression;
+    private AExpression expression;
 
     public SReturn(Location location, AExpression expression) {
         super(location);
@@ -40,37 +42,54 @@ public class SReturn extends AStatement {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        if (expression != null) {
+            expression.storeSettings(settings);
+        }
+    }
 
-        AExpression.Output expressionOutput = null;
+    @Override
+    void extractVariables(Set<String> variables) {
+        if (expression != null) {
+            expression.extractVariables(variables);
+        }
+    }
 
+    @Override
+    void analyze(Locals locals) {
         if (expression == null) {
-            if (scope.getReturnType() != void.class) {
+            if (locals.getReturnType() != void.class) {
                 throw location.createError(new ClassCastException("Cannot cast from " +
-                        "[" + scope.getReturnCanonicalTypeName() + "] to " +
+                        "[" + PainlessLookupUtility.typeToCanonicalTypeName(locals.getReturnType()) + "] to " +
                         "[" + PainlessLookupUtility.typeToCanonicalTypeName(void.class) + "]."));
             }
         } else {
-            AExpression.Input expressionInput = new AExpression.Input();
-            expressionInput.expected = scope.getReturnType();
-            expressionInput.internal = true;
-            expressionOutput = expression.analyze(classNode, scriptRoot, scope, expressionInput);
-            expression.cast(expressionInput, expressionOutput);
+            expression.expected = locals.getReturnType();
+            expression.internal = true;
+            expression.analyze(locals);
+            expression = expression.cast(locals);
         }
 
-        output.methodEscape = true;
-        output.loopEscape = true;
-        output.allEscape = true;
+        methodEscape = true;
+        loopEscape = true;
+        allEscape = true;
 
-        output.statementCount = 1;
+        statementCount = 1;
+    }
 
-        ReturnNode returnNode = new ReturnNode();
-        returnNode.setExpressionNode(expression == null ? null : expression.cast(expressionOutput));
-        returnNode.setLocation(location);
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeStatementOffset(location);
 
-        output.statementNode = returnNode;
+        if (expression != null) {
+            expression.write(writer, globals);
+        }
 
-        return output;
+        writer.returnValue();
+    }
+
+    @Override
+    public String toString() {
+        return expression == null ? singleLineToString() : singleLineToString(expression);
     }
 }

@@ -19,10 +19,12 @@
 
 package org.elasticsearch.search.aggregations.bucket.nested;
 
+import org.elasticsearch.common.io.stream.Writeable.Reader;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.InternalSingleBucketAggregationTestCase;
 import org.elasticsearch.search.aggregations.ParsedAggregation;
 import org.elasticsearch.search.aggregations.bucket.ParsedSingleBucketAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
 import java.io.IOException;
 import java.util.List;
@@ -31,13 +33,18 @@ import java.util.Map;
 public class InternalNestedTests extends InternalSingleBucketAggregationTestCase<InternalNested> {
     @Override
     protected InternalNested createTestInstance(String name, long docCount, InternalAggregations aggregations,
-            Map<String, Object> metadata) {
-        return new InternalNested(name, docCount, aggregations, metadata);
+            List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData) {
+        return new InternalNested(name, docCount, aggregations, pipelineAggregators, metaData);
     }
 
     @Override
     protected void extraAssertReduced(InternalNested reduced, List<InternalNested> inputs) {
         // Nothing extra to assert
+    }
+
+    @Override
+    protected Reader<InternalNested> instanceReader() {
+        return InternalNested::new;
     }
 
     @Override

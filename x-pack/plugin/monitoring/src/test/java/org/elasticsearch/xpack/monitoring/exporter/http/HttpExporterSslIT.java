@@ -12,6 +12,7 @@ import org.elasticsearch.action.admin.cluster.settings.ClusterUpdateSettingsResp
 import org.elasticsearch.bootstrap.JavaVersion;
 import org.elasticsearch.common.settings.MockSecureSettings;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.env.Environment;
 import org.elasticsearch.env.TestEnvironment;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.test.ESIntegTestCase.Scope;
@@ -43,6 +44,7 @@ import static org.hamcrest.Matchers.notNullValue;
 public class HttpExporterSslIT extends MonitoringIntegTestCase {
 
     private final Settings globalSettings = Settings.builder().put("path.home", createTempDir()).build();
+    private final Environment environment = TestEnvironment.newEnvironment(globalSettings);
 
     private static MockWebServer webServer;
     private MockSecureSettings secureSettings;
@@ -106,7 +108,7 @@ public class HttpExporterSslIT extends MonitoringIntegTestCase {
             .put(globalSettings)
             .build();
 
-        TestsSSLService sslService = new TestsSSLService(TestEnvironment.newEnvironment(sslSettings));
+        TestsSSLService sslService = new TestsSSLService(sslSettings, environment);
         final SSLContext sslContext = sslService.sslContext("xpack.security.transport.ssl");
         MockWebServer server = new MockWebServer(sslContext, false);
         server.start();
@@ -175,8 +177,6 @@ public class HttpExporterSslIT extends MonitoringIntegTestCase {
     private ActionFuture<ClusterUpdateSettingsResponse> setVerificationMode(String name, VerificationMode mode) {
         final ClusterUpdateSettingsRequest updateSettings = new ClusterUpdateSettingsRequest();
         final Settings settings = Settings.builder()
-            .put("xpack.monitoring.exporters." + name + ".type", HttpExporter.TYPE)
-            .put("xpack.monitoring.exporters." + name + ".host", "https://" + webServer.getHostName() + ":" + webServer.getPort())
             .put("xpack.monitoring.exporters." + name + ".ssl.verification_mode", mode.name())
             .build();
         updateSettings.transientSettings(settings);

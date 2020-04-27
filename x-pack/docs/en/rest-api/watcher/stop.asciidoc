@@ -1,54 +1,38 @@
 [role="xpack"]
 [[watcher-api-stop]]
-=== Stop watch service API
+=== Stop API
 ++++
-<titleabbrev>Stop watch service</titleabbrev>
+<titleabbrev>Stop</titleabbrev>
 ++++
 
-Stops the {watcher} service if it is running.
+The `stop` API stops the {watcher} service if the service is running.
 
-[[watcher-api-stop-request]]
-==== {api-request-title}
+[float]
+==== Request
 
 `POST _watcher/_stop`
 
-[[watcher-api-stop-prereqs]]
-==== {api-prereq-title}
+[float]
+==== Authorization
 
-* You must have `manage_watcher` cluster privileges to use this API. For more
-information, see <<security-privileges>>.
+You must have `manage_watcher` cluster privileges to use this API. For more
+information, see {xpack-ref}/security-privileges.html[Security Privileges].
 
-//[[watcher-api-stop-desc]]
-//==== {api-description-title}
+[float]
+==== Examples
 
-//[[watcher-api-stop-path-params]]
-//==== {api-path-parms-title}
-
-//[[watcher-api-stop-query-params]]
-//==== {api-query-parms-title}
-
-//[[watcher-api-stop-request-body]]
-//==== {api-request-body-title}
-
-//[[watcher-api-stop-response-body]]
-//==== {api-response-body-title}
-
-//[[watcher-api-stop-response-codes]]
-//==== {api-response-codes-title}
-
-[[watcher-api-stop-example]]
-==== {api-examples-title}
-
-[source,console]
+[source,js]
 --------------------------------------------------
 POST _watcher/_stop
 --------------------------------------------------
+// CONSOLE
 
 {watcher} returns the following response if the request is successful:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
    "acknowledged": true
 }
 --------------------------------------------------
+// TESTRESPONSE

@@ -7,7 +7,6 @@ package org.elasticsearch.xpack.sql.jdbc;
 
 import org.elasticsearch.xpack.sql.client.SuppressForbidden;
 
-import javax.sql.DataSource;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -27,6 +26,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.sql.DataSource;
 
 /**
  * Class handling debug logging. Typically disabled (hence why it's called debug).
@@ -71,7 +72,7 @@ final class Debug {
         return createProxy(Connection.class, new ConnectionProxy(logger(info, managedPrinter), connection));
     }
 
-    static DatabaseMetaData proxy(DatabaseMetaDataProxy handler) {
+    static DatabaseMetaData proxy(DatabaseMetadataProxy handler) {
         return createProxy(DatabaseMetaData.class, handler);
     }
 
@@ -112,9 +113,10 @@ final class Debug {
             synchronized (Debug.class) {
                 log = OUTPUT_MANAGED.get(managedPrinter);
                 if (log == null) {
-                    log = createLog(managedPrinter, info.flushAlways());
+                    log = new DebugLog(managedPrinter);
                     OUTPUT_MANAGED.put(managedPrinter, log);
                 }
+                return log;
             }
         }
 
@@ -133,7 +135,7 @@ final class Debug {
                 ERR = null;
             }
             if (ERR == null) {
-                ERR = createLog(new PrintWriter(new OutputStreamWriter(sys, StandardCharsets.UTF_8)), info.flushAlways());
+                ERR = new DebugLog(new PrintWriter(new OutputStreamWriter(sys, StandardCharsets.UTF_8)));
             }
             return ERR;
         }
@@ -152,7 +154,7 @@ final class Debug {
             }
 
             if (OUT == null) {
-                OUT = createLog(new PrintWriter(new OutputStreamWriter(sys, StandardCharsets.UTF_8)), info.flushAlways());
+                OUT = new DebugLog(new PrintWriter(new OutputStreamWriter(sys, StandardCharsets.UTF_8)));
             }
             return OUT;
         }
@@ -163,7 +165,7 @@ final class Debug {
                 // must be local file
                 try {
                     PrintWriter print = new PrintWriter(Files.newBufferedWriter(Paths.get("").resolve(out), StandardCharsets.UTF_8));
-                    log = createLog(print, info.flushAlways());
+                    log = new DebugLog(print);
                     OUTPUT_CACHE.put(out, log);
                     OUTPUT_REFS.put(out, Integer.valueOf(0));
                 } catch (Exception ex) {
@@ -173,12 +175,6 @@ final class Debug {
             OUTPUT_REFS.put(out, Integer.valueOf(OUTPUT_REFS.get(out).intValue() + 1));
         }
 
-        return log;
-    }
-
-    private static DebugLog createLog(PrintWriter print, boolean flushAlways) {
-        DebugLog log = new DebugLog(print, flushAlways);
-        log.logSystemInfo();
         return log;
     }
 

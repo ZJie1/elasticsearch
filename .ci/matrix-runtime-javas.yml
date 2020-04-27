@@ -7,8 +7,11 @@
 
 ES_RUNTIME_JAVA:
   - java11
+  - java12
+  - openjdk12
+  - openjdk13
   - openjdk14
-  - openjdk15
   - zulu11
+  - zulu12
   - corretto11
   - adoptopenjdk11

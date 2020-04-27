@@ -12,7 +12,7 @@ import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.env.TestEnvironment;
 import org.elasticsearch.license.XPackLicenseState;
-import org.elasticsearch.license.XPackLicenseState.Feature;
+import org.elasticsearch.license.XPackLicenseState.AllowedRealmType;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationResult;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationToken;
@@ -65,34 +65,17 @@ public class RealmsTests extends ESTestCase {
         factories.put(FileRealmSettings.TYPE, config -> new DummyRealm(FileRealmSettings.TYPE, config));
         factories.put(NativeRealmSettings.TYPE, config -> new DummyRealm(NativeRealmSettings.TYPE, config));
         factories.put(KerberosRealmSettings.TYPE, config -> new DummyRealm(KerberosRealmSettings.TYPE, config));
-        randomRealmTypesCount = randomIntBetween(2, 5);
+        randomRealmTypesCount = randomIntBetween(1, 5);
         for (int i = 0; i < randomRealmTypesCount; i++) {
             String name = "type_" + i;
             factories.put(name, config -> new DummyRealm(name, config));
         }
         licenseState = mock(XPackLicenseState.class);
-        when(licenseState.copyCurrentLicenseState()).thenReturn(licenseState);
         threadContext = new ThreadContext(Settings.EMPTY);
         reservedRealm = mock(ReservedRealm.class);
-        when(licenseState.isSecurityEnabled()).thenReturn(true);
-        allowAllRealms();
+        when(licenseState.isAuthAllowed()).thenReturn(true);
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.ALL);
         when(reservedRealm.type()).thenReturn(ReservedRealm.TYPE);
-        when(reservedRealm.name()).thenReturn("reserved");
-    }
-
-    private void allowAllRealms() {
-        when(licenseState.isAllowed(Feature.SECURITY_ALL_REALMS)).thenReturn(true);
-        when(licenseState.isAllowed(Feature.SECURITY_STANDARD_REALMS)).thenReturn(true);
-    }
-
-    private void allowOnlyStandardRealms() {
-        when(licenseState.isAllowed(Feature.SECURITY_ALL_REALMS)).thenReturn(false);
-        when(licenseState.isAllowed(Feature.SECURITY_STANDARD_REALMS)).thenReturn(true);
-    }
-
-    private void allowOnlyNativeRealms() {
-        when(licenseState.isAllowed(Feature.SECURITY_ALL_REALMS)).thenReturn(false);
-        when(licenseState.isAllowed(Feature.SECURITY_STANDARD_REALMS)).thenReturn(false);
     }
 
     public void testWithSettings() throws Exception {
@@ -150,10 +133,26 @@ public class RealmsTests extends ESTestCase {
         }
         Settings settings = builder.build();
         Environment env = TestEnvironment.newEnvironment(settings);
-        IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () ->{
-            new Realms(settings, env, factories, licenseState, threadContext, reservedRealm);
-        });
-        assertThat(e.getMessage(), containsString("Found multiple realms configured with the same order"));
+        Realms realms = new Realms(settings, env, factories, licenseState, threadContext, reservedRealm);
+
+        Iterator<Realm> iterator = realms.iterator();
+        assertThat(iterator.hasNext(), is(true));
+        Realm realm = iterator.next();
+        assertThat(realm, is(reservedRealm));
+
+        // As order is same for all realms, it should fall back secondary comparison on name
+        // Verify that realms are iterated in order based on name
+        Iterator<String> expectedSortedOrderNames = nameToRealmId.keySet().iterator();
+        while (iterator.hasNext()) {
+            realm = iterator.next();
+            String expectedRealmName = expectedSortedOrderNames.next();
+            assertThat(realm.order(), equalTo(1));
+            assertThat(realm.type(), equalTo("type_" + nameToRealmId.get(expectedRealmName)));
+            assertThat(realm.name(), equalTo(expectedRealmName));
+        }
+
+        assertThat(realms.getUnlicensedRealms(), empty());
+        assertThat(realms.getUnlicensedRealms(), sameInstance(realms.getUnlicensedRealms()));
     }
 
     public void testWithSettingsWithMultipleInternalRealmsOfSameType() throws Exception {
@@ -169,20 +168,6 @@ public class RealmsTests extends ESTestCase {
         } catch (IllegalArgumentException e) {
             assertThat(e.getMessage(), containsString("multiple [file] realms are configured"));
         }
-    }
-
-    public void testWithSettingsWithMultipleRealmsWithSameName() throws Exception {
-        Settings settings = Settings.builder()
-            .put("xpack.security.authc.realms.file.realm_1.order", 0)
-            .put("xpack.security.authc.realms.native.realm_1.order", 1)
-            .put("xpack.security.authc.realms.kerberos.realm_1.order", 2)
-            .put("path.home", createTempDir())
-            .build();
-        Environment env = TestEnvironment.newEnvironment(settings);
-        IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () ->{
-            new Realms(settings, env, factories, licenseState, threadContext, reservedRealm);
-        });
-        assertThat(e.getMessage(), containsString("Found multiple realms configured with the same name"));
     }
 
     public void testWithEmptySettings() throws Exception {
@@ -241,7 +226,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(realms.getUnlicensedRealms(), empty());
         assertThat(realms.getUnlicensedRealms(), sameInstance(realms.getUnlicensedRealms()));
 
-        allowOnlyNativeRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.DEFAULT);
 
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
@@ -269,7 +254,7 @@ public class RealmsTests extends ESTestCase {
             i++;
         }
 
-        allowOnlyNativeRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.NATIVE);
 
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
@@ -325,7 +310,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(realms.getUnlicensedRealms(), empty());
         assertThat(realms.getUnlicensedRealms(), sameInstance(realms.getUnlicensedRealms()));
 
-        allowOnlyStandardRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.DEFAULT);
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
         realm = iter.next();
@@ -343,7 +328,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(realm.type(), equalTo("type_0"));
         assertThat(realm.name(), equalTo("custom"));
 
-        allowOnlyNativeRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.NATIVE);
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
         realm = iter.next();
@@ -390,7 +375,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(iter.hasNext(), is(false));
         assertThat(realms.getUnlicensedRealms(), empty());
 
-        allowOnlyNativeRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.NATIVE);
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
         realm = iter.next();
@@ -425,7 +410,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(iter.hasNext(), is(false));
         assertThat(realms.getUnlicensedRealms(), empty());
 
-        allowOnlyStandardRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.DEFAULT);
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
         realm = iter.next();
@@ -443,7 +428,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(realm.type(), equalTo(selectedRealmType));
         assertThat(realm.name(), equalTo("foo"));
 
-        allowOnlyNativeRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.NATIVE);
         iter = realms.iterator();
         assertThat(iter.hasNext(), is(true));
         realm = iter.next();
@@ -513,7 +498,7 @@ public class RealmsTests extends ESTestCase {
         assertThat(realms.getUnlicensedRealms(), empty());
 
         // check that disabled realms are not included in unlicensed realms
-        allowOnlyNativeRealms();
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.NATIVE);
         assertThat(realms.getUnlicensedRealms(), hasSize(orderToIndex.size()));
     }
 
@@ -527,7 +512,7 @@ public class RealmsTests extends ESTestCase {
 
         assertThat(realms.iterator().hasNext(), is(true));
 
-        when(licenseState.isSecurityEnabled()).thenReturn(false);
+        when(licenseState.isAuthAllowed()).thenReturn(false);
         assertThat(realms.iterator().hasNext(), is(false));
     }
 
@@ -566,9 +551,23 @@ public class RealmsTests extends ESTestCase {
             assertThat(typeMap.size(), is(2));
         }
 
-        // check standard realms include native
-        when(licenseState.isSecurityEnabled()).thenReturn(true);
-        allowOnlyStandardRealms();
+        // disable ALL using license
+        when(licenseState.isAuthAllowed()).thenReturn(false);
+        when(licenseState.allowedRealmType()).thenReturn(AllowedRealmType.NONE);
+        future = new PlainActionFuture<>();
+        realms.usageStats(future);
+        usageStats = future.get();
+        assertThat(usageStats.size(), is(factories.size()));
+        for (Entry<String, Object> entry : usageStats.entrySet()) {
+            Map<String, Object> typeMap = (Map<String, Object>) entry.getValue();
+            assertThat(typeMap, hasEntry("enabled", false));
+            assertThat(typeMap, hasEntry("available", false));
+            assertThat(typeMap.size(), is(2));
+        }
+
+        // check native or internal realms enabled only
+        when(licenseState.isAuthAllowed()).thenReturn(true);
+        when(licenseState.allowedRealmType()).thenReturn(randomFrom(AllowedRealmType.NATIVE, AllowedRealmType.DEFAULT));
         future = new PlainActionFuture<>();
         realms.usageStats(future);
         usageStats = future.get();

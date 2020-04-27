@@ -29,7 +29,7 @@ import org.elasticsearch.cluster.ClusterStateObserver;
 import org.elasticsearch.cluster.LocalNodeMasterListener;
 import org.elasticsearch.cluster.block.ClusterBlocks;
 import org.elasticsearch.cluster.coordination.NoMasterBlockService;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.allocation.decider.EnableAllocationDecider;
@@ -359,7 +359,6 @@ public class ClusterApplierServiceTests extends ESTestCase {
         clusterApplierService.addStateApplier(event -> {
             throw new RuntimeException("dummy exception");
         });
-        clusterApplierService.allowClusterStateApplicationFailure();
 
         CountDownLatch latch = new CountDownLatch(1);
         clusterApplierService.onNewClusterState("test", () -> ClusterState.builder(clusterApplierService.state()).build(),
@@ -388,11 +387,10 @@ public class ClusterApplierServiceTests extends ESTestCase {
         AtomicReference<Throwable> error = new AtomicReference<>();
         clusterApplierService.clusterSettings.addSettingsUpdateConsumer(EnableAllocationDecider.CLUSTER_ROUTING_ALLOCATION_ENABLE_SETTING,
             v -> {});
-        clusterApplierService.allowClusterStateApplicationFailure();
 
         CountDownLatch latch = new CountDownLatch(1);
         clusterApplierService.onNewClusterState("test", () -> ClusterState.builder(clusterApplierService.state())
-                .metadata(Metadata.builder(clusterApplierService.state().metadata())
+                .metaData(MetaData.builder(clusterApplierService.state().metaData())
                     .persistentSettings(
                         Settings.builder().put(EnableAllocationDecider.CLUSTER_ROUTING_ALLOCATION_ENABLE_SETTING.getKey(), false).build())
                     .build())
@@ -499,7 +497,6 @@ public class ClusterApplierServiceTests extends ESTestCase {
 
         final ClusterSettings clusterSettings;
         volatile Long currentTimeOverride = null;
-        boolean applicationMayFail;
 
         TimedClusterApplierService(Settings settings, ClusterSettings clusterSettings, ThreadPool threadPool) {
             super("test_node", settings, clusterSettings, threadPool);
@@ -509,15 +506,6 @@ public class ClusterApplierServiceTests extends ESTestCase {
         @Override
         protected long currentTimeInMillis() {
             return Objects.requireNonNullElseGet(currentTimeOverride, super::currentTimeInMillis);
-        }
-
-        @Override
-        protected boolean applicationMayFail() {
-            return this.applicationMayFail;
-        }
-
-        void allowClusterStateApplicationFailure() {
-            this.applicationMayFail = true;
         }
     }
 

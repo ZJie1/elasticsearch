@@ -20,16 +20,19 @@
 package org.elasticsearch.gradle
 
 import org.elasticsearch.gradle.precommit.DependencyLicensesTask
+import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.Dependency
+import org.gradle.api.artifacts.DependencyResolutionListener
 import org.gradle.api.artifacts.DependencySet
 import org.gradle.api.internal.ConventionTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 /**
  * A task to gather information about the dependencies and export them into a csv file.
@@ -43,32 +46,31 @@ import org.gradle.api.tasks.TaskAction
  * </ul>
  *
  */
-class DependenciesInfoTask extends ConventionTask {
+public class DependenciesInfoTask extends ConventionTask {
 
     /** Dependencies to gather information from. */
-    @InputFiles
-    Configuration runtimeConfiguration
+    @Input
+    public Configuration runtimeConfiguration
 
     /** We subtract compile-only dependencies. */
-    @InputFiles
-    Configuration compileOnlyConfiguration
+    @Input
+    public Configuration compileOnlyConfiguration
+
+    private LinkedHashMap<String, String> mappings
 
     /** Directory to read license files */
-    @Optional
     @InputDirectory
-    File licensesDir = new File(project.projectDir, 'licenses').exists() ? new File(project.projectDir, 'licenses') : null
+    public File licensesDir = new File(project.projectDir, 'licenses')
 
     @OutputFile
     File outputFile = new File(project.buildDir, "reports/dependencies/dependencies.csv")
 
-    private LinkedHashMap<String, String> mappings
-
-    DependenciesInfoTask() {
+    public DependenciesInfoTask() {
         description = 'Create a CSV file with dependencies information.'
     }
 
     @TaskAction
-    void generateDependenciesInfo() {
+    public void generateDependenciesInfo() {
 
         final DependencySet runtimeDependencies = runtimeConfiguration.getAllDependencies()
         // we have to resolve the transitive dependencies and create a group:artifactId:version map
@@ -136,7 +138,7 @@ class DependenciesInfoTask extends ConventionTask {
     protected String getLicenseType(final String group, final String name) {
         File license
 
-        if (licensesDir != null) {
+        if (licensesDir.exists()) {
             licensesDir.eachFileMatch({ it ==~ /.*-LICENSE.*/ }) { File file ->
                 String prefix = file.name.split('-LICENSE.*')[0]
                 if (group.contains(prefix) || name.contains(prefix)) {

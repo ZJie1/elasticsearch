@@ -6,8 +6,6 @@
 
 package org.elasticsearch.xpack.ccr.action;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ElasticsearchSecurityException;
@@ -22,9 +20,9 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.ClusterStateUpdateTask;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -35,7 +33,7 @@ import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.seqno.RetentionLeaseActions;
 import org.elasticsearch.index.seqno.RetentionLeaseNotFoundException;
 import org.elasticsearch.index.shard.ShardId;
-import org.elasticsearch.persistent.PersistentTasksCustomMetadata;
+import org.elasticsearch.persistent.PersistentTasksCustomMetaData;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
@@ -50,8 +48,6 @@ import java.util.Map;
 import java.util.Objects;
 
 public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowAction.Request, AcknowledgedResponse> {
-
-    private static final Logger logger = LogManager.getLogger(TransportUnfollowAction.class);
 
     private final Client client;
 
@@ -104,19 +100,19 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
 
             @Override
             public void clusterStateProcessed(final String source, final ClusterState oldState, final ClusterState newState) {
-                final IndexMetadata indexMetadata = oldState.metadata().index(request.getFollowerIndex());
-                final Map<String, String> ccrCustomMetadata = indexMetadata.getCustomData(Ccr.CCR_CUSTOM_METADATA_KEY);
-                final String remoteClusterName = ccrCustomMetadata.get(Ccr.CCR_CUSTOM_METADATA_REMOTE_CLUSTER_NAME_KEY);
+                final IndexMetaData indexMetaData = oldState.metaData().index(request.getFollowerIndex());
+                final Map<String, String> ccrCustomMetaData = indexMetaData.getCustomData(Ccr.CCR_CUSTOM_METADATA_KEY);
+                final String remoteClusterName = ccrCustomMetaData.get(Ccr.CCR_CUSTOM_METADATA_REMOTE_CLUSTER_NAME_KEY);
                 final Client remoteClient = client.getRemoteClusterClient(remoteClusterName);
-                final String leaderIndexName = ccrCustomMetadata.get(Ccr.CCR_CUSTOM_METADATA_LEADER_INDEX_NAME_KEY);
-                final String leaderIndexUuid = ccrCustomMetadata.get(Ccr.CCR_CUSTOM_METADATA_LEADER_INDEX_UUID_KEY);
+                final String leaderIndexName = ccrCustomMetaData.get(Ccr.CCR_CUSTOM_METADATA_LEADER_INDEX_NAME_KEY);
+                final String leaderIndexUuid = ccrCustomMetaData.get(Ccr.CCR_CUSTOM_METADATA_LEADER_INDEX_UUID_KEY);
                 final Index leaderIndex = new Index(leaderIndexName, leaderIndexUuid);
                 final String retentionLeaseId = CcrRetentionLeases.retentionLeaseId(
                         oldState.getClusterName().value(),
-                        indexMetadata.getIndex(),
+                        indexMetaData.getIndex(),
                         remoteClusterName,
                         leaderIndex);
-                final int numberOfShards = IndexMetadata.INDEX_NUMBER_OF_SHARDS_SETTING.get(indexMetadata.getSettings());
+                final int numberOfShards = IndexMetaData.INDEX_NUMBER_OF_SHARDS_SETTING.get(indexMetaData.getSettings());
 
                 final GroupedActionListener<RetentionLeaseActions.Response> groupListener = new GroupedActionListener<>(
                         new ActionListener<Collection<RetentionLeaseActions.Response>>() {
@@ -125,7 +121,7 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
                             public void onResponse(final Collection<RetentionLeaseActions.Response> responses) {
                                 logger.trace(
                                         "[{}] removed retention lease [{}] on all leader primary shards",
-                                        indexMetadata.getIndex(),
+                                        indexMetaData.getIndex(),
                                         retentionLeaseId);
                                 listener.onResponse(new AcknowledgedResponse(true));
                             }
@@ -134,7 +130,7 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
                             public void onFailure(final Exception e) {
                                 logger.warn(new ParameterizedMessage(
                                         "[{}] failure while removing retention lease [{}] on leader primary shards",
-                                        indexMetadata.getIndex(),
+                                        indexMetaData.getIndex(),
                                         retentionLeaseId),
                                         e);
                                 final ElasticsearchException wrapper = new ElasticsearchException(e);
@@ -146,7 +142,7 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
                         numberOfShards
                 );
                 for (int i = 0; i < numberOfShards; i++) {
-                    final ShardId followerShardId = new ShardId(indexMetadata.getIndex(), i);
+                    final ShardId followerShardId = new ShardId(indexMetaData.getIndex(), i);
                     final ShardId leaderShardId = new ShardId(leaderIndex, i);
                     removeRetentionLeaseForShard(
                             followerShardId,
@@ -216,7 +212,7 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
     }
 
     static ClusterState unfollow(String followerIndex, ClusterState current) {
-        IndexMetadata followerIMD = current.metadata().index(followerIndex);
+        IndexMetaData followerIMD = current.metaData().index(followerIndex);
         if (followerIMD == null) {
             throw new IndexNotFoundException(followerIndex);
         }
@@ -225,14 +221,14 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
             throw new IllegalArgumentException("index [" + followerIndex + "] is not a follower index");
         }
 
-        if (followerIMD.getState() != IndexMetadata.State.CLOSE) {
+        if (followerIMD.getState() != IndexMetaData.State.CLOSE) {
             throw new IllegalArgumentException("cannot convert the follower index [" + followerIndex +
                 "] to a non-follower, because it has not been closed");
         }
 
-        PersistentTasksCustomMetadata persistentTasks = current.metadata().custom(PersistentTasksCustomMetadata.TYPE);
+        PersistentTasksCustomMetaData persistentTasks = current.metaData().custom(PersistentTasksCustomMetaData.TYPE);
         if (persistentTasks != null) {
-            for (PersistentTasksCustomMetadata.PersistentTask<?> persistentTask : persistentTasks.tasks()) {
+            for (PersistentTasksCustomMetaData.PersistentTask<?> persistentTask : persistentTasks.tasks()) {
                 if (persistentTask.getTaskName().equals(ShardFollowTask.NAME)) {
                     ShardFollowTask shardFollowTask = (ShardFollowTask) persistentTask.getParams();
                     if (shardFollowTask.getFollowShardId().getIndexName().equals(followerIndex)) {
@@ -248,17 +244,17 @@ public class TransportUnfollowAction extends TransportMasterNodeAction<UnfollowA
         builder.put(followerIMD.getSettings());
         builder.remove(CcrSettings.CCR_FOLLOWING_INDEX_SETTING.getKey());
 
-        final IndexMetadata.Builder newIndexMetadata = IndexMetadata.builder(followerIMD);
-        newIndexMetadata.settings(builder);
-        newIndexMetadata.settingsVersion(followerIMD.getSettingsVersion() + 1);
+        final IndexMetaData.Builder newIndexMetaData = IndexMetaData.builder(followerIMD);
+        newIndexMetaData.settings(builder);
+        newIndexMetaData.settingsVersion(followerIMD.getSettingsVersion() + 1);
         // Remove ccr custom metadata
-        newIndexMetadata.removeCustom(Ccr.CCR_CUSTOM_METADATA_KEY);
+        newIndexMetaData.removeCustom(Ccr.CCR_CUSTOM_METADATA_KEY);
 
-        Metadata newMetadata = Metadata.builder(current.metadata())
-            .put(newIndexMetadata)
+        MetaData newMetaData = MetaData.builder(current.metaData())
+            .put(newIndexMetaData)
             .build();
         return ClusterState.builder(current)
-            .metadata(newMetadata)
+            .metaData(newMetaData)
             .build();
     }
 }

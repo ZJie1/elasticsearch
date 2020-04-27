@@ -50,7 +50,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import static org.elasticsearch.client.Requests.searchRequest;
@@ -75,12 +74,7 @@ public class ExplainableScriptIT extends ESIntegTestCase {
                 }
 
                 @Override
-                public <T> T compile(
-                    String scriptName,
-                    String scriptSource,
-                    ScriptContext<T> context,
-                    Map<String, String> params
-                ) {
+                public <T> T compile(String scriptName, String scriptSource, ScriptContext<T> context, Map<String, String> params) {
                     assert scriptSource.equals("explainable_script");
                     assert context == ScoreScript.CONTEXT;
                     ScoreScript.Factory factory = (params1, lookup) -> new ScoreScript.LeafFactory() {
@@ -96,11 +90,6 @@ public class ExplainableScriptIT extends ESIntegTestCase {
                     };
                     return context.factoryClazz.cast(factory);
                 }
-
-                @Override
-                public Set<ScriptContext<?>> getSupportedContexts() {
-                    return Set.of(ScoreScript.CONTEXT);
-                }
             };
         }
     }
@@ -114,11 +103,11 @@ public class ExplainableScriptIT extends ESIntegTestCase {
         @Override
         public Explanation explain(Explanation subQueryScore) throws IOException {
             Explanation scoreExp = Explanation.match(subQueryScore.getValue(), "_score: ", subQueryScore);
-            return Explanation.match((float) (execute(null)), "This script returned " + execute(null), scoreExp);
+            return Explanation.match((float) (execute()), "This script returned " + execute(), scoreExp);
         }
 
         @Override
-        public double execute(ExplanationHolder explanation) {
+        public double execute() {
             return ((Number) ((ScriptDocValues) getDoc().get("number_field")).get(0)).doubleValue();
         }
     }
@@ -131,7 +120,7 @@ public class ExplainableScriptIT extends ESIntegTestCase {
     public void testExplainScript() throws InterruptedException, IOException, ExecutionException {
         List<IndexRequestBuilder> indexRequests = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
-            indexRequests.add(client().prepareIndex("test").setId(Integer.toString(i)).setSource(
+            indexRequests.add(client().prepareIndex("test", "type").setId(Integer.toString(i)).setSource(
                     jsonBuilder().startObject().field("number_field", i).field("text", "text").endObject()));
         }
         indexRandom(true, true, indexRequests);

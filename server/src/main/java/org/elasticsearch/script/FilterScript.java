@@ -70,7 +70,7 @@ public abstract class FilterScript {
     }
 
     /** A factory to construct stateful {@link FilterScript} factories for a specific index. */
-    public interface Factory extends ScriptFactory {
+    public interface Factory {
         LeafFactory newFactory(Map<String, Object> params, SearchLookup lookup);
     }
 

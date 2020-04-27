@@ -141,18 +141,10 @@ public class JreHttpUrlConnection implements Closeable {
             CheckedBiFunction<InputStream, Function<String, String>, R, IOException> parser,
             String requestMethod
     ) throws ClientException {
-        return request(doc, parser, requestMethod, "application/json");
-    }
-
-    public <R> ResponseOrException<R> request(
-            CheckedConsumer<OutputStream, IOException> doc,
-            CheckedBiFunction<InputStream, Function<String, String>, R, IOException> parser,
-            String requestMethod, String contentTypeHeader
-    ) throws ClientException {
         try {
             con.setRequestMethod(requestMethod);
             con.setDoOutput(true);
-            con.setRequestProperty("Content-Type", contentTypeHeader);
+            con.setRequestProperty("Content-Type", "application/json");
             con.setRequestProperty("Accept", "application/json");
             if (doc != null) {
                 try (OutputStream out = con.getOutputStream()) {

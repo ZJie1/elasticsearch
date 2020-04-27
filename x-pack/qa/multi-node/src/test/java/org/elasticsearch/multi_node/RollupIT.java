@@ -34,8 +34,7 @@ import java.util.concurrent.TimeUnit;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.xpack.test.SecuritySettingsSourceField.basicAuthHeaderValue;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.oneOf;
+import static org.hamcrest.Matchers.isOneOf;
 
 public class RollupIT extends ESRestTestCase {
 
@@ -208,7 +207,7 @@ public class RollupIT extends ESRestTestCase {
         Map<String, Object> getRollupJobResponse = toMap(client().performRequest(getRollupJobRequest));
         Map<String, Object> job = getJob(getRollupJobResponse, rollupJob);
         if (job != null) {
-            assertThat(ObjectPath.eval("status.job_state", job), is(oneOf(states)));
+            assertThat(ObjectPath.eval("status.job_state", job), isOneOf(states));
         }
 
         // check that the rollup job is started using the Tasks API
@@ -220,7 +219,7 @@ public class RollupIT extends ESRestTestCase {
         Map<String, Object> taskResponseNode = (Map<String, Object>) taskResponseNodes.values().iterator().next();
         Map<String, Object> taskResponseTasks = (Map<String, Object>) taskResponseNode.get("tasks");
         Map<String, Object> taskResponseStatus = (Map<String, Object>) taskResponseTasks.values().iterator().next();
-        assertThat(ObjectPath.eval("status.job_state", taskResponseStatus), is(oneOf(states)));
+        assertThat(ObjectPath.eval("status.job_state", taskResponseStatus), isOneOf(states));
 
         // check that the rollup job is started using the Cluster State API
         final Request clusterStateRequest = new Request("GET", "_cluster/state/metadata");
@@ -234,7 +233,7 @@ public class RollupIT extends ESRestTestCase {
 
                 final String jobStateField = "task.xpack/rollup/job.state.job_state";
                 assertThat("Expected field [" + jobStateField + "] to be started or indexing in " + task.get("id"),
-                    ObjectPath.eval(jobStateField, task), is(oneOf(states)));
+                    ObjectPath.eval(jobStateField, task), isOneOf(states));
                 break;
             }
         }
@@ -252,7 +251,7 @@ public class RollupIT extends ESRestTestCase {
 
             Map<String, Object> job = getJob(getRollupJobResponse, rollupJob);
             if (job != null) {
-                assertThat(ObjectPath.eval("status.job_state", job), is(oneOf(expectedStates)));
+                assertThat(ObjectPath.eval("status.job_state", job), isOneOf(expectedStates));
             }
         }, 30L, TimeUnit.SECONDS);
     }

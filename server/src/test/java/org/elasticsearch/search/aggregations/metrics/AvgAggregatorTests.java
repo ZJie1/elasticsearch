@@ -52,9 +52,7 @@ import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregator;
 import org.elasticsearch.search.aggregations.support.AggregationInspectionHelper;
-import org.elasticsearch.search.aggregations.support.CoreValuesSourceType;
 import org.elasticsearch.search.aggregations.support.ValueType;
-import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 import org.elasticsearch.search.lookup.LeafDocLookup;
 
 import java.io.IOException;
@@ -84,9 +82,6 @@ public class AvgAggregatorTests extends AggregatorTestCase {
 
     /** Script to return the {@code _value} provided by aggs framework. */
     public static final String VALUE_SCRIPT = "_value";
-
-    /** Script to return a random double */
-    public static final String RANDOM_SCRIPT = "Math.random()";
 
     @Override
     protected ScriptService getMockScriptService() {
@@ -120,12 +115,8 @@ public class AvgAggregatorTests extends AggregatorTestCase {
             return ((Number) vars.get("_value")).doubleValue() + inc;
         });
 
-        Map<String, Function<Map<String, Object>, Object>> nonDeterministicScripts = new HashMap<>();
-        nonDeterministicScripts.put(RANDOM_SCRIPT, vars -> AvgAggregatorTests.randomDouble());
-
         MockScriptEngine scriptEngine = new MockScriptEngine(MockScriptEngine.NAME,
             scripts,
-            nonDeterministicScripts,
             Collections.emptyMap());
         Map<String, ScriptEngine> engines = Collections.singletonMap(scriptEngine.getType(), scriptEngine);
 
@@ -524,7 +515,7 @@ public class AvgAggregatorTests extends AggregatorTestCase {
         fieldType.setName("value");
         fieldType.setHasDocValues(true);
 
-        AggregationBuilder aggregationBuilder = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.NUMERIC)
+        AggregationBuilder aggregationBuilder = new TermsAggregationBuilder("terms", ValueType.NUMERIC)
             .field("value")
             .order(BucketOrder.compound(BucketOrder.aggregation("filter>avg", true)))
             .subAggregation(AggregationBuilders.filter("filter", termQuery("value", 100))
@@ -647,10 +638,9 @@ public class AvgAggregatorTests extends AggregatorTestCase {
     }
 
     /**
-     * Make sure that an aggregation using a deterministic script does gets cached while
-     * one using a nondeterministic script does not.
+     * Make sure that an aggregation using a script does not get cached.
      */
-    public void testScriptCaching() throws IOException {
+    public void testDontCacheScripts() throws IOException {
         Directory directory = newDirectory();
         RandomIndexWriter indexWriter = new RandomIndexWriter(random(), directory);
         final int numDocs = 10;
@@ -685,42 +675,11 @@ public class AvgAggregatorTests extends AggregatorTestCase {
         assertEquals("avg", avg.getName());
         assertTrue(AggregationInspectionHelper.hasValue(avg));
 
-        // Test that an aggregation using a deterministic script gets cached
-        assertTrue(aggregator.context().getQueryShardContext().isCacheable());
-
-        aggregationBuilder = new AvgAggregationBuilder("avg")
-            .field("value")
-            .script(new Script(ScriptType.INLINE, MockScriptEngine.NAME, RANDOM_SCRIPT, Collections.emptyMap()));
-
-        aggregator = createAggregator(aggregationBuilder, indexSearcher, fieldType);
-        aggregator.preCollection();
-        indexSearcher.search(new MatchAllDocsQuery(), aggregator);
-        aggregator.postCollection();
-
-        avg = (InternalAvg) aggregator.buildAggregation(0L);
-
-        assertTrue(avg.getValue() >= 0.0);
-        assertTrue(avg.getValue() <= 1.0);
-        assertEquals("avg", avg.getName());
-        assertTrue(AggregationInspectionHelper.hasValue(avg));
-
-        // Test that an aggregation using a nondeterministic script does not get cached
+        // Test that an aggregation using a script does not get cached
         assertFalse(aggregator.context().getQueryShardContext().isCacheable());
 
         multiReader.close();
         directory.close();
         unmappedDirectory.close();
-    }
-
-    @Override
-    protected List<ValuesSourceType> getSupportedValuesSourceTypes() {
-        return List.of(
-            CoreValuesSourceType.NUMERIC
-        );
-    }
-
-    @Override
-    protected AggregationBuilder createAggBuilderForTypeTest(MappedFieldType fieldType, String fieldName) {
-        return new AvgAggregationBuilder("foo").field(fieldName);
     }
 }

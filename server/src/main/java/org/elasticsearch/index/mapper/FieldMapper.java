@@ -50,7 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.stream.StreamSupport;
 
 public abstract class FieldMapper extends Mapper implements Cloneable {
@@ -223,12 +222,6 @@ public abstract class FieldMapper extends Mapper implements Cloneable {
             if (docValuesSet == false) {
                 fieldType.setHasDocValues(defaultDocValues);
             }
-        }
-
-        /** Set metadata on this field. */
-        public T meta(Map<String, String> meta) {
-            fieldType.setMeta(meta);
-            return (T) this;
         }
     }
 
@@ -434,10 +427,6 @@ public abstract class FieldMapper extends Mapper implements Cloneable {
 
         multiFields.toXContent(builder, params);
         copyTo.toXContent(builder, params);
-
-        if (includeDefaults || fieldType().meta().isEmpty() == false) {
-            builder.field("meta", new TreeMap<>(fieldType().meta())); // ensure consistent order
-        }
     }
 
     protected final void doXContentAnalyzers(XContentBuilder builder, boolean includeDefaults) throws IOException {

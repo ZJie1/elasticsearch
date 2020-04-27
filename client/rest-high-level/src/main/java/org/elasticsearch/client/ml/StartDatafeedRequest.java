@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.datafeed.DatafeedConfig;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.unit.TimeValue;
@@ -32,13 +33,13 @@ import java.util.Objects;
 /**
  * Request to start a Datafeed
  */
-public class StartDatafeedRequest implements Validatable, ToXContentObject {
+public class StartDatafeedRequest extends ActionRequest implements ToXContentObject {
 
     public static final ParseField START = new ParseField("start");
     public static final ParseField END = new ParseField("end");
     public static final ParseField TIMEOUT = new ParseField("timeout");
 
-    public static final ConstructingObjectParser<StartDatafeedRequest, Void> PARSER =
+    public static ConstructingObjectParser<StartDatafeedRequest, Void> PARSER =
         new ConstructingObjectParser<>("start_datafeed_request", a -> new StartDatafeedRequest((String)a[0]));
 
     static {
@@ -111,6 +112,11 @@ public class StartDatafeedRequest implements Validatable, ToXContentObject {
      */
     public void setTimeout(TimeValue timeout) {
         this.timeout = timeout;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+       return null;
     }
 
     @Override

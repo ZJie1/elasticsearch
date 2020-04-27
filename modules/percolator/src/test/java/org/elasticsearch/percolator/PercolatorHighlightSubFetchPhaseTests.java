@@ -37,7 +37,6 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static java.util.Collections.emptyMap;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
@@ -100,11 +99,8 @@ public class PercolatorHighlightSubFetchPhaseTests extends ESTestCase {
         bq.add(percolateQuery, BooleanClause.Occur.FILTER);
         bq.add(percolateQuery2, BooleanClause.Occur.FILTER);
         assertThat(PercolatorHighlightSubFetchPhase.locatePercolatorQuery(bq.build()).size(), equalTo(2));
-        assertThat(PercolatorHighlightSubFetchPhase.locatePercolatorQuery(bq.build()),
-            containsInAnyOrder(sameInstance(percolateQuery), sameInstance(percolateQuery2)));
-
-        assertNotNull(PercolatorHighlightSubFetchPhase.locatePercolatorQuery(null));
-        assertThat(PercolatorHighlightSubFetchPhase.locatePercolatorQuery(null).size(), equalTo(0));
+        assertThat(PercolatorHighlightSubFetchPhase.locatePercolatorQuery(bq.build()).get(0), sameInstance(percolateQuery));
+        assertThat(PercolatorHighlightSubFetchPhase.locatePercolatorQuery(bq.build()).get(1), sameInstance(percolateQuery2));
     }
 
 }

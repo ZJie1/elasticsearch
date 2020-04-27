@@ -24,7 +24,6 @@ import org.elasticsearch.gradle.BuildPlugin
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaBasePlugin
-import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
 
 /**
@@ -38,13 +37,12 @@ class StandaloneTestPlugin implements Plugin<Project> {
     void apply(Project project) {
         project.pluginManager.apply(StandaloneRestTestPlugin)
 
-        project.tasks.register('test', Test).configure { t ->
-            t.group = JavaBasePlugin.VERIFICATION_GROUP
-            t.description = 'Runs unit tests that are separate'
-            t.mustRunAfter(project.tasks.getByName('precommit'))
-        }
+        Test test = project.tasks.create('test', Test)
+        test.group = JavaBasePlugin.VERIFICATION_GROUP
+        test.description = 'Runs unit tests that are separate'
 
         BuildPlugin.configureCompile(project)
-        project.tasks.named('check').configure { it.dependsOn(project.tasks.named('test')) }
+        test.mustRunAfter(project.tasks.getByName('precommit'))
+        project.tasks.getByName('check').dependsOn(test)
     }
 }

@@ -94,6 +94,14 @@ public final class ConnectionProfile {
     }
 
     /**
+     * Builds a connection profile that is dedicated to a single channel type. Use this
+     * when opening single use connections
+     */
+    public static ConnectionProfile buildSingleChannelProfile(TransportRequestOptions.Type channelType) {
+        return buildSingleChannelProfile(channelType, null, null, null, null);
+    }
+
+    /**
      * Builds a connection profile that is dedicated to a single channel type. Allows passing connection and
      * handshake timeouts and compression settings.
      */

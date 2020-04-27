@@ -7,6 +7,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test" }
   - do:
@@ -32,6 +33,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test" }
   - do:
@@ -58,6 +60,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test" }
   - do:
@@ -84,6 +87,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test" }
   - do:
@@ -110,6 +114,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test" }
   - do:
@@ -136,11 +141,13 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test", "hidden": false }
   - do:
       index:
         index:   source
+        type:    _doc
         id:      2
         body:    { "text": "test", "hidden": true }
   - do:
@@ -204,6 +211,7 @@ setup:
   - do:
       index:
         index:   source
+        type:    _doc
         id:      1
         body:    { "text": "test", "foo": "z", "bar": "z" }
   - do:

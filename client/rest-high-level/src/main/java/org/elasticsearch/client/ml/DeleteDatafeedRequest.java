@@ -18,14 +18,15 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 
 import java.util.Objects;
 
 /**
  * Request to delete a Machine Learning Datafeed via its ID
  */
-public class DeleteDatafeedRequest implements Validatable {
+public class DeleteDatafeedRequest extends ActionRequest {
 
     private String datafeedId;
     private Boolean force;
@@ -50,6 +51,11 @@ public class DeleteDatafeedRequest implements Validatable {
      */
     public void setForce(Boolean force) {
         this.force = force;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+       return null;
     }
 
     @Override

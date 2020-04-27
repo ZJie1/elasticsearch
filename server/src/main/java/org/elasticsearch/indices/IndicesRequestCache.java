@@ -28,7 +28,6 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
-import org.elasticsearch.common.CheckedSupplier;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.cache.Cache;
 import org.elasticsearch.common.cache.CacheBuilder;
@@ -44,7 +43,6 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ConcurrentCollections;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -72,7 +70,7 @@ public final class IndicesRequestCache implements RemovalListener<IndicesRequest
 
     /**
      * A setting to enable or disable request caching on an index level. Its dynamic by default
-     * since we are checking on the cluster state IndexMetadata always.
+     * since we are checking on the cluster state IndexMetaData always.
      */
     public static final Setting<Boolean> INDEX_CACHE_REQUEST_ENABLED_SETTING =
         Setting.boolSetting("index.requests.cache.enable", true, Property.Dynamic, Property.IndexScope);
@@ -117,8 +115,8 @@ public final class IndicesRequestCache implements RemovalListener<IndicesRequest
     // NORELEASE The cacheKeyRenderer has been added in order to debug
     // https://github.com/elastic/elasticsearch/issues/32827, it should be
     // removed when this issue is solved
-    BytesReference getOrCompute(CacheEntity cacheEntity, CheckedSupplier<BytesReference, IOException> loader,
-                                DirectoryReader reader, BytesReference cacheKey, Supplier<String> cacheKeyRenderer) throws Exception {
+    BytesReference getOrCompute(CacheEntity cacheEntity, Supplier<BytesReference> loader,
+            DirectoryReader reader, BytesReference cacheKey, Supplier<String> cacheKeyRenderer) throws Exception {
         assert reader.getReaderCacheHelper() != null;
         final Key key =  new Key(cacheEntity, reader.getReaderCacheHelper().getKey(), cacheKey);
         Loader cacheLoader = new Loader(cacheEntity, loader);
@@ -126,8 +124,7 @@ public final class IndicesRequestCache implements RemovalListener<IndicesRequest
         if (cacheLoader.isLoaded()) {
             key.entity.onMiss();
             if (logger.isTraceEnabled()) {
-                logger.trace("Cache miss for reader version [{}], max_doc[{}] and request:\n {}",
-                    reader.getVersion(), reader.maxDoc(), cacheKeyRenderer.get());
+                logger.trace("Cache miss for reader version [{}] and request:\n {}", reader.getVersion(), cacheKeyRenderer.get());
             }
             // see if its the first time we see this reader, and make sure to register a cleanup key
             CleanupKey cleanupKey = new CleanupKey(cacheEntity, reader.getReaderCacheHelper().getKey());
@@ -140,8 +137,7 @@ public final class IndicesRequestCache implements RemovalListener<IndicesRequest
         } else {
             key.entity.onHit();
             if (logger.isTraceEnabled()) {
-                logger.trace("Cache hit for reader version [{}], max_doc[{}] and request:\n {}",
-                    reader.getVersion(), reader.maxDoc(), cacheKeyRenderer.get());
+                logger.trace("Cache hit for reader version [{}] and request:\n {}", reader.getVersion(), cacheKeyRenderer.get());
             }
         }
         return value;
@@ -161,10 +157,10 @@ public final class IndicesRequestCache implements RemovalListener<IndicesRequest
     private static class Loader implements CacheLoader<Key, BytesReference> {
 
         private final CacheEntity entity;
-        private final CheckedSupplier<BytesReference, IOException> loader;
+        private final Supplier<BytesReference> loader;
         private boolean loaded;
 
-        Loader(CacheEntity entity, CheckedSupplier<BytesReference, IOException> loader) {
+        Loader(CacheEntity entity, Supplier<BytesReference> loader) {
             this.entity = entity;
             this.loader = loader;
         }

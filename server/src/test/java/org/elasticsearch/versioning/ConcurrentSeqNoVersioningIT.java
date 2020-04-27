@@ -23,7 +23,7 @@ import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.cluster.coordination.LinearizabilityChecker;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.SuppressForbidden;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
@@ -136,8 +136,8 @@ public class ConcurrentSeqNoVersioningIT extends AbstractDisruptionTestCase {
         assertAcked(prepareCreate("test")
             .setSettings(Settings.builder()
                 .put(indexSettings())
-                .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 1 + randomInt(2))
-                .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, randomInt(3))
+                .put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, 1 + randomInt(2))
+                .put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, randomInt(3))
             ));
 
         ensureGreen();
@@ -147,7 +147,7 @@ public class ConcurrentSeqNoVersioningIT extends AbstractDisruptionTestCase {
         logger.info("--> Indexing initial doc for {} keys", numberOfKeys);
         List<Partition> partitions =
             IntStream.range(0, numberOfKeys)
-                .mapToObj(i -> client().prepareIndex("test").setId("ID:" + i).setSource("value", -1).get())
+                .mapToObj(i -> client().prepareIndex("test", "type", "ID:" + i).setSource("value", -1).get())
                 .map(response ->
                     new Partition(response.getId(), new Version(response.getPrimaryTerm(), response.getSeqNo())))
                 .collect(Collectors.toList());
@@ -246,7 +246,7 @@ public class ConcurrentSeqNoVersioningIT extends AbstractDisruptionTestCase {
                             version = version.previousTerm();
                         }
 
-                        IndexRequest indexRequest = new IndexRequest("test").id(partition.id)
+                        IndexRequest indexRequest = new IndexRequest("test", "type", partition.id)
                             .source("value", random.nextInt())
                             .setIfPrimaryTerm(version.primaryTerm)
                             .setIfSeqNo(version.seqNo);

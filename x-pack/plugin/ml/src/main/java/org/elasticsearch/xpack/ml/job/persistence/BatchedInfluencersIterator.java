@@ -6,7 +6,7 @@
 package org.elasticsearch.xpack.ml.job.persistence;
 
 import org.elasticsearch.ElasticsearchParseException;
-import org.elasticsearch.client.OriginSettingClient;
+import org.elasticsearch.client.Client;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 class BatchedInfluencersIterator extends BatchedResultsIterator<Influencer> {
-    BatchedInfluencersIterator(OriginSettingClient client, String jobId) {
+    BatchedInfluencersIterator(Client client, String jobId) {
         super(client, jobId, Influencer.RESULT_TYPE_VALUE);
     }
 

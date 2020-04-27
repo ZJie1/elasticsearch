@@ -135,14 +135,13 @@ public class UpdateJobProcessNotifier {
 
                     @Override
                     public void onFailure(Exception e) {
-                        Throwable cause = ExceptionsHelper.unwrapCause(e);
-                        if (cause instanceof ResourceNotFoundException) {
+                        if (e instanceof ResourceNotFoundException) {
                             logger.debug("Remote job [{}] not updated as it has been deleted", update.getJobId());
-                        } else if (cause.getMessage().contains("because job [" + update.getJobId() + "] is not open")
-                                && cause instanceof ElasticsearchStatusException) {
+                        } else if (e.getMessage().contains("because job [" + update.getJobId() + "] is not open")
+                                && e instanceof ElasticsearchStatusException) {
                             logger.debug("Remote job [{}] not updated as it is no longer open", update.getJobId());
                         } else {
-                            logger.error("Failed to update remote job [" + update.getJobId() + "]", cause);
+                            logger.error("Failed to update remote job [" + update.getJobId() + "]", e);
                         }
                         updateHolder.listener.onFailure(e);
                         executeProcessUpdates(updatesIterator);

@@ -38,13 +38,11 @@ public class SnapshotLifecyclePolicy implements ToXContentObject {
     private final String schedule;
     private final String repository;
     private final Map<String, Object> configuration;
-    private final SnapshotRetentionConfiguration retentionPolicy;
 
     private static final ParseField NAME = new ParseField("name");
     private static final ParseField SCHEDULE = new ParseField("schedule");
     private static final ParseField REPOSITORY = new ParseField("repository");
     private static final ParseField CONFIG = new ParseField("config");
-    private static final ParseField RETENTION = new ParseField("retention");
 
     @SuppressWarnings("unchecked")
     private static final ConstructingObjectParser<SnapshotLifecyclePolicy, String> PARSER =
@@ -54,8 +52,7 @@ public class SnapshotLifecyclePolicy implements ToXContentObject {
                 String schedule = (String) a[1];
                 String repo = (String) a[2];
                 Map<String, Object> config = (Map<String, Object>) a[3];
-                SnapshotRetentionConfiguration retention = (SnapshotRetentionConfiguration) a[4];
-                return new SnapshotLifecyclePolicy(id, name, schedule, repo, config, retention);
+                return new SnapshotLifecyclePolicy(id, name, schedule, repo, config);
             });
 
     static {
@@ -63,18 +60,15 @@ public class SnapshotLifecyclePolicy implements ToXContentObject {
         PARSER.declareString(ConstructingObjectParser.constructorArg(), SCHEDULE);
         PARSER.declareString(ConstructingObjectParser.constructorArg(), REPOSITORY);
         PARSER.declareObject(ConstructingObjectParser.optionalConstructorArg(), (p, c) -> p.map(), CONFIG);
-        PARSER.declareObject(ConstructingObjectParser.optionalConstructorArg(), SnapshotRetentionConfiguration::parse, RETENTION);
     }
 
     public SnapshotLifecyclePolicy(final String id, final String name, final String schedule,
-                                   final String repository, @Nullable final Map<String, Object> configuration,
-                                   @Nullable final SnapshotRetentionConfiguration retentionPolicy) {
-        this.id = Objects.requireNonNull(id, "policy id is required");
-        this.name = Objects.requireNonNull(name, "policy snapshot name is required");
-        this.schedule = Objects.requireNonNull(schedule, "policy schedule is required");
-        this.repository = Objects.requireNonNull(repository, "policy snapshot repository is required");
+                                   final String repository, @Nullable Map<String, Object> configuration) {
+        this.id = Objects.requireNonNull(id);
+        this.name = name;
+        this.schedule = schedule;
+        this.repository = repository;
         this.configuration = configuration;
-        this.retentionPolicy = retentionPolicy;
     }
 
     public String getId() {
@@ -98,11 +92,6 @@ public class SnapshotLifecyclePolicy implements ToXContentObject {
         return this.configuration;
     }
 
-    @Nullable
-    public SnapshotRetentionConfiguration getRetentionPolicy() {
-        return this.retentionPolicy;
-    }
-
     public static SnapshotLifecyclePolicy parse(XContentParser parser, String id) {
         return PARSER.apply(parser, id);
     }
@@ -116,16 +105,13 @@ public class SnapshotLifecyclePolicy implements ToXContentObject {
         if (this.configuration != null) {
             builder.field(CONFIG.getPreferredName(), this.configuration);
         }
-        if (this.retentionPolicy != null) {
-            builder.field(RETENTION.getPreferredName(), this.retentionPolicy);
-        }
         builder.endObject();
         return builder;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, schedule, repository, configuration, retentionPolicy);
+        return Objects.hash(id, name, schedule, repository, configuration);
     }
 
     @Override
@@ -142,8 +128,7 @@ public class SnapshotLifecyclePolicy implements ToXContentObject {
             Objects.equals(name, other.name) &&
             Objects.equals(schedule, other.schedule) &&
             Objects.equals(repository, other.repository) &&
-            Objects.equals(configuration, other.configuration) &&
-            Objects.equals(retentionPolicy, other.retentionPolicy);
+            Objects.equals(configuration, other.configuration);
     }
 
     @Override

@@ -5,20 +5,31 @@
  */
 package org.elasticsearch.xpack.sql.analysis.analyzer;
 
-import org.elasticsearch.rest.RestStatus;
-import org.elasticsearch.xpack.ql.common.Failure;
-import org.elasticsearch.xpack.sql.SqlClientException;
+import org.elasticsearch.xpack.sql.analysis.AnalysisException;
+import org.elasticsearch.xpack.sql.analysis.analyzer.Verifier.Failure;
+import org.elasticsearch.xpack.sql.tree.Location;
+import org.elasticsearch.xpack.sql.util.StringUtils;
 
 import java.util.Collection;
+import java.util.stream.Collectors;
 
-public class VerificationException extends SqlClientException {
+
+public class VerificationException extends AnalysisException {
+
+    private final Collection<Failure> failures;
 
     protected VerificationException(Collection<Failure> sources) {
-        super(Failure.failMessage(sources));
+        super(null, StringUtils.EMPTY);
+        failures = sources;
     }
 
     @Override
-    public RestStatus status() {
-        return RestStatus.BAD_REQUEST;
+    public String getMessage() {
+        return failures.stream()
+                .map(f -> {
+                    Location l = f.source().source().source();
+                    return "line " + l.getLineNumber() + ":" + l.getColumnNumber() + ": " + f.message();
+                })
+                .collect(Collectors.joining(StringUtils.NEW_LINE, "Found " + failures.size() + " problem(s)\n", StringUtils.EMPTY));
     }
 }

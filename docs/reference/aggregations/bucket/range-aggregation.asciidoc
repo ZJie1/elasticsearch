@@ -6,7 +6,7 @@ Note that this aggregation includes the `from` value and excludes the `to` value
 
 Example:
 
-[source,console,id=range-aggregation-example]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -24,12 +24,13 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 // TEST[s/GET \/_search/GET \/_search\?filter_path=aggregations/]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...
@@ -63,7 +64,7 @@ Response:
 
 Setting the `keyed` flag to `true` will associate a unique string key with each bucket and return the ranges as a hash rather than an array:
 
-[source,console,id=range-aggregation-keyed-example]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -82,12 +83,13 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 // TEST[s/GET \/_search/GET \/_search\?filter_path=aggregations/]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...
@@ -116,7 +118,7 @@ Response:
 
 It is also possible to customize the key for each range:
 
-[source,console,id=range-aggregation-custom-keys-example]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -135,12 +137,13 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 // TEST[s/GET \/_search/GET \/_search\?filter_path=aggregations/]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...
@@ -174,7 +177,7 @@ will be executed during aggregation execution.
 
 The following example shows how to use an `inline` script with the `painless` script language and no script parameters:
 
-[source,console,id=range-aggregation-script-example]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -195,10 +198,11 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 It is also possible to use stored scripts. Here is a simple stored script:
 
-[source,console,id=range-aggregation-stored-script-example]
+[source,js]
 --------------------------------------------------
 POST /_scripts/convert_currency
 {
@@ -208,11 +212,12 @@ POST /_scripts/convert_currency
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 
 And this new stored script can be used in the range aggregation like this:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -235,6 +240,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[s/GET \/_search/GET \/_search\?filter_path=aggregations/]
 // TEST[continued]
 <1> Id of the stored script
@@ -242,7 +248,7 @@ GET /_search
 
 //////////////////////////
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     "aggregations": {
@@ -264,6 +270,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// TESTRESPONSE
 
 //////////////////////////
 
@@ -271,7 +278,7 @@ GET /_search
 
 Lets say the product prices are in USD but we would like to get the price ranges in EURO. We can use value script to convert the prices prior the aggregation (assuming conversion rate of 0.8)
 
-[source,console,id=range-aggregation-value-script-example]
+[source,js]
 --------------------------------------------------
 GET /sales/_search
 {
@@ -295,13 +302,14 @@ GET /sales/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 
 ==== Sub Aggregations
 
 The following example, not only "bucket" the documents to the different buckets but also computes statistics over the prices in each price range
 
-[source,console,id=range-aggregation-sub-aggregation-example]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -324,12 +332,13 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:sales]
 // TEST[s/GET \/_search/GET \/_search\?filter_path=aggregations/]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   ...
@@ -379,3 +388,31 @@ Response:
 }
 --------------------------------------------------
 // TESTRESPONSE[s/\.\.\.//]
+
+If a sub aggregation is also based on the same value source as the range aggregation (like the `stats` aggregation in the example above) it is possible to leave out the value source definition for it. The following will return the same response as above:
+
+[source,js]
+--------------------------------------------------
+GET /_search
+{
+    "aggs" : {
+        "price_ranges" : {
+            "range" : {
+                "field" : "price",
+                "ranges" : [
+                    { "to" : 100 },
+                    { "from" : 100, "to" : 200 },
+                    { "from" : 200 }
+                ]
+            },
+            "aggs" : {
+                "price_stats" : {
+                    "stats" : {} <1>
+                }
+            }
+        }
+    }
+}
+--------------------------------------------------
+// CONSOLE
+<1> We don't need to specify the `price` as we "inherit" it by default from the parent `range` aggregation

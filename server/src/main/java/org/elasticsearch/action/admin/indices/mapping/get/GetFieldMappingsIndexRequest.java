@@ -19,12 +19,10 @@
 
 package org.elasticsearch.action.admin.indices.mapping.get;
 
-import org.elasticsearch.Version;
 import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.action.OriginalIndices;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.action.support.single.shard.SingleShardRequest;
-import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 
@@ -32,26 +30,26 @@ import java.io.IOException;
 
 public class GetFieldMappingsIndexRequest extends SingleShardRequest<GetFieldMappingsIndexRequest> {
 
+    private final boolean probablySingleFieldRequest;
     private final boolean includeDefaults;
     private final String[] fields;
+    private final String[] types;
 
-    private final OriginalIndices originalIndices;
+    private OriginalIndices originalIndices;
 
     GetFieldMappingsIndexRequest(StreamInput in) throws IOException {
         super(in);
-        if (in.getVersion().before(Version.V_8_0_0)) {
-            in.readStringArray();   // former types array
-        }
+        types = in.readStringArray();
         fields = in.readStringArray();
         includeDefaults = in.readBoolean();
-        if (in.getVersion().before(Version.V_8_0_0)) {
-            in.readBoolean();       // former probablySingleField boolean
-        }
+        probablySingleFieldRequest = in.readBoolean();
         originalIndices = OriginalIndices.readOriginalIndices(in);
     }
 
-    GetFieldMappingsIndexRequest(GetFieldMappingsRequest other, String index) {
+    GetFieldMappingsIndexRequest(GetFieldMappingsRequest other, String index, boolean probablySingleFieldRequest) {
+        this.probablySingleFieldRequest = probablySingleFieldRequest;
         this.includeDefaults = other.includeDefaults();
+        this.types = other.types();
         this.fields = other.fields();
         assert index != null;
         this.index(index);
@@ -63,8 +61,16 @@ public class GetFieldMappingsIndexRequest extends SingleShardRequest<GetFieldMap
         return null;
     }
 
+    public String[] types() {
+        return types;
+    }
+
     public String[] fields() {
         return fields;
+    }
+
+    public boolean probablySingleFieldRequest() {
+        return probablySingleFieldRequest;
     }
 
     public boolean includeDefaults() {
@@ -84,14 +90,10 @@ public class GetFieldMappingsIndexRequest extends SingleShardRequest<GetFieldMap
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        if (out.getVersion().before(Version.V_8_0_0)) {
-            out.writeStringArray(Strings.EMPTY_ARRAY);
-        }
+        out.writeStringArray(types);
         out.writeStringArray(fields);
         out.writeBoolean(includeDefaults);
-        if (out.getVersion().before(Version.V_8_0_0)) {
-            out.writeBoolean(false);
-        }
+        out.writeBoolean(probablySingleFieldRequest);
         OriginalIndices.writeOriginalIndices(originalIndices, out);
     }
 

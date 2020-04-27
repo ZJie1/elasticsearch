@@ -1,10 +1,9 @@
 {
   "indices.reload_search_analyzers":{
     "documentation":{
-      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-reload-analyzers.html",
-      "description":"Reloads an index's search analyzers and their resources."
+      "url":"https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-reload-analyzers.html"
     },
-    "stability" : "stable",
+    "stability":"experimental",
     "url":{
       "paths":[
         {
@@ -36,7 +35,6 @@
         "options":[
           "open",
           "closed",
-          "hidden",
           "none",
           "all"
         ],

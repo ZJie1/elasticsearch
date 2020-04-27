@@ -6,10 +6,11 @@
 
 Returns setting information for an index.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /twitter/_settings
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 
@@ -37,8 +38,6 @@ used to limit the request.
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `true`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +
@@ -64,7 +63,7 @@ The get settings API can be used to get settings for more than one index with a
 single call. To get settings for all indices you can use `_all` for `<index>`.
 Wildcard expressions are also supported. The following are some examples:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /twitter,kimchy/_settings
 
@@ -72,6 +71,7 @@ GET /_all/_settings
 
 GET /log_2013_*/_settings
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 // TEST[s/^/PUT kimchy\nPUT log_2013_01_01\n/]
 
@@ -80,8 +80,9 @@ GET /log_2013_*/_settings
 The settings that are returned can be filtered with wildcard matching
 as follows:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /log_2013_-*/_settings/index.number_*
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]

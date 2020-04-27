@@ -6,10 +6,11 @@
 
 Opens a closed index.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /twitter/_open
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 // TEST[s/^/POST \/twitter\/_close\n/]
 
@@ -80,8 +81,6 @@ or using the <<cluster-update-settings,cluster update settings>> API.
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `true`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +
@@ -99,18 +98,20 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=timeoutparms]
 
 A closed index can be re-opened like this:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /my_index/_open
 --------------------------------------------------
+// CONSOLE
 // TEST[s/^/PUT my_index\nPOST my_index\/_close\n/]
 
 The API returns the following response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     "acknowledged" : true,
     "shards_acknowledged" : true
 }
 --------------------------------------------------
+// TESTRESPONSE

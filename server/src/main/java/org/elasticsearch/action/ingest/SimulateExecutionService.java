@@ -26,10 +26,8 @@ import org.elasticsearch.ingest.IngestDocument;
 import org.elasticsearch.ingest.Pipeline;
 import org.elasticsearch.threadpool.ThreadPool;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 
 import static org.elasticsearch.ingest.TrackingResultProcessor.decorate;
 
@@ -43,53 +41,38 @@ class SimulateExecutionService {
         this.threadPool = threadPool;
     }
 
-    void executeDocument(Pipeline pipeline, IngestDocument ingestDocument, boolean verbose,
-                         BiConsumer<SimulateDocumentResult, Exception> handler) {
+    SimulateDocumentResult executeDocument(Pipeline pipeline, IngestDocument ingestDocument, boolean verbose) {
         if (verbose) {
-            List<SimulateProcessorResult> processorResultList = new CopyOnWriteArrayList<>();
+            List<SimulateProcessorResult> processorResultList = new ArrayList<>();
             CompoundProcessor verbosePipelineProcessor = decorate(pipeline.getCompoundProcessor(), processorResultList);
-            Pipeline verbosePipeline = new Pipeline(pipeline.getId(), pipeline.getDescription(), pipeline.getVersion(),
-                verbosePipelineProcessor);
-            ingestDocument.executePipeline(verbosePipeline, (result, e) -> {
-                handler.accept(new SimulateDocumentVerboseResult(processorResultList), e);
-            });
+            try {
+                Pipeline verbosePipeline = new Pipeline(pipeline.getId(), pipeline.getDescription(), pipeline.getVersion(),
+                    verbosePipelineProcessor);
+                ingestDocument.executePipeline(verbosePipeline);
+                return new SimulateDocumentVerboseResult(processorResultList);
+            } catch (Exception e) {
+                return new SimulateDocumentVerboseResult(processorResultList);
+            }
         } else {
-            ingestDocument.executePipeline(pipeline, (result, e) -> {
-                if (e == null) {
-                    handler.accept(new SimulateDocumentBaseResult(result), null);
-                } else {
-                    handler.accept(new SimulateDocumentBaseResult(e), null);
-                }
-            });
+            try {
+                IngestDocument result = pipeline.execute(ingestDocument);
+                return new SimulateDocumentBaseResult(result);
+            } catch (Exception e) {
+                return new SimulateDocumentBaseResult(e);
+            }
         }
     }
 
     public void execute(SimulatePipelineRequest.Parsed request, ActionListener<SimulatePipelineResponse> listener) {
         threadPool.executor(THREAD_POOL_NAME).execute(ActionRunnable.wrap(listener, l -> {
-            final AtomicInteger counter = new AtomicInteger();
-            final List<SimulateDocumentResult> responses =
-                new CopyOnWriteArrayList<>(new SimulateDocumentBaseResult[request.getDocuments().size()]);
-
-            if (request.getDocuments().isEmpty()) {
-                l.onResponse(new SimulatePipelineResponse(request.getPipeline().getId(),
-                    request.isVerbose(), responses));
-                return;
-            }
-
-            int iter = 0;
-            for (IngestDocument ingestDocument : request.getDocuments()) {
-                final int index = iter;
-                executeDocument(request.getPipeline(), ingestDocument, request.isVerbose(), (response, e) -> {
+                List<SimulateDocumentResult> responses = new ArrayList<>();
+                for (IngestDocument ingestDocument : request.getDocuments()) {
+                    SimulateDocumentResult response = executeDocument(request.getPipeline(), ingestDocument, request.isVerbose());
                     if (response != null) {
-                        responses.set(index, response);
+                        responses.add(response);
                     }
-                    if (counter.incrementAndGet() == request.getDocuments().size()) {
-                        l.onResponse(new SimulatePipelineResponse(request.getPipeline().getId(),
-                            request.isVerbose(), responses));
-                    }
-                });
-                iter++;
-            }
+                }
+                l.onResponse(new SimulatePipelineResponse(request.getPipeline().getId(), request.isVerbose(), responses));
         }));
     }
 }

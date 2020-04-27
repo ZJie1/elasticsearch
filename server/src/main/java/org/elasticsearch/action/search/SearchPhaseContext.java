@@ -23,8 +23,7 @@ import org.elasticsearch.action.OriginalIndices;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.search.SearchShardTarget;
 import org.elasticsearch.search.internal.InternalSearchResponse;
-import org.elasticsearch.search.internal.SearchContextId;
-import org.elasticsearch.search.internal.ShardSearchRequest;
+import org.elasticsearch.search.internal.ShardSearchTransportRequest;
 import org.elasticsearch.transport.Transport;
 
 import java.util.concurrent.Executor;
@@ -97,11 +96,11 @@ interface SearchPhaseContext extends Executor {
 
     /**
      * Releases a search context with the given context ID on the node the given connection is connected to.
-     * @see org.elasticsearch.search.query.QuerySearchResult#getContextId()
-     * @see org.elasticsearch.search.fetch.FetchSearchResult#getContextId()
+     * @see org.elasticsearch.search.query.QuerySearchResult#getRequestId()
+     * @see org.elasticsearch.search.fetch.FetchSearchResult#getRequestId()
      *
      */
-    default void sendReleaseSearchContext(SearchContextId contextId, Transport.Connection connection, OriginalIndices originalIndices) {
+    default void sendReleaseSearchContext(long contextId, Transport.Connection connection, OriginalIndices originalIndices) {
         if (connection != null) {
             getSearchTransport().sendFreeContext(connection, contextId, originalIndices);
         }
@@ -110,7 +109,7 @@ interface SearchPhaseContext extends Executor {
     /**
      * Builds an request for the initial search phase.
      */
-    ShardSearchRequest buildShardSearchRequest(SearchShardIterator shardIt);
+    ShardSearchTransportRequest buildShardSearchRequest(SearchShardIterator shardIt);
 
     /**
      * Processes the phase transition from on phase to another. This method handles all errors that happen during the initial run execution

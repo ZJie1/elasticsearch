@@ -11,11 +11,8 @@ import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.index.IndexResponse;
-import org.elasticsearch.persistent.PersistentTasksCustomMetadata;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.xpack.core.ClientHelper;
-import org.elasticsearch.xpack.core.ml.MlTasks;
-import org.elasticsearch.xpack.core.ml.action.StartDatafeedAction;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedConfig;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedUpdate;
 import org.elasticsearch.xpack.core.ml.job.persistence.AnomalyDetectorsIndex;
@@ -36,7 +33,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
-import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -44,8 +40,6 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.core.Is.is;
 
 public class DatafeedConfigProviderIT extends MlSingleNodeTestCase {
     private DatafeedConfigProvider datafeedConfigProvider;
@@ -212,7 +206,7 @@ public class DatafeedConfigProviderIT extends MlSingleNodeTestCase {
         AtomicReference<SortedSet<String>> datafeedIdsHolder = new AtomicReference<>();
         AtomicReference<Exception> exceptionHolder = new AtomicReference<>();
 
-        blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("_all", false, null, false, actionListener),
+        blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("_all", false, actionListener),
                 datafeedIdsHolder, exceptionHolder);
 
         assertNull(datafeedIdsHolder.get());
@@ -221,7 +215,7 @@ public class DatafeedConfigProviderIT extends MlSingleNodeTestCase {
         assertThat(exceptionHolder.get().getMessage(), containsString("No datafeed with id [*] exists"));
 
         exceptionHolder.set(null);
-        blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("_all", true,  null, false,actionListener),
+        blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("_all", true, actionListener),
                 datafeedIdsHolder, exceptionHolder);
         assertNotNull(datafeedIdsHolder.get());
         assertNull(exceptionHolder.get());
@@ -251,28 +245,24 @@ public class DatafeedConfigProviderIT extends MlSingleNodeTestCase {
 
         client().admin().indices().prepareRefresh(AnomalyDetectorsIndex.configIndexName()).get();
 
-        // Test datafeed IDs only
+        // Test job IDs only
         SortedSet<String> expandedIds =
-                blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("foo*", true, null, false, actionListener));
+                blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("foo*", true, actionListener));
         assertEquals(new TreeSet<>(Arrays.asList("foo-1", "foo-2")), expandedIds);
 
-        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("*-1", true,null, false, actionListener));
+        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("*-1", true, actionListener));
         assertEquals(new TreeSet<>(Arrays.asList("bar-1", "foo-1")), expandedIds);
 
-        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("bar*", true, null, false,  actionListener));
+        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("bar*", true, actionListener));
         assertEquals(new TreeSet<>(Arrays.asList("bar-1", "bar-2")), expandedIds);
 
-        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("b*r-1", true, null, false,  actionListener));
+        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("b*r-1", true, actionListener));
         assertEquals(new TreeSet<>(Collections.singletonList("bar-1")), expandedIds);
 
-        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("bar-1,foo*",
-            true,
-            null,
-            false,
-            actionListener));
+        expandedIds = blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("bar-1,foo*", true, actionListener));
         assertEquals(new TreeSet<>(Arrays.asList("bar-1", "foo-1", "foo-2")), expandedIds);
 
-        // Test full datafeed config
+        // Test full job config
         List<DatafeedConfig.Builder> expandedDatafeedBuilders =
                 blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedConfigs("foo*", true, actionListener));
         List<DatafeedConfig> expandedDatafeeds =
@@ -298,31 +288,6 @@ public class DatafeedConfigProviderIT extends MlSingleNodeTestCase {
                 blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedConfigs("bar-1,foo*", true, actionListener));
         expandedDatafeeds = expandedDatafeedBuilders.stream().map(DatafeedConfig.Builder::build).collect(Collectors.toList());
         assertThat(expandedDatafeeds, containsInAnyOrder(bar1, foo1, foo2));
-    }
-
-    public void testExpandDatafeedsWithTaskData() throws Exception {
-        putDatafeedConfig(createDatafeedConfig("foo-2", "j2"), Collections.emptyMap());
-        client().admin().indices().prepareRefresh(AnomalyDetectorsIndex.configIndexName()).get();
-
-        PersistentTasksCustomMetadata.Builder tasksBuilder = PersistentTasksCustomMetadata.builder();
-        tasksBuilder.addTask(MlTasks.datafeedTaskId("foo-1"),
-            MlTasks.DATAFEED_TASK_NAME, new StartDatafeedAction.DatafeedParams("foo-1", 0L),
-            new PersistentTasksCustomMetadata.Assignment("node-1", "test assignment"));
-
-        PersistentTasksCustomMetadata tasks = tasksBuilder.build();
-        AtomicReference<Exception> exceptionHolder = new AtomicReference<>();
-        AtomicReference<SortedSet<String>> datafeedIdsHolder = new AtomicReference<>();
-        // Test datafeed IDs only
-        SortedSet<String> expandedIds =
-            blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("foo*", false, tasks, true, actionListener));
-        assertEquals(new TreeSet<>(Arrays.asList("foo-1", "foo-2")), expandedIds);
-
-        blockingCall(actionListener -> datafeedConfigProvider.expandDatafeedIds("foo-1*,foo-2*", false, tasks, false, actionListener),
-            datafeedIdsHolder,
-            exceptionHolder);
-        assertThat(exceptionHolder.get(), is(not(nullValue())));
-        assertEquals(ResourceNotFoundException.class, exceptionHolder.get().getClass());
-        assertThat(exceptionHolder.get().getMessage(), containsString("No datafeed with id [foo-1*] exists"));
     }
 
     public void testFindDatafeedsForJobIds() throws Exception {

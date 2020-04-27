@@ -9,9 +9,8 @@ import org.elasticsearch.Version;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
-import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.service.ClusterService;
@@ -39,7 +38,6 @@ import org.elasticsearch.xpack.core.security.SecurityField;
 import org.elasticsearch.xpack.core.security.authc.Realm;
 import org.elasticsearch.xpack.core.security.authc.RealmSettings;
 import org.elasticsearch.xpack.core.security.authc.file.FileRealmSettings;
-import org.elasticsearch.xpack.core.security.authc.support.Hasher;
 import org.elasticsearch.xpack.core.security.authz.AuthorizationServiceField;
 import org.elasticsearch.xpack.core.security.authz.accesscontrol.IndicesAccessControl;
 import org.elasticsearch.xpack.core.security.authz.permission.DocumentPermissions;
@@ -50,8 +48,9 @@ import org.elasticsearch.xpack.security.audit.AuditTrailService;
 import org.elasticsearch.xpack.security.audit.logfile.LoggingAuditTrail;
 import org.elasticsearch.xpack.security.authc.Realms;
 import org.hamcrest.Matchers;
-import org.junit.After;
+import org.junit.Before;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -65,7 +64,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.INDEX_FORMAT_SETTING;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.INDEX_FORMAT_SETTING;
 import static org.elasticsearch.xpack.core.security.index.RestrictedIndicesNames.SECURITY_MAIN_ALIAS;
 import static org.elasticsearch.xpack.security.support.SecurityIndexManager.INTERNAL_MAIN_INDEX_FORMAT;
 import static org.hamcrest.Matchers.containsString;
@@ -89,7 +88,7 @@ public class SecurityTests extends ESTestCase {
         }
 
         @Override
-        public Map<String, Realm.Factory> getRealms(SecurityComponents components) {
+        public Map<String, Realm.Factory> getRealms(ResourceWatcherService resourceWatcherService) {
             return Collections.singletonMap(realmType, config -> null);
         }
     }
@@ -104,7 +103,7 @@ public class SecurityTests extends ESTestCase {
             .put("path.home", createTempDir()).build();
         Environment env = TestEnvironment.newEnvironment(settings);
         licenseState = new TestUtils.UpdatableLicenseState(settings);
-        SSLService sslService = new SSLService(env);
+        SSLService sslService = new SSLService(settings, env);
         security = new Security(settings, null, Arrays.asList(extensions)) {
             @Override
             protected XPackLicenseState getLicenseState() {
@@ -129,8 +128,7 @@ public class SecurityTests extends ESTestCase {
         Client client = mock(Client.class);
         when(client.threadPool()).thenReturn(threadPool);
         when(client.settings()).thenReturn(settings);
-        return security.createComponents(client, threadPool, clusterService, mock(ResourceWatcherService.class), mock(ScriptService.class),
-            xContentRegistry(), env, new IndexNameExpressionResolver());
+        return security.createComponents(client, threadPool, clusterService, mock(ResourceWatcherService.class), mock(ScriptService.class));
     }
 
     private static <T> T findComponent(Class<T> type, Collection<Object> components) {
@@ -142,9 +140,13 @@ public class SecurityTests extends ESTestCase {
         return null;
     }
 
-    @After
-    public void cleanup() {
-        threadContext = null;
+    @Before
+    public void cleanup() throws IOException {
+        if (threadContext != null) {
+            threadContext.stashContext();
+            threadContext.close();
+            threadContext = null;
+        }
     }
 
     public void testCustomRealmExtension() throws Exception {
@@ -240,38 +242,24 @@ public class SecurityTests extends ESTestCase {
         assertNull(joinValidator);
     }
 
-    public void testJoinValidatorForFIPSOnAllowedLicense() throws Exception {
+    public void testJoinValidatorForFIPSLicense() throws Exception {
         DiscoveryNode node = new DiscoveryNode("foo", buildNewFakeTransportAddress(),
             VersionUtils.randomVersionBetween(random(), null, Version.CURRENT));
-        Metadata.Builder builder = Metadata.builder();
-        License license =
-            TestUtils.generateSignedLicense(
-                randomFrom(License.OperationMode.ENTERPRISE, License.OperationMode.PLATINUM, License.OperationMode.TRIAL).toString(),
-                TimeValue.timeValueHours(24));
+        MetaData.Builder builder = MetaData.builder();
+        License license = TestUtils.generateSignedLicense(TimeValue.timeValueHours(24));
         TestUtils.putLicense(builder, license);
-        ClusterState state = ClusterState.builder(ClusterName.DEFAULT).metadata(builder.build()).build();
+        ClusterState state = ClusterState.builder(ClusterName.DEFAULT).metaData(builder.build()).build();
         new Security.ValidateLicenseForFIPS(false).accept(node, state);
-        // no exception thrown
-        new Security.ValidateLicenseForFIPS(true).accept(node, state);
-        // no exception thrown
-    }
 
-    public void testJoinValidatorForFIPSOnForbiddenLicense() throws Exception {
-        DiscoveryNode node = new DiscoveryNode("foo", buildNewFakeTransportAddress(),
-            VersionUtils.randomVersionBetween(random(), null, Version.CURRENT));
-        Metadata.Builder builder = Metadata.builder();
-        final String forbiddenLicenseType =
-            randomFrom(List.of(License.OperationMode.values()).stream()
-                .filter(l -> XPackLicenseState.isFipsAllowedForOperationMode(l) == false).collect(Collectors.toList())).toString();
-        License license = TestUtils.generateSignedLicense(forbiddenLicenseType, TimeValue.timeValueHours(24));
-        TestUtils.putLicense(builder, license);
-        ClusterState state = ClusterState.builder(ClusterName.DEFAULT).metadata(builder.build()).build();
-        new Security.ValidateLicenseForFIPS(false).accept(node, state);
-        // no exception thrown
-        IllegalStateException e = expectThrows(IllegalStateException.class,
-            () -> new Security.ValidateLicenseForFIPS(true).accept(node, state));
-        assertThat(e.getMessage(), containsString("FIPS mode cannot be used"));
-
+        final boolean isLicenseValidForFips =
+            FIPS140LicenseBootstrapCheck.ALLOWED_LICENSE_OPERATION_MODES.contains(license.operationMode());
+        if (isLicenseValidForFips) {
+            new Security.ValidateLicenseForFIPS(true).accept(node, state);
+        } else {
+            IllegalStateException e = expectThrows(IllegalStateException.class,
+                () -> new Security.ValidateLicenseForFIPS(true).accept(node, state));
+            assertThat(e.getMessage(), containsString("FIPS mode cannot be used"));
+        }
     }
 
     public void testIndexJoinValidator_FullyCurrentCluster() throws Exception {
@@ -280,7 +268,7 @@ public class SecurityTests extends ESTestCase {
         assertNotNull(joinValidator);
         DiscoveryNode node = new DiscoveryNode("foo", buildNewFakeTransportAddress(), Version.CURRENT);
         int indexFormat = randomBoolean() ? INTERNAL_MAIN_INDEX_FORMAT : INTERNAL_MAIN_INDEX_FORMAT - 1;
-        IndexMetadata indexMetadata = IndexMetadata.builder(SECURITY_MAIN_ALIAS)
+        IndexMetaData indexMetaData = IndexMetaData.builder(SECURITY_MAIN_ALIAS)
             .settings(settings(VersionUtils.randomIndexCompatibleVersion(random())).put(INDEX_FORMAT_SETTING.getKey(), indexFormat))
             .numberOfShards(1).numberOfReplicas(0)
             .build();
@@ -288,7 +276,7 @@ public class SecurityTests extends ESTestCase {
         DiscoveryNodes discoveryNodes = DiscoveryNodes.builder().add(existingOtherNode).build();
         ClusterState clusterState = ClusterState.builder(ClusterName.DEFAULT)
             .nodes(discoveryNodes)
-            .metadata(Metadata.builder().put(indexMetadata, true).build()).build();
+            .metaData(MetaData.builder().put(indexMetaData, true).build()).build();
         joinValidator.accept(node, clusterState);
     }
 
@@ -298,7 +286,7 @@ public class SecurityTests extends ESTestCase {
         assertNotNull(joinValidator);
         Version version = VersionUtils.randomIndexCompatibleVersion(random());
         DiscoveryNode node = new DiscoveryNode("foo", buildNewFakeTransportAddress(), Version.CURRENT);
-        IndexMetadata indexMetadata = IndexMetadata.builder(SECURITY_MAIN_ALIAS)
+        IndexMetaData indexMetaData = IndexMetaData.builder(SECURITY_MAIN_ALIAS)
             .settings(settings(version).put(INDEX_FORMAT_SETTING.getKey(), INTERNAL_MAIN_INDEX_FORMAT))
             .numberOfShards(1).numberOfReplicas(0)
             .build();
@@ -306,7 +294,7 @@ public class SecurityTests extends ESTestCase {
         DiscoveryNodes discoveryNodes = DiscoveryNodes.builder().add(existingOtherNode).build();
         ClusterState clusterState = ClusterState.builder(ClusterName.DEFAULT)
             .nodes(discoveryNodes)
-            .metadata(Metadata.builder().put(indexMetadata, true).build()).build();
+            .metaData(MetaData.builder().put(indexMetaData, true).build()).build();
         joinValidator.accept(node, clusterState);
     }
 
@@ -387,80 +375,5 @@ public class SecurityTests extends ESTestCase {
             .build();
         Security.validateRealmSettings(settings);
         // no-exception
-    }
-
-    public void testValidateForFipsKeystoreWithImplicitJksType() {
-        final Settings settings = Settings.builder()
-            .put(XPackSettings.FIPS_MODE_ENABLED.getKey(), true)
-            .put("xpack.security.transport.ssl.keystore.path", "path/to/keystore")
-            .put(XPackSettings.PASSWORD_HASHING_ALGORITHM.getKey(),
-                randomFrom(Hasher.getAvailableAlgoStoredHash().stream()
-                    .filter(alg -> alg.startsWith("pbkdf2") == false).collect(Collectors.toList())))
-            .build();
-            final IllegalArgumentException iae =
-                expectThrows(IllegalArgumentException.class, () -> Security.validateForFips(settings));
-            assertThat(iae.getMessage(), containsString("JKS Keystores cannot be used in a FIPS 140 compliant JVM"));
-    }
-
-    public void testValidateForFipsKeystoreWithExplicitJksType() {
-        final Settings settings = Settings.builder()
-            .put(XPackSettings.FIPS_MODE_ENABLED.getKey(), true)
-            .put("xpack.security.transport.ssl.keystore.path", "path/to/keystore")
-            .put("xpack.security.transport.ssl.keystore.type", "JKS")
-            .put(XPackSettings.PASSWORD_HASHING_ALGORITHM.getKey(),
-                randomFrom(Hasher.getAvailableAlgoStoredHash().stream()
-                    .filter(alg -> alg.startsWith("pbkdf2")).collect(Collectors.toList())))
-            .build();
-        final IllegalArgumentException iae =
-            expectThrows(IllegalArgumentException.class, () -> Security.validateForFips(settings));
-        assertThat(iae.getMessage(), containsString("JKS Keystores cannot be used in a FIPS 140 compliant JVM"));
-    }
-
-    public void testValidateForFipsInvalidPasswordHashingAlgorithm() {
-        final Settings settings = Settings.builder()
-            .put(XPackSettings.FIPS_MODE_ENABLED.getKey(), true)
-            .put(XPackSettings.PASSWORD_HASHING_ALGORITHM.getKey(),
-                randomFrom(Hasher.getAvailableAlgoStoredHash().stream()
-                    .filter(alg -> alg.startsWith("pbkdf2") == false).collect(Collectors.toList())))
-            .build();
-        final IllegalArgumentException iae =
-            expectThrows(IllegalArgumentException.class, () -> Security.validateForFips(settings));
-        assertThat(iae.getMessage(), containsString("Only PBKDF2 is allowed for password hashing in a FIPS 140 JVM."));
-    }
-
-    public void testValidateForFipsMultipleValidationErrors() {
-        final Settings settings = Settings.builder()
-            .put(XPackSettings.FIPS_MODE_ENABLED.getKey(), true)
-            .put("xpack.security.transport.ssl.keystore.path", "path/to/keystore")
-            .put("xpack.security.transport.ssl.keystore.type", "JKS")
-            .put(XPackSettings.PASSWORD_HASHING_ALGORITHM.getKey(),
-                randomFrom(Hasher.getAvailableAlgoStoredHash().stream()
-                    .filter(alg -> alg.startsWith("pbkdf2") == false).collect(Collectors.toList())))
-            .build();
-        final IllegalArgumentException iae =
-            expectThrows(IllegalArgumentException.class, () -> Security.validateForFips(settings));
-        assertThat(iae.getMessage(), containsString("JKS Keystores cannot be used in a FIPS 140 compliant JVM"));
-        assertThat(iae.getMessage(), containsString("Only PBKDF2 is allowed for password hashing in a FIPS 140 JVM."));
-    }
-
-    public void testValidateForFipsNoErrors() {
-        final Settings settings = Settings.builder()
-            .put(XPackSettings.FIPS_MODE_ENABLED.getKey(), true)
-            .put("xpack.security.transport.ssl.keystore.path", "path/to/keystore")
-            .put("xpack.security.transport.ssl.keystore.type", "BCFKS")
-            .put(XPackSettings.PASSWORD_HASHING_ALGORITHM.getKey(),
-                randomFrom(Hasher.getAvailableAlgoStoredHash().stream()
-                    .filter(alg -> alg.startsWith("pbkdf2")).collect(Collectors.toList())))
-            .build();
-        Security.validateForFips(settings);
-        // no exception thrown
-    }
-
-    public void testValidateForFipsNoErrorsForDefaultSettings() {
-        final Settings settings = Settings.builder()
-            .put(XPackSettings.FIPS_MODE_ENABLED.getKey(), true)
-            .build();
-        Security.validateForFips(settings);
-        // no exception thrown
     }
 }

@@ -115,11 +115,7 @@ public class VerifyNodeRepositoryAction {
     private static void finishVerification(String repositoryName, ActionListener<List<DiscoveryNode>> listener, List<DiscoveryNode> nodes,
                                    CopyOnWriteArrayList<VerificationFailure> errors) {
         if (errors.isEmpty() == false) {
-            RepositoryVerificationException e = new RepositoryVerificationException(repositoryName, errors.toString());
-            for (VerificationFailure error : errors) {
-                e.addSuppressed(error.getCause());
-            }
-            listener.onFailure(e);
+            listener.onFailure(new RepositoryVerificationException(repositoryName, errors.toString()));
         } else {
             listener.onResponse(nodes);
         }

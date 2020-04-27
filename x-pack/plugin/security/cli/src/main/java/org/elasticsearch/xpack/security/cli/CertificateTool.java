@@ -142,7 +142,6 @@ public class CertificateTool extends LoggingAwareMultiCommand {
         subcommands.put("csr", new SigningRequestCommand());
         subcommands.put("cert", new GenerateCertificateCommand());
         subcommands.put("ca", new CertificateAuthorityCommand());
-        subcommands.put("http", new HttpCertificateCommand());
     }
 
 
@@ -150,7 +149,7 @@ public class CertificateTool extends LoggingAwareMultiCommand {
         "signing requests for use with SSL/TLS in the Elastic stack.";
 
     static final String INSTANCE_EXPLANATION =
-        "    * An instance is any piece of the Elastic Stack that requires an SSL certificate.\n" +
+        "    * An instance is any piece of the Elastic Stack that requires a SSL certificate.\n" +
             "      Depending on your configuration, Elasticsearch, Logstash, Kibana, and Beats\n" +
             "      may all require a certificate and private key.\n" +
             "    * The minimum required value for each instance is a name. This can simply be the\n" +
@@ -921,8 +920,8 @@ public class CertificateTool extends LoggingAwareMultiCommand {
         }
     }
 
-    static PEMEncryptor getEncrypter(char[] password) {
-        return new JcePEMEncryptorBuilder("AES-128-CBC").setProvider(BC_PROV).build(password);
+    private static PEMEncryptor getEncrypter(char[] password) {
+        return new JcePEMEncryptorBuilder("DES-EDE3-CBC").setProvider(BC_PROV).build(password);
     }
 
     private static <T, E extends Exception> T withPassword(String description, char[] password, Terminal terminal,
@@ -1037,7 +1036,7 @@ public class CertificateTool extends LoggingAwareMultiCommand {
         }
     }
 
-    static GeneralNames getSubjectAlternativeNamesValue(List<String> ipAddresses, List<String> dnsNames, List<String> commonNames) {
+    private static GeneralNames getSubjectAlternativeNamesValue(List<String> ipAddresses, List<String> dnsNames, List<String> commonNames) {
         Set<GeneralName> generalNameList = new HashSet<>();
         for (String ip : ipAddresses) {
             generalNameList.add(new GeneralName(GeneralName.iPAddress, ip));
@@ -1057,7 +1056,7 @@ public class CertificateTool extends LoggingAwareMultiCommand {
         return new GeneralNames(generalNameList.toArray(new GeneralName[0]));
     }
 
-    static boolean isAscii(char[] str) {
+    private static boolean isAscii(char[] str) {
         return ASCII_ENCODER.canEncode(CharBuffer.wrap(str));
     }
 

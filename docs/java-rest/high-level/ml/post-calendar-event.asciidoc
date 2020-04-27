@@ -3,7 +3,6 @@
 :request: PostCalendarEventRequest
 :response: PostCalendarEventResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
 === Post Calendar Event API
 Adds new ScheduledEvents to an existing {ml} calendar.

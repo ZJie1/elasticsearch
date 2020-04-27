@@ -5,7 +5,7 @@ Just like the dedicated <<search-aggregations-bucket-daterange-aggregation,date>
 
 Example:
 
-[source,console,id=ip-range-example]
+[source,js]
 --------------------------------------------------
 GET /ip_addresses/_search
 {
@@ -23,11 +23,12 @@ GET /ip_addresses/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:iprange]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...
@@ -54,7 +55,7 @@ Response:
 
 IP ranges can also be defined as CIDR masks:
 
-[source,console,id=ip-range-cidr-example]
+[source,js]
 --------------------------------------------------
 GET /ip_addresses/_search
 {
@@ -72,11 +73,12 @@ GET /ip_addresses/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:iprange]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...
@@ -107,7 +109,7 @@ Response:
 
 Setting the `keyed` flag to `true` will associate a unique string key with each bucket and return the ranges as a hash rather than an array:
 
-[source,console,id=ip-range-keyed-example]
+[source,js]
 --------------------------------------------------
 GET /ip_addresses/_search
 {
@@ -126,11 +128,12 @@ GET /ip_addresses/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:iprange]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...
@@ -155,7 +158,7 @@ Response:
 
 It is also possible to customize the key for each range:
 
-[source,console,id=ip-range-keyed-customized-keys-example]
+[source,js]
 --------------------------------------------------
 GET /ip_addresses/_search
 {
@@ -174,11 +177,12 @@ GET /ip_addresses/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:iprange]
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     ...

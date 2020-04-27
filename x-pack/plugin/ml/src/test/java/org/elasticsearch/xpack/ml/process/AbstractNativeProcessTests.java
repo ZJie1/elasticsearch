@@ -16,7 +16,6 @@ import org.junit.Before;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -58,8 +57,7 @@ public class AbstractNativeProcessTests extends ESTestCase {
         when(outputStream.read(new byte[512])).thenReturn(-1);
         restoreStream =  mock(OutputStream.class);
         onProcessCrash = mock(Consumer.class);
-        executorService = EsExecutors.newFixed("test", 1, 1, EsExecutors.daemonThreadFactory("test"), new ThreadContext(Settings.EMPTY),
-            false);
+        executorService = EsExecutors.newFixed("test", 1, 1, EsExecutors.daemonThreadFactory("test"), new ThreadContext(Settings.EMPTY));
     }
 
     @After
@@ -144,7 +142,7 @@ public class AbstractNativeProcessTests extends ESTestCase {
     private class TestNativeProcess extends AbstractNativeProcess {
 
         TestNativeProcess(OutputStream inputStream) {
-            super("foo", nativeController, logStream, inputStream, outputStream, restoreStream, 0, null, onProcessCrash, Duration.ZERO);
+            super("foo", nativeController, logStream, inputStream, outputStream, restoreStream, 0, null, onProcessCrash);
         }
 
         @Override

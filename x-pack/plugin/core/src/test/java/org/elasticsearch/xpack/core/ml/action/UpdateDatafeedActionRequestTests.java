@@ -45,7 +45,7 @@ public class UpdateDatafeedActionRequestTests extends AbstractSerializingTestCas
 
     @Override
     protected Request doParseInstance(XContentParser parser) {
-        return Request.parseRequest(datafeedId, null, parser);
+        return Request.parseRequest(datafeedId, parser);
     }
 
     @Override

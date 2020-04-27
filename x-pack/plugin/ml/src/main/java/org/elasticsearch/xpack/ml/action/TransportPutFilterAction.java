@@ -51,7 +51,7 @@ public class TransportPutFilterAction extends HandledTransportAction<PutFilterAc
         indexRequest.opType(DocWriteRequest.OpType.CREATE);
         indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
-            ToXContent.MapParams params = new ToXContent.MapParams(Collections.singletonMap(ToXContentParams.FOR_INTERNAL_STORAGE, "true"));
+            ToXContent.MapParams params = new ToXContent.MapParams(Collections.singletonMap(ToXContentParams.INCLUDE_TYPE, "true"));
             indexRequest.source(filter.toXContent(builder, params));
         } catch (IOException e) {
             throw new IllegalStateException("Failed to serialise filter with id [" + filter.getId() + "]", e);
@@ -67,7 +67,7 @@ public class TransportPutFilterAction extends HandledTransportAction<PutFilterAc
                     @Override
                     public void onFailure(Exception e) {
                         Exception reportedException;
-                        if (ExceptionsHelper.unwrapCause(e) instanceof VersionConflictEngineException) {
+                        if (e instanceof VersionConflictEngineException) {
                             reportedException = new ResourceAlreadyExistsException("A filter with id [" + filter.getId()
                                     + "] already exists");
                         } else {

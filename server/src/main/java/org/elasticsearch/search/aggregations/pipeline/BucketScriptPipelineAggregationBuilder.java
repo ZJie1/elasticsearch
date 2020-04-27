@@ -37,8 +37,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.Function;
 
-import static org.elasticsearch.common.xcontent.ConstructingObjectParser.constructorArg;
 import static org.elasticsearch.search.aggregations.pipeline.PipelineAggregator.Parser.BUCKETS_PATH;
 import static org.elasticsearch.search.aggregations.pipeline.PipelineAggregator.Parser.FORMAT;
 import static org.elasticsearch.search.aggregations.pipeline.PipelineAggregator.Parser.GAP_POLICY;
@@ -51,24 +51,31 @@ public class BucketScriptPipelineAggregationBuilder extends AbstractPipelineAggr
     private String format = null;
     private GapPolicy gapPolicy = GapPolicy.SKIP;
 
-    public static final ConstructingObjectParser<BucketScriptPipelineAggregationBuilder, String> PARSER = new ConstructingObjectParser<>(
-            NAME, false, (args, name) -> {
-                @SuppressWarnings("unchecked")
-                var bucketsPathsMap = (Map<String, String>) args[0];
-                return new BucketScriptPipelineAggregationBuilder(name, bucketsPathsMap, (Script) args[1]);
-            });
-    static {
-        PARSER.declareField(constructorArg(), BucketScriptPipelineAggregationBuilder::extractBucketPath,
-                BUCKETS_PATH_FIELD, ObjectParser.ValueType.OBJECT_ARRAY_OR_STRING);
-        Script.declareScript(PARSER, constructorArg());
+    private static final Function<String, ConstructingObjectParser<BucketScriptPipelineAggregationBuilder, Void>> PARSER
+        = name -> {
 
-        PARSER.declareString(BucketScriptPipelineAggregationBuilder::format, FORMAT);
-        PARSER.declareField(BucketScriptPipelineAggregationBuilder::gapPolicy, p -> {
+        @SuppressWarnings("unchecked")
+        ConstructingObjectParser<BucketScriptPipelineAggregationBuilder, Void> parser = new ConstructingObjectParser<>(
+            BucketScriptPipelineAggregationBuilder.NAME,
+            false,
+            o -> new BucketScriptPipelineAggregationBuilder(name, (Map<String, String>) o[0], (Script) o[1]));
+
+        parser.declareField(ConstructingObjectParser.constructorArg()
+            , BucketScriptPipelineAggregationBuilder::extractBucketPath
+            , BUCKETS_PATH_FIELD
+            , ObjectParser.ValueType.OBJECT_ARRAY_OR_STRING);
+        parser.declareField(ConstructingObjectParser.constructorArg(),
+            (p, c) -> Script.parse(p), Script.SCRIPT_PARSE_FIELD, ObjectParser.ValueType.OBJECT_OR_STRING);
+
+        parser.declareString(BucketScriptPipelineAggregationBuilder::format, FORMAT);
+        parser.declareField(BucketScriptPipelineAggregationBuilder::gapPolicy, p -> {
             if (p.currentToken() == XContentParser.Token.VALUE_STRING) {
                 return GapPolicy.parse(p.text().toLowerCase(Locale.ROOT), p.getTokenLocation());
             }
             throw new IllegalArgumentException("Unsupported token [" + p.currentToken() + "]");
         }, GAP_POLICY, ObjectParser.ValueType.STRING);
+
+        return parser;
     };
 
 
@@ -183,8 +190,8 @@ public class BucketScriptPipelineAggregationBuilder extends AbstractPipelineAggr
     }
 
     @Override
-    protected PipelineAggregator createInternal(Map<String, Object> metadata) {
-        return new BucketScriptPipelineAggregator(name, bucketsPathsMap, script, formatter(), gapPolicy, metadata);
+    protected PipelineAggregator createInternal(Map<String, Object> metaData) {
+        return new BucketScriptPipelineAggregator(name, bucketsPathsMap, script, formatter(), gapPolicy, metaData);
     }
 
     @Override
@@ -198,9 +205,8 @@ public class BucketScriptPipelineAggregationBuilder extends AbstractPipelineAggr
         return builder;
     }
 
-    @Override
-    protected void validate(ValidationContext context) {
-        context.validateHasParent(NAME, name);
+    public static BucketScriptPipelineAggregationBuilder parse(String aggName, XContentParser parser) {
+        return PARSER.apply(aggName).apply(parser, null);
     }
 
     @Override

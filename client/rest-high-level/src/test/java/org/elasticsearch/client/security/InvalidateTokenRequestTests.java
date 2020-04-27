@@ -32,7 +32,10 @@ public class InvalidateTokenRequestTests extends ESTestCase {
         final InvalidateTokenRequest request = InvalidateTokenRequest.accessToken(token);
         assertThat(request.getAccessToken(), equalTo(token));
         assertThat(request.getRefreshToken(), nullValue());
-        assertThat(Strings.toString(request), equalTo("{\"token\":\"Tf01rrAymdUjxMY4VlG3gV3gsFFUWxVVPrztX+4uhe0=\"}"));
+        assertThat(Strings.toString(request), equalTo("{" +
+            "\"token\":\"Tf01rrAymdUjxMY4VlG3gV3gsFFUWxVVPrztX+4uhe0=\"" +
+            "}"
+        ));
     }
 
     public void testInvalidateRefreshToken() {
@@ -40,7 +43,10 @@ public class InvalidateTokenRequestTests extends ESTestCase {
         final InvalidateTokenRequest request = InvalidateTokenRequest.refreshToken(token);
         assertThat(request.getAccessToken(), nullValue());
         assertThat(request.getRefreshToken(), equalTo(token));
-        assertThat(Strings.toString(request), equalTo("{\"refresh_token\":\"4rE0YPT/oHODS83TbTtYmuh8\"}"));
+        assertThat(Strings.toString(request), equalTo("{" +
+            "\"refresh_token\":\"4rE0YPT/oHODS83TbTtYmuh8\"" +
+            "}"
+        ));
     }
 
     public void testInvalidateRealmTokens() {
@@ -50,7 +56,10 @@ public class InvalidateTokenRequestTests extends ESTestCase {
         assertThat(request.getRefreshToken(), nullValue());
         assertThat(request.getRealmName(), equalTo(realmName));
         assertThat(request.getUsername(), nullValue());
-        assertThat(Strings.toString(request), equalTo("{\"realm_name\":\"native\"}"));
+        assertThat(Strings.toString(request), equalTo("{" +
+            "\"realm_name\":\"native\"" +
+            "}"
+        ));
     }
 
     public void testInvalidateUserTokens() {
@@ -60,7 +69,10 @@ public class InvalidateTokenRequestTests extends ESTestCase {
         assertThat(request.getRefreshToken(), nullValue());
         assertThat(request.getRealmName(), nullValue());
         assertThat(request.getUsername(), equalTo(username));
-        assertThat(Strings.toString(request), equalTo("{\"username\":\"user\"}"));
+        assertThat(Strings.toString(request), equalTo("{" +
+            "\"username\":\"user\"" +
+            "}"
+        ));
     }
 
     public void testInvalidateUserTokensInRealm() {
@@ -71,7 +83,12 @@ public class InvalidateTokenRequestTests extends ESTestCase {
         assertThat(request.getRefreshToken(), nullValue());
         assertThat(request.getRealmName(), equalTo(realmName));
         assertThat(request.getUsername(), equalTo(username));
-        assertThat(Strings.toString(request), equalTo("{\"realm_name\":\"native\",\"username\":\"user\"}"));
+        assertThat(Strings.toString(request), equalTo("{" +
+            "\"realm_name\":\"native\"," +
+            "\"username\":\"user\"" +
+
+            "}"
+        ));
     }
 
     public void testEqualsAndHashCode() {

@@ -25,5 +25,4 @@ import javax.ws.rs.ext.Provider;
 
 @Provider
 public class RestHighLevelJacksonJsonProvider extends ResteasyJackson2Provider {
-
 }

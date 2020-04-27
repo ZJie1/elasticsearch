@@ -5,41 +5,28 @@
 
 You can use the following APIs to perform {ml} {dfanalytics} activities.
 
-* <<put-dfanalytics,Create {dfanalytics-jobs}>>
+* <<put-dfanalytics,Create {dfanalytics-jobs}>> 
 * <<delete-dfanalytics,Delete {dfanalytics-jobs}>>
 * <<get-dfanalytics,Get {dfanalytics-jobs} info>>
 * <<get-dfanalytics-stats,Get {dfanalytics-jobs} statistics>>
 * <<start-dfanalytics,Start {dfanalytics-jobs}>>
 * <<stop-dfanalytics,Stop {dfanalytics-jobs}>>
 * <<evaluate-dfanalytics,Evaluate {dfanalytics}>>
-* <<explain-dfanalytics,Explain {dfanalytics}>>
+* <<estimate-memory-usage-dfanalytics,Estimate memory usage for {dfanalytics}>>
 
-
-You can use the following APIs to perform {infer} operations.
-
-* <<put-inference>>
-* <<get-inference>>
-* <<get-inference-stats>>
-* <<delete-inference>>
-
-
-See also <<ml-apis>>.
+See also <<ml-apis>>. 
 
 //CREATE
 include::put-dfanalytics.asciidoc[]
-include::put-inference.asciidoc[]
 //DELETE
 include::delete-dfanalytics.asciidoc[]
-include::delete-inference-trained-model.asciidoc[]
 //EVALUATE
 include::evaluate-dfanalytics.asciidoc[]
 //ESTIMATE_MEMORY_USAGE
-include::explain-dfanalytics.asciidoc[]
+include::estimate-memory-usage-dfanalytics.asciidoc[]
 //GET
 include::get-dfanalytics.asciidoc[]
 include::get-dfanalytics-stats.asciidoc[]
-include::get-inference-trained-model.asciidoc[]
-include::get-inference-trained-model-stats.asciidoc[]
 //SET/START/STOP
 include::start-dfanalytics.asciidoc[]
 include::stop-dfanalytics.asciidoc[]

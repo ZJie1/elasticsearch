@@ -35,8 +35,16 @@ public class ExplainRequestBuilder extends SingleShardOperationRequestBuilder<Ex
         super(client, action, new ExplainRequest());
     }
 
-    public ExplainRequestBuilder(ElasticsearchClient client, ExplainAction action, String index, String id) {
-        super(client, action, new ExplainRequest().index(index).id(id));
+    public ExplainRequestBuilder(ElasticsearchClient client, ExplainAction action, String index, String type, String id) {
+        super(client, action, new ExplainRequest().index(index).type(type).id(id));
+    }
+
+    /**
+     * Sets the type to get a score explanation for.
+     */
+    public ExplainRequestBuilder setType(String type) {
+        request().type(type);
+        return this;
     }
 
     /**

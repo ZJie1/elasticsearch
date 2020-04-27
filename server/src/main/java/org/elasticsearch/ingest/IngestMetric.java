@@ -22,8 +22,6 @@ package org.elasticsearch.ingest;
 import org.elasticsearch.common.metrics.CounterMetric;
 import org.elasticsearch.common.metrics.MeanMetric;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * <p>Metrics to measure ingest actions.
  * <p>This counts measure documents and timings for a given scope.
@@ -41,7 +39,7 @@ class IngestMetric {
      * The current count of things being measure. Should most likely ever be 0 or 1.
      * Useful when aggregating multiple metrics to see how many things are in flight.
      */
-    private final AtomicLong ingestCurrent = new AtomicLong();
+    private final CounterMetric ingestCurrent = new CounterMetric();
     /**
      * The ever increasing count of things being measured
      */
@@ -55,7 +53,7 @@ class IngestMetric {
      * Call this prior to the ingest action.
      */
     void preIngest() {
-        ingestCurrent.incrementAndGet();
+        ingestCurrent.inc();
     }
 
     /**
@@ -63,7 +61,7 @@ class IngestMetric {
      * @param ingestTimeInMillis The time it took to perform the action.
      */
     void postIngest(long ingestTimeInMillis) {
-        ingestCurrent.decrementAndGet();
+        ingestCurrent.dec();
         ingestTime.inc(ingestTimeInMillis);
         ingestCount.inc();
     }
@@ -92,6 +90,6 @@ class IngestMetric {
      * Creates a serializable representation for these metrics.
      */
     IngestStats.Stats createStats() {
-        return new IngestStats.Stats(ingestCount.count(), ingestTime.sum(), ingestCurrent.get(), ingestFailed.count());
+        return new IngestStats.Stats(ingestCount.count(), ingestTime.sum(), ingestCurrent.count(), ingestFailed.count());
     }
 }

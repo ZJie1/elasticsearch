@@ -18,16 +18,18 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.job.config.Job;
 import org.elasticsearch.client.ml.job.process.ModelSnapshot;
+
 
 import java.util.Objects;
 
 /**
  * Request to delete a Machine Learning Model Snapshot Job via its Job and Snapshot IDs
  */
-public class DeleteModelSnapshotRequest implements Validatable {
+public class DeleteModelSnapshotRequest extends ActionRequest {
 
     private final String jobId;
     private final String snapshotId;
@@ -43,6 +45,11 @@ public class DeleteModelSnapshotRequest implements Validatable {
 
     public String getSnapshotId() {
         return snapshotId;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+       return null;
     }
 
     @Override

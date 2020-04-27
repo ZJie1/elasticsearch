@@ -39,11 +39,11 @@ These functions support the following properties:
 * `over_field_name` (optional)
 * `partition_field_name` (optional)
 
-For more information about those properties, see the
-{ref}/ml-put-job.html#ml-put-job-request-body[create {anomaly-jobs} API].
+For more information about those properties,
+see {ref}/ml-job-resource.html#ml-detectorconfig[Detector configuration objects].
 
 .Example 1: Analyzing events with the count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example1
 {
@@ -58,6 +58,7 @@ PUT _ml/anomaly_detectors/example1
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 This example is probably the simplest possible analysis. It identifies
@@ -69,7 +70,7 @@ event rate and detects when the event rate is unusual compared to its past
 behavior.
 
 .Example 2: Analyzing errors with the high_count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example2
 {
@@ -86,6 +87,7 @@ PUT _ml/anomaly_detectors/example2
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 If you use this `high_count` function in a detector in your {anomaly-job}, it
@@ -94,7 +96,7 @@ unusually high count of error codes compared to other users.
 
 
 .Example 3: Analyzing status codes with the low_count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example3
 {
@@ -110,6 +112,7 @@ PUT _ml/anomaly_detectors/example3
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 In this example, the function detects when the count of events for a
@@ -120,7 +123,7 @@ event rate for each status code and detects when a status code has an unusually
 low count compared to its past behavior.
 
 .Example 4: Analyzing aggregated data with the count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example4
 {
@@ -136,6 +139,7 @@ PUT _ml/anomaly_detectors/example4
   }
 }  
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 If you are analyzing an aggregated `events_per_min` field, do not use a sum
@@ -164,8 +168,8 @@ These functions support the following properties:
 * `by_field_name` (optional)
 * `partition_field_name` (optional)
 
-For more information about those properties, see the
-{ref}/ml-put-job.html#ml-put-job-request-body[create {anomaly-jobs} API].
+For more information about those properties,
+see {ref}/ml-job-resource.html#ml-detectorconfig[Detector configuration objects].
 
 For example, if you have the following number of events per bucket:
 
@@ -184,7 +188,7 @@ The `non_zero_count` function models only the following data:
 ========================================
 
 .Example 5: Analyzing signatures with the high_non_zero_count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example5
 {
@@ -200,6 +204,7 @@ PUT _ml/anomaly_detectors/example5
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 If you use this `high_non_zero_count` function in a detector in your
@@ -233,11 +238,11 @@ These functions support the following properties:
 * `over_field_name` (optional)
 * `partition_field_name` (optional)
 
-For more information about those properties, see the
-{ref}/ml-put-job.html#ml-put-job-request-body[create {anomaly-jobs} API].
+For more information about those properties,
+see {ref}/ml-job-resource.html#ml-detectorconfig[Detector configuration objects].
 
 .Example 6: Analyzing users with the distinct_count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example6
 {
@@ -253,6 +258,7 @@ PUT _ml/anomaly_detectors/example6
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 This `distinct_count` function detects when a system has an unusual number
@@ -261,7 +267,7 @@ of logged in users. When you use this function in a detector in your
 distinct number of users is unusual compared to the past.
 
 .Example 7: Analyzing ports with the high_distinct_count function
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ml/anomaly_detectors/example7
 {
@@ -278,6 +284,7 @@ PUT _ml/anomaly_detectors/example7
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:needs-licence]
 
 This example detects instances of port scanning. When you use this function in a

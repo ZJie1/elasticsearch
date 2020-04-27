@@ -15,8 +15,6 @@ import org.elasticsearch.test.rest.FakeRestChannel;
 import org.elasticsearch.test.rest.FakeRestRequest;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.mockito.Mockito.mock;
@@ -27,11 +25,11 @@ import static org.mockito.Mockito.when;
 public class SecurityBaseRestHandlerTests extends ESTestCase {
 
     public void testSecurityBaseRestHandlerChecksLicenseState() throws Exception {
-        final boolean securityDefaultEnabled = randomBoolean();
+        final boolean securityDisabledByLicenseDefaults = randomBoolean();
         final AtomicBoolean consumerCalled = new AtomicBoolean(false);
         final XPackLicenseState licenseState = mock(XPackLicenseState.class);
         when(licenseState.isSecurityAvailable()).thenReturn(true);
-        when(licenseState.isSecurityEnabled()).thenReturn(securityDefaultEnabled);
+        when(licenseState.isSecurityDisabledByLicenseDefaults()).thenReturn(securityDisabledByLicenseDefaults);
         when(licenseState.getOperationMode()).thenReturn(
             randomFrom(License.OperationMode.BASIC, License.OperationMode.STANDARD, License.OperationMode.GOLD));
         SecurityBaseRestHandler handler = new SecurityBaseRestHandler(Settings.EMPTY, licenseState) {
@@ -39,11 +37,6 @@ public class SecurityBaseRestHandlerTests extends ESTestCase {
             @Override
             public String getName() {
                 return "test_xpack_security_base_action";
-            }
-
-            @Override
-            public List<Route> routes() {
-                return Collections.emptyList();
             }
 
             @Override
@@ -56,7 +49,7 @@ public class SecurityBaseRestHandlerTests extends ESTestCase {
             }
         };
         FakeRestRequest fakeRestRequest = new FakeRestRequest();
-        FakeRestChannel fakeRestChannel = new FakeRestChannel(fakeRestRequest, randomBoolean(), securityDefaultEnabled ? 0 : 1);
+        FakeRestChannel fakeRestChannel = new FakeRestChannel(fakeRestRequest, randomBoolean(), securityDisabledByLicenseDefaults ? 1 : 0);
         NodeClient client = mock(NodeClient.class);
 
         assertFalse(consumerCalled.get());
@@ -64,7 +57,7 @@ public class SecurityBaseRestHandlerTests extends ESTestCase {
         handler.handleRequest(fakeRestRequest, fakeRestChannel, client);
 
         verify(licenseState).isSecurityAvailable();
-        if (securityDefaultEnabled) {
+        if (securityDisabledByLicenseDefaults == false) {
             assertTrue(consumerCalled.get());
             assertEquals(0, fakeRestChannel.responses().get());
             assertEquals(0, fakeRestChannel.errors().get());

@@ -20,6 +20,9 @@
 package org.elasticsearch.cloud.azure.classic;
 
 public class AzureServiceRemoteException extends IllegalStateException {
+    public AzureServiceRemoteException(String msg) {
+        super(msg);
+    }
 
     public AzureServiceRemoteException(String msg, Throwable cause) {
         super(msg, cause);

@@ -18,7 +18,7 @@ The following search returns documents that contain phrases beginning with
 This search would match a `message` value of `quick brown fox` or `two quick
 brown ferrets` but not `the fox is quick and brown`.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -31,6 +31,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 
 [[match-phrase-prefix-top-level-params]]

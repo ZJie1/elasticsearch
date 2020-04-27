@@ -24,9 +24,10 @@ privilege.
 [[security-api-put-role-desc]]
 ==== {api-description-title}
 
-The role management APIs are generally the preferred way to manage roles, rather than using
-<<roles-management-file,file-based role management>>. The create
-or update roles API cannot update roles that are defined in roles files.
+The role API is generally the preferred way to manage roles, rather than using
+file-based role management. For more information about the native realm, see 
+{stack-ov}/realms.html[Realms] and <<configuring-native-realm>>. 
+
 
 [[security-api-put-role-path-params]]
 ==== {api-path-parms-title}
@@ -58,7 +59,7 @@ This field is optional.
 `indices`:: (list) A list of indices permissions entries.
 `field_security`::: (list) The document fields that the owners of the role have
 read access to. For more information, see
-<<field-and-document-access-control>>.
+{stack-ov}/field-and-document-access-control.html[Setting up field and document level security].
 `names` (required)::: (list) A list of indices (or index name patterns) to which the
 permissions in this entry apply.
 `privileges`(required)::: (list) The index level privileges that the owners of the role
@@ -72,16 +73,16 @@ that begin with `_` are reserved for system usage.
 
 `run_as`:: (list) A list of users that the owners of this role can impersonate.
 For more information, see
-<<run-as-privilege>>.
+{stack-ov}/run-as-privilege.html[Submitting requests on behalf of other users].
 
-For more information, see <<defining-roles>>.
+For more information, see {stack-ov}/defining-roles.html[Defining roles].
 
 [[security-api-put-role-example]]
 ==== {api-examples-title}
 
 The following example adds a role called `my_admin_role`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /_security/role/my_admin_role
 {
@@ -109,11 +110,12 @@ POST /_security/role/my_admin_role
   }
 }
 --------------------------------------------------
+// CONSOLE
 
 A successful call returns a JSON structure that shows whether the role has been
 created or updated.
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "role": {
@@ -121,5 +123,5 @@ created or updated.
   }
 }
 --------------------------------------------------
-
+// TESTRESPONSE
 <1> When an existing role is updated, `created` is set to false.

@@ -38,10 +38,11 @@ import org.elasticsearch.search.aggregations.AggregatorFactory;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder.ScriptField;
 import org.elasticsearch.search.fetch.StoredFieldsContext;
-import org.elasticsearch.search.fetch.subphase.FetchDocValuesContext.FieldAndFormat;
+import org.elasticsearch.search.fetch.subphase.DocValueFieldsContext.FieldAndFormat;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.elasticsearch.search.fetch.subphase.ScriptFieldsContext;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.search.sort.ScoreSortBuilder;
 import org.elasticsearch.search.sort.SortAndFormats;
 import org.elasticsearch.search.sort.SortBuilder;
@@ -79,8 +80,8 @@ public class TopHitsAggregationBuilder extends AbstractAggregationBuilder<TopHit
     }
 
     protected TopHitsAggregationBuilder(TopHitsAggregationBuilder clone,
-                                        Builder factoriesBuilder, Map<String, Object> metadata) {
-        super(clone, factoriesBuilder, metadata);
+                                        Builder factoriesBuilder, Map<String, Object> metaData) {
+        super(clone, factoriesBuilder, metaData);
         this.from = clone.from;
         this.size = clone.size;
         this.explain = clone.explain;
@@ -100,8 +101,8 @@ public class TopHitsAggregationBuilder extends AbstractAggregationBuilder<TopHit
     }
 
     @Override
-    protected AggregationBuilder shallowCopy(Builder factoriesBuilder, Map<String, Object> metadata) {
-        return new TopHitsAggregationBuilder(this, factoriesBuilder, metadata);
+    protected AggregationBuilder shallowCopy(Builder factoriesBuilder, Map<String, Object> metaData) {
+        return new TopHitsAggregationBuilder(this, factoriesBuilder, metaData);
     }
 
     /**
@@ -571,15 +572,10 @@ public class TopHitsAggregationBuilder extends AbstractAggregationBuilder<TopHit
     }
 
     @Override
-    public BucketCardinality bucketCardinality() {
-        return BucketCardinality.NONE;
-    }
-
-    @Override
-    protected TopHitsAggregatorFactory doBuild(QueryShardContext queryShardContext, AggregatorFactory parent, Builder subfactoriesBuilder)
+    protected TopHitsAggregatorFactory doBuild(SearchContext context, AggregatorFactory parent, Builder subfactoriesBuilder)
             throws IOException {
         long innerResultWindow = from() + size();
-        int maxInnerResultWindow = queryShardContext.getMapperService().getIndexSettings().getMaxInnerResultWindow();
+        int maxInnerResultWindow = context.mapperService().getIndexSettings().getMaxInnerResultWindow();
         if (innerResultWindow > maxInnerResultWindow) {
             throw new IllegalArgumentException(
                 "Top hits result window is too large, the top hits aggregator [" + name + "]'s from + size must be less " +
@@ -592,8 +588,9 @@ public class TopHitsAggregationBuilder extends AbstractAggregationBuilder<TopHit
         List<ScriptFieldsContext.ScriptField> fields = new ArrayList<>();
         if (scriptFields != null) {
             for (ScriptField field : scriptFields) {
-                FieldScript.Factory factory = queryShardContext.compile(field.script(), FieldScript.CONTEXT);
-                FieldScript.LeafFactory searchScript = factory.newFactory(field.script().getParams(), queryShardContext.lookup());
+                QueryShardContext shardContext = context.getQueryShardContext();
+                FieldScript.Factory factory = shardContext.getScriptService().compile(field.script(), FieldScript.CONTEXT);
+                FieldScript.LeafFactory searchScript = factory.newFactory(field.script().getParams(), shardContext.lookup());
                 fields.add(new org.elasticsearch.search.fetch.subphase.ScriptFieldsContext.ScriptField(
                     field.fieldName(), searchScript, field.ignoreFailure()));
             }
@@ -603,11 +600,11 @@ public class TopHitsAggregationBuilder extends AbstractAggregationBuilder<TopHit
         if (sorts == null) {
             optionalSort = Optional.empty();
         } else {
-            optionalSort = SortBuilder.buildSort(sorts, queryShardContext);
+            optionalSort = SortBuilder.buildSort(sorts, context.getQueryShardContext());
         }
         return new TopHitsAggregatorFactory(name, from, size, explain, version, seqNoAndPrimaryTerm, trackScores, optionalSort,
-            highlightBuilder, storedFieldsContext, docValueFields, fields, fetchSourceContext, queryShardContext, parent,
-            subfactoriesBuilder, metadata);
+            highlightBuilder, storedFieldsContext, docValueFields, fields, fetchSourceContext, context, parent, subfactoriesBuilder,
+            metaData);
     }
 
     @Override

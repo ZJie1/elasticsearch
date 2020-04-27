@@ -6,43 +6,34 @@
 package org.elasticsearch.xpack.core.ml.dataframe.evaluation.softclassification;
 
 import org.elasticsearch.common.ParseField;
-import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.Aggregations;
-import org.elasticsearch.search.aggregations.PipelineAggregationBuilder;
-import org.elasticsearch.xpack.core.ml.dataframe.evaluation.EvaluationMetric;
-import org.elasticsearch.xpack.core.ml.dataframe.evaluation.EvaluationMetricResult;
-import org.elasticsearch.xpack.core.ml.dataframe.evaluation.EvaluationParameters;
 import org.elasticsearch.xpack.core.ml.utils.ExceptionsHelper;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
-import static org.elasticsearch.xpack.core.ml.dataframe.evaluation.softclassification.BinarySoftClassification.actualIsTrueQuery;
-
-abstract class AbstractConfusionMatrixMetric implements EvaluationMetric {
+abstract class AbstractConfusionMatrixMetric implements SoftClassificationMetric {
 
     public static final ParseField AT = new ParseField("at");
 
     protected final double[] thresholds;
-    private EvaluationMetricResult result;
 
-    protected AbstractConfusionMatrixMetric(List<Double> at) {
-        this.thresholds = ExceptionsHelper.requireNonNull(at, AT).stream().mapToDouble(Double::doubleValue).toArray();
+    protected AbstractConfusionMatrixMetric(double[] thresholds) {
+        this.thresholds = ExceptionsHelper.requireNonNull(thresholds, AT);
         if (thresholds.length == 0) {
-            throw ExceptionsHelper.badRequestException("[" + getName() + "." + AT.getPreferredName() + "] must have at least one value");
+            throw ExceptionsHelper.badRequestException("[" + getMetricName() + "." + AT.getPreferredName()
+                + "] must have at least one value");
         }
         for (double threshold : thresholds) {
             if (threshold < 0 || threshold > 1.0) {
-                throw ExceptionsHelper.badRequestException("[" + getName() + "." + AT.getPreferredName()
+                throw ExceptionsHelper.badRequestException("[" + getMetricName() + "." + AT.getPreferredName()
                     + "] values must be in [0.0, 1.0]");
             }
         }
@@ -66,62 +57,46 @@ abstract class AbstractConfusionMatrixMetric implements EvaluationMetric {
     }
 
     @Override
-    public Tuple<List<AggregationBuilder>, List<PipelineAggregationBuilder>> aggs(EvaluationParameters parameters,
-                                                                                  String actualField,
-                                                                                  String predictedProbabilityField) {
-        if (result != null) {
-            return Tuple.tuple(List.of(), List.of());
+    public final List<AggregationBuilder> aggs(String actualField, List<ClassInfo> classInfos) {
+        List<AggregationBuilder> aggs = new ArrayList<>();
+        for (double threshold : thresholds) {
+            aggs.addAll(aggsAt(actualField, classInfos, threshold));
         }
-        return Tuple.tuple(aggsAt(actualField, predictedProbabilityField), List.of());
+        return aggs;
     }
 
-    @Override
-    public void process(Aggregations aggs) {
-        result = evaluate(aggs);
+    protected abstract List<AggregationBuilder> aggsAt(String labelField, List<ClassInfo> classInfos, double threshold);
+
+    protected enum Condition {
+        TP, FP, TN, FN;
     }
 
-    @Override
-    public Optional<EvaluationMetricResult> getResult() {
-        return Optional.ofNullable(result);
+    protected String aggName(ClassInfo classInfo, double threshold, Condition condition) {
+        return getMetricName() + "_" + classInfo.getName() + "_at_" + threshold + "_" + condition.name();
     }
 
-    protected abstract List<AggregationBuilder> aggsAt(String actualField, String predictedProbabilityField);
-
-    protected abstract EvaluationMetricResult evaluate(Aggregations aggs);
-
-    enum Condition {
-        TP(true, true),
-        FP(false, true),
-        TN(false, false),
-        FN(true, false);
-
-        final boolean actual;
-        final boolean predicted;
-
-        Condition(boolean actual, boolean predicted) {
-            this.actual = actual;
-            this.predicted = predicted;
-        }
-    }
-
-    protected String aggName(double threshold, Condition condition) {
-        return getName() + "_at_" + threshold + "_" + condition.name();
-    }
-
-    protected AggregationBuilder buildAgg(String actualField, String predictedProbabilityField, double threshold, Condition condition) {
+    protected AggregationBuilder buildAgg(ClassInfo classInfo, double threshold, Condition condition) {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        QueryBuilder actualIsTrueQuery = actualIsTrueQuery(actualField);
-        QueryBuilder predictedIsTrueQuery = QueryBuilders.rangeQuery(predictedProbabilityField).gte(threshold);
-        if (condition.actual) {
-            boolQuery.must(actualIsTrueQuery);
-        } else {
-            boolQuery.mustNot(actualIsTrueQuery);
+        switch (condition) {
+            case TP:
+                boolQuery.must(classInfo.matchingQuery());
+                boolQuery.must(QueryBuilders.rangeQuery(classInfo.getProbabilityField()).gte(threshold));
+                break;
+            case FP:
+                boolQuery.mustNot(classInfo.matchingQuery());
+                boolQuery.must(QueryBuilders.rangeQuery(classInfo.getProbabilityField()).gte(threshold));
+                break;
+            case TN:
+                boolQuery.mustNot(classInfo.matchingQuery());
+                boolQuery.must(QueryBuilders.rangeQuery(classInfo.getProbabilityField()).lt(threshold));
+                break;
+            case FN:
+                boolQuery.must(classInfo.matchingQuery());
+                boolQuery.must(QueryBuilders.rangeQuery(classInfo.getProbabilityField()).lt(threshold));
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown enum value: " + condition);
         }
-        if (condition.predicted) {
-            boolQuery.must(predictedIsTrueQuery);
-        } else {
-            boolQuery.mustNot(predictedIsTrueQuery);
-        }
-        return AggregationBuilders.filter(aggName(threshold, condition), boolQuery);
+        return AggregationBuilders.filter(aggName(classInfo, threshold, condition), boolQuery);
     }
 }

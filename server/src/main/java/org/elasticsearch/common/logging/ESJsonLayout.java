@@ -50,7 +50,7 @@ import java.util.Set;
  * <li>component - logger name, most of the times class name</li>
  * <li>cluster.name - taken from sys:es.logs.cluster_name system property because it is always set</li>
  * <li>node.name - taken from NodeNamePatternConverter, as it can be set in runtime as hostname when not set in elasticsearch.yml</li>
- * <li>node_and_cluster_id - in json as node.id and cluster.uuid - taken from NodeIdConverter and present
+ * <li>node_and_cluster_id - in json as node.id and cluster.uuid - taken from NodeAndClusterIdConverter and present
  * once clusterStateUpdate is first received</li>
  * <li>message - a json escaped message. Multiline messages will be converted to single line with new line explicitly
  * replaced to \n</li>
@@ -58,33 +58,29 @@ import java.util.Set;
  * Taken from JsonThrowablePatternConverter</li>
  * </ul>
  * <p>
- * It is possible to add more field by  using {@link ESLogMessage#with} method which allow adding key value pairs
- * or override field with <code>overrideFields</code>
- * <code>appender.logger.layout.overrideFields=message</code>.
- * In the example above the pattern will be <code>... "message":  %OverrideField{message} ...</code>
- * the message passed to a logger will be overridden with a value from %OverrideField{message}
- * Once an appender is defined to be overriding a field, all the log events should contain this field.
+ * It is possible to add more or override them with <code>esmessagefield</code>
+ * <code>appender.logger.layout.esmessagefields=message,took,took_millis,total_hits,types,stats,search_type,total_shards,source,id</code>
+ * Each of these will be expanded into a json field with a value taken {@link ESLogMessage} field. In the example above
+ * <code>... "message":  %ESMessageField{message}, "took": %ESMessageField{took} ...</code>
+ * the message passed to a logger will be overriden with a value from %ESMessageField{message}
  * <p>
- * The value taken from ESLogMessage has to be a simple escaped JSON value.
- * @deprecated ECSJsonlayout should be used as JSON logs layout
+ * The value taken from %ESMessageField{message} has to be a simple escaped JSON value and is populated in subclasses of
+ * <code>ESLogMessage</code>
  */
-@Deprecated(since = "v8")
 @Plugin(name = "ESJsonLayout", category = Node.CATEGORY, elementType = Layout.ELEMENT_TYPE, printObject = true)
 public class ESJsonLayout extends AbstractStringLayout {
 
     private final PatternLayout patternLayout;
-    private String esmessagefields;
 
-    protected ESJsonLayout(String typeName, Charset charset, String[] overrideFields) {
+    protected ESJsonLayout(String typeName, Charset charset, String[] esmessagefields) {
         super(charset);
-        this.esmessagefields = String.join(",",overrideFields);
         this.patternLayout = PatternLayout.newBuilder()
-                                          .withPattern(pattern(typeName, overrideFields))
+                                          .withPattern(pattern(typeName, esmessagefields))
                                           .withAlwaysWriteExceptions(false)
                                           .build();
     }
 
-    private String pattern(String type, String[] esmessagefields) {
+    private String pattern(String type, String[] esMessageFields) {
         if (Strings.isEmpty(type)) {
             throw new IllegalArgumentException("layout parameter 'type_name' cannot be empty");
         }
@@ -97,24 +93,26 @@ public class ESJsonLayout extends AbstractStringLayout {
         map.put("node.name", inQuotes("%node_name"));
         map.put("message", inQuotes("%notEmpty{%enc{%marker}{JSON} }%enc{%.-10000m}{JSON}"));
 
-
-        // esmessagefields are treated as potentially overriding
-        for (String key : esmessagefields) {
-            map.remove(key);
+        for (String key : esMessageFields) {
+            map.put(key, inQuotes("%ESMessageField{" + key + "}"));
         }
 
-        return createPattern(map, Set.of(esmessagefields));
+        return createPattern(map, Set.of(esMessageFields));
     }
 
 
-    private String createPattern(Map<String, Object> map, Set<String> esmessagefields) {
+    private String createPattern(Map<String, Object> map, Set<String> esMessageFields) {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
         String separator = "";
         for (Map.Entry<String, Object> entry : map.entrySet()) {
 
-            // fields present in esmessagefields are meant to be provided in CustomMapFields
-            if (esmessagefields.contains(entry.getKey()) == false) {
+            if (esMessageFields.contains(entry.getKey())) {
+                sb.append("%notEmpty{");
+                sb.append(separator);
+                appendField(sb, entry);
+                sb.append("}");
+            } else {
                 sb.append(separator);
                 appendField(sb, entry);
             }
@@ -122,7 +120,6 @@ public class ESJsonLayout extends AbstractStringLayout {
             separator = ", ";
         }
         sb.append(notEmpty(", %node_and_cluster_id "));
-        sb.append(notEmpty(", %CustomMapFields "));
         sb.append("%exceptionAsJson ");
         sb.append("}");
         sb.append(System.lineSeparator());
@@ -150,8 +147,8 @@ public class ESJsonLayout extends AbstractStringLayout {
     @PluginFactory
     public static ESJsonLayout createLayout(String type,
                                             Charset charset,
-                                            String[] overrideFields) {
-        return new ESJsonLayout(type, charset, overrideFields);
+                                            String[] esmessagefields) {
+        return new ESJsonLayout(type, charset, esmessagefields);
     }
 
     PatternLayout getPatternLayout() {
@@ -168,7 +165,7 @@ public class ESJsonLayout extends AbstractStringLayout {
         Charset charset;
 
         @PluginAttribute("esmessagefields")
-        private String overrideFields;
+        private String esMessageFields;
 
         public Builder() {
             setCharset(StandardCharsets.UTF_8);
@@ -176,7 +173,7 @@ public class ESJsonLayout extends AbstractStringLayout {
 
         @Override
         public ESJsonLayout build() {
-            String[] split = Strings.isNullOrEmpty(overrideFields) ? new String[]{} : overrideFields.split(",");
+            String[] split = Strings.isNullOrEmpty(esMessageFields) ? new String[]{} : esMessageFields.split(",");
             return ESJsonLayout.createLayout(type, charset, split);
         }
 
@@ -198,12 +195,12 @@ public class ESJsonLayout extends AbstractStringLayout {
             return asBuilder();
         }
 
-        public String getOverrideFields() {
-            return overrideFields;
+        public String getESMessageFields() {
+            return esMessageFields;
         }
 
-        public B setOverrideFields(String overrideFields) {
-            this.overrideFields = overrideFields;
+        public B setESMessageFields(String esmessagefields) {
+            this.esMessageFields = esmessagefields;
             return asBuilder();
         }
     }

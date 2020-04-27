@@ -70,7 +70,7 @@
   - do:
       indices.get_alias:
         name: ".ml-anomalies-.write-job-crud-test-apis"
-  - match: { \.ml-anomalies-shared.aliases.\.ml-anomalies-\.write-job-crud-test-apis: { is_hidden: true } }
+  - match: { \.ml-anomalies-shared.aliases.\.ml-anomalies-\.write-job-crud-test-apis: {} }
 
   - do:
       ml.delete_job:
@@ -113,9 +113,8 @@
   - match: { analysis_limits.model_memory_limit: "2048mb" }
 
 ---
-"Test put job with model_memory_limit as string and lazy open":
-  - skip:
-      features: headers
+"Test put job with model_memory_limit as string":
+
   - do:
       ml.put_job:
         job_id: job-model-memory-limit-as-string
@@ -127,43 +126,11 @@
             "data_description" : {
             },
             "analysis_limits": {
-                "model_memory_limit": "3000g"
-            },
-            "allow_lazy_open": true
+                "model_memory_limit": "3g"
+            }
           }
   - match: { job_id: "job-model-memory-limit-as-string" }
-  - match: { analysis_limits.model_memory_limit: "3072000mb" }
-
-  # The assumption here is that a 3000GB job will not fit on the test
-  # node - increase in future if the test ever fails because of this!
-  # But because the job is allowed to open lazily, opening it shouldn't
-  # throw an exception - it should wait for a big enough node to be
-  # added to the cluster.
-  - do:
-      ml.open_job:
-        job_id: job-model-memory-limit-as-string
-  - match: { opened: true }
-  - match: { node: "" }
-
-  - do:
-      headers:
-        Authorization: "Basic eF9wYWNrX3Jlc3RfdXNlcjp4LXBhY2stdGVzdC1wYXNzd29yZA==" # run as x_pack_rest_user, i.e. the test setup superuser
-      ml.get_job_stats:
-        job_id: job-model-memory-limit-as-string
-  - match: {"jobs.0.state": opening}
-
-  # Despite never being assigned to a node the job should close gracefully
-  - do:
-      ml.close_job:
-        job_id: job-model-memory-limit-as-string
-  - match: { closed: true }
-
-  - do:
-      headers:
-        Authorization: "Basic eF9wYWNrX3Jlc3RfdXNlcjp4LXBhY2stdGVzdC1wYXNzd29yZA==" # run as x_pack_rest_user, i.e. the test setup superuser
-      ml.get_job_stats:
-        job_id: job-model-memory-limit-as-string
-  - match: {"jobs.0.state": closed}
+  - match: { analysis_limits.model_memory_limit: "3072mb" }
 
 ---
 "Test get job API with non existing job id":
@@ -471,8 +438,7 @@
           model_bytes: 10000000
 
   - do:
-      indices.refresh:
-        expand_wildcards: all
+      indices.refresh: {}
 
   - do:
       catch: /Invalid update value for analysis_limits[:] model_memory_limit cannot be decreased below current usage; current usage \[9mb\], update had \[5mb\]/
@@ -564,7 +530,6 @@
       ml.open_job:
         job_id: delete-opened-job
   - match: { opened: true }
-  - match: { node: /\S+/ }
 
   - do:
       catch: /Cannot delete job \[delete-opened-job\] because the job is opened/
@@ -923,14 +888,13 @@
 
   - do:
       index:
-        index: .ml-state-000001
+        index: .ml-state
         id: jobs-crud-existing-docs_categorizer_state#1
         body:
           key: value
 
   - do:
-      indices.refresh:
-        expand_wildcards: all
+      indices.refresh: {}
 
   - do:
       catch: /status_exception/
@@ -951,14 +915,13 @@
 
   - do:
       index:
-        index: .ml-state-000001
+        index: .ml-state
         id: jobs-crud-existing-docs_quantiles
         body:
           key: value
 
   - do:
-      indices.refresh:
-        expand_wildcards: all
+      indices.refresh: {}
 
   - do:
       catch: /status_exception/
@@ -995,8 +958,7 @@
           }
 
   - do:
-      indices.refresh:
-        expand_wildcards: all
+      indices.refresh: {}
 
   - do:
       catch: /status_exception/
@@ -1132,14 +1094,14 @@
 
   - do:
       indices.create:
-        index: ".ml-state-000001"
+        index: ".ml-state"
 
   - do:
       indices.close:
-        index: ".ml-state-000001"
+        index: ".ml-state"
 
   - do:
-      catch: /Cannot create job \[closed-results-job\] as it requires closed index \[\.ml-state-000001\]/
+      catch: /Cannot create job \[closed-results-job\] as it requires closed index \[\.ml-state\]/
       ml.put_job:
         job_id: closed-results-job
         body:  >
@@ -1431,7 +1393,7 @@
   - match: { job_id: "persistent-task-allocation-allowed-test" }
 
   - do:
-      catch: /Cannot open jobs because persistent task assignment is disabled by the \[cluster.persistent_tasks.allocation.enable\] setting/
+      catch: /no persistent task assignments are allowed due to cluster settings/
       ml.open_job:
         job_id: persistent-task-allocation-allowed-test
 
@@ -1448,7 +1410,6 @@
       ml.open_job:
         job_id: persistent-task-allocation-allowed-test
   - match: { opened: true }
-  - match: { node: /\S+/ }
 
 ---
 "Test reopen job resets the finished time":

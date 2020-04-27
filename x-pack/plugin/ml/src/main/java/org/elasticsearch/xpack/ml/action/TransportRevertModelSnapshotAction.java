@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.ml.action;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.elasticsearch.ResourceNotFoundException;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ActionFilters;
@@ -20,7 +18,7 @@ import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.persistent.PersistentTasksCustomMetadata;
+import org.elasticsearch.persistent.PersistentTasksCustomMetaData;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
@@ -43,8 +41,6 @@ import java.util.function.Consumer;
 
 public class TransportRevertModelSnapshotAction extends TransportMasterNodeAction<RevertModelSnapshotAction.Request,
         RevertModelSnapshotAction.Response> {
-
-    private static final Logger logger = LogManager.getLogger(TransportRevertModelSnapshotAction.class);
 
     private final Client client;
     private final JobManager jobManager;
@@ -91,7 +87,7 @@ public class TransportRevertModelSnapshotAction extends TransportMasterNodeActio
         // 3. Revert the state
         ActionListener<Boolean> jobExistsListener = ActionListener.wrap(
             exists -> {
-                PersistentTasksCustomMetadata tasks = state.getMetadata().custom(PersistentTasksCustomMetadata.TYPE);
+                PersistentTasksCustomMetaData tasks = state.getMetaData().custom(PersistentTasksCustomMetaData.TYPE);
                 JobState jobState = MlTasks.getJobState(request.getJobId(), tasks);
 
                 if (jobState.equals(JobState.CLOSED) == false) {
@@ -118,7 +114,7 @@ public class TransportRevertModelSnapshotAction extends TransportMasterNodeActio
         );
 
         // 1. Verify/Create the state index and its alias exists
-        AnomalyDetectorsIndex.createStateIndexAndAliasIfNecessary(client, state, indexNameExpressionResolver, createStateIndexListener);
+        AnomalyDetectorsIndex.createStateIndexAndAliasIfNecessary(client, state, createStateIndexListener);
     }
 
     private void getModelSnapshot(RevertModelSnapshotAction.Request request, JobResultsProvider provider, Consumer<ModelSnapshot> handler,
@@ -171,7 +167,7 @@ public class TransportRevertModelSnapshotAction extends TransportMasterNodeActio
         return ActionListener.wrap(response -> {
             jobResultsProvider.dataCounts(jobId, counts -> {
                 counts.setLatestRecordTimeStamp(modelSnapshot.getLatestRecordTimeStamp());
-                jobDataCountsPersister.persistDataCountsAsync(jobId, counts, new ActionListener<Boolean>() {
+                jobDataCountsPersister.persistDataCounts(jobId, counts, new ActionListener<Boolean>() {
                     @Override
                     public void onResponse(Boolean aBoolean) {
                         listener.onResponse(response);

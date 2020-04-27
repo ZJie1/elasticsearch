@@ -19,10 +19,12 @@
 
 package org.elasticsearch.analysis.common;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterIterator;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.index.IndexSettings;
@@ -50,6 +52,9 @@ import static org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter.SPLIT
 import static org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter.STEM_ENGLISH_POSSESSIVE;
 
 public class WordDelimiterTokenFilterFactory extends AbstractTokenFilterFactory {
+
+    private static final DeprecationLogger DEPRECATION_LOGGER =
+        new DeprecationLogger(LogManager.getLogger(WordDelimiterTokenFilterFactory.class));
 
     private final byte[] charTypeTable;
     private final int flags;

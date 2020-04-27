@@ -20,7 +20,6 @@
 package org.elasticsearch.common.logging;
 
 import org.elasticsearch.common.SuppressForbidden;
-import org.elasticsearch.common.xcontent.ObjectParser;
 import org.elasticsearch.test.rest.ESRestTestCase;
 
 import java.io.BufferedReader;
@@ -30,9 +29,8 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.stream.Stream;
 
-import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.isEmptyOrNullString;
 import static org.hamcrest.Matchers.not;
 
 /**
@@ -71,18 +69,18 @@ public abstract class JsonLogsIntegTestCase extends ESRestTestCase {
         JsonLogLine firstLine = findFirstLine();
         assertNotNull(firstLine);
 
-        try (Stream<JsonLogLine> stream = JsonLogsStream.from(openReader(getLogFile()), getParser() )) {
+        try (Stream<JsonLogLine> stream = JsonLogsStream.from(openReader(getLogFile()))) {
             stream.limit(LINES_TO_CHECK)
                   .forEach(jsonLogLine -> {
-                      assertThat(jsonLogLine.getType(), is(not(emptyOrNullString())));
-                      assertThat(jsonLogLine.getTimestamp(), is(not(emptyOrNullString())));
-                      assertThat(jsonLogLine.getLevel(), is(not(emptyOrNullString())));
-                      assertThat(jsonLogLine.getComponent(), is(not(emptyOrNullString())));
-                      assertThat(jsonLogLine.getMessage(), is(not(emptyOrNullString())));
+                      assertThat(jsonLogLine.type(), not(isEmptyOrNullString()));
+                      assertThat(jsonLogLine.timestamp(), not(isEmptyOrNullString()));
+                      assertThat(jsonLogLine.level(), not(isEmptyOrNullString()));
+                      assertThat(jsonLogLine.component(), not(isEmptyOrNullString()));
+                      assertThat(jsonLogLine.message(), not(isEmptyOrNullString()));
 
                       // all lines should have the same nodeName and clusterName
-                      assertThat(jsonLogLine.getNodeName(), nodeNameMatcher());
-                      assertThat(jsonLogLine.getClusterName(), equalTo(firstLine.getClusterName()));
+                      assertThat(jsonLogLine.nodeName(), nodeNameMatcher());
+                      assertThat(jsonLogLine.clusterName(), equalTo(firstLine.clusterName()));
                   });
         }
     }
@@ -101,7 +99,7 @@ public abstract class JsonLogsIntegTestCase extends ESRestTestCase {
             JsonLogLine firstLine = null;
             while (iterator.hasNext()) {
                 JsonLogLine jsonLogLine = iterator.next();
-                if (jsonLogLine.getNodeId() != null) {
+                if (jsonLogLine.nodeId() != null) {
                     firstLine = jsonLogLine;
                 }
             }
@@ -112,28 +110,20 @@ public abstract class JsonLogsIntegTestCase extends ESRestTestCase {
             int i = 0;
             while (iterator.hasNext() && i++ < LINES_TO_CHECK) {
                 JsonLogLine jsonLogLine = iterator.next();
-                assertThat(jsonLogLine.getNodeId(), equalTo(firstLine.getNodeId()));
-                assertThat(jsonLogLine.getClusterUuid(), equalTo(firstLine.getClusterUuid()));
+                assertThat(jsonLogLine.nodeId(), equalTo(firstLine.nodeId()));
+                assertThat(jsonLogLine.clusterUuid(), equalTo(firstLine.clusterUuid()));
             }
         }
     }
 
     @SuppressForbidden(reason = "PathUtils doesn't have permission to read this file")
     private Path getLogFile() {
-        String logFileString = getLogFileName();
+        String logFileString = System.getProperty("tests.logfile");
         if (logFileString == null) {
             fail("tests.logfile must be set to run this test. It is automatically "
                 + "set by gradle. If you must set it yourself then it should be the absolute path to the "
                 + "log file.");
         }
         return Paths.get(logFileString);
-    }
-
-    protected String getLogFileName() {
-        return System.getProperty("tests.logfile");
-    }
-
-    protected ObjectParser<JsonLogLine, Void> getParser() {
-        return JsonLogLine.ECS_LOG_LINE;
     }
 }

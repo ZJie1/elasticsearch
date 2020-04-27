@@ -221,6 +221,11 @@ teardown:
 ---
 "Attempt to open job when upgrade_mode is enabled":
   - do:
+      ml.set_upgrade_mode:
+        enabled: true
+  - match: { acknowledged: true }
+
+  - do:
       ml.put_job:
         job_id: failing-set-upgrade-mode-job
         body:  >
@@ -238,11 +243,6 @@ teardown:
           }
 
   - do:
-      ml.set_upgrade_mode:
-        enabled: true
-  - match: { acknowledged: true }
-
-  - do:
-      catch: /Cannot perform cluster:admin/xpack/ml/job/open action while upgrade mode is enabled/
+      catch: /Cannot open jobs when upgrade mode is enabled/
       ml.open_job:
         job_id: failing-set-upgrade-mode-job

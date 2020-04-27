@@ -3,7 +3,6 @@
 :request: GetCategoriesRequest
 :response: GetCategoriesResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
 === Get categories API
 

@@ -6,7 +6,6 @@
 
 package org.elasticsearch.xpack.core.spatial;
 
-import org.elasticsearch.Version;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.xpack.core.XPackFeatureSet;
@@ -23,11 +22,6 @@ public class SpatialFeatureSetUsage extends XPackFeatureSet.Usage {
 
     public SpatialFeatureSetUsage(StreamInput input) throws IOException {
         super(input);
-    }
-
-    @Override
-    public Version getMinimalSupportedVersion() {
-        return Version.V_7_4_0;
     }
 
     @Override

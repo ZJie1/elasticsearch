@@ -27,8 +27,8 @@ import org.elasticsearch.action.admin.indices.stats.CommonStats;
 import org.elasticsearch.action.admin.indices.stats.CommonStatsFlags;
 import org.elasticsearch.action.admin.indices.stats.ShardStats;
 import org.elasticsearch.action.support.ActionFilters;
+import org.elasticsearch.action.support.nodes.BaseNodeRequest;
 import org.elasticsearch.action.support.nodes.TransportNodesAction;
-import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.health.ClusterHealthStatus;
 import org.elasticsearch.cluster.health.ClusterStateHealth;
 import org.elasticsearch.cluster.service.ClusterService;
@@ -44,7 +44,6 @@ import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.node.NodeService;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
-import org.elasticsearch.transport.TransportRequest;
 import org.elasticsearch.transport.TransportService;
 
 import java.io.IOException;
@@ -74,14 +73,12 @@ public class TransportClusterStatsAction extends TransportNodesAction<ClusterSta
     @Override
     protected ClusterStatsResponse newResponse(ClusterStatsRequest request,
                                                List<ClusterStatsNodeResponse> responses, List<FailedNodeException> failures) {
-        ClusterState state = clusterService.state();
         return new ClusterStatsResponse(
             System.currentTimeMillis(),
-            state.metadata().clusterUUID(),
+            clusterService.state().metaData().clusterUUID(),
             clusterService.getClusterName(),
             responses,
-            failures,
-            state);
+            failures);
     }
 
     @Override
@@ -98,7 +95,7 @@ public class TransportClusterStatsAction extends TransportNodesAction<ClusterSta
     protected ClusterStatsNodeResponse nodeOperation(ClusterStatsNodeRequest nodeRequest, Task task) {
         NodeInfo nodeInfo = nodeService.info(true, true, false, true, false, true, false, true, false, false);
         NodeStats nodeStats = nodeService.stats(CommonStatsFlags.NONE,
-                true, true, true, false, true, false, false, false, false, false, true, false, false);
+                true, true, true, false, true, false, false, false, false, false, false, false);
         List<ShardStats> shardsStats = new ArrayList<>();
         for (IndexService indexService : indicesService) {
             for (IndexShard indexShard : indexService) {
@@ -139,7 +136,7 @@ public class TransportClusterStatsAction extends TransportNodesAction<ClusterSta
 
     }
 
-    public static class ClusterStatsNodeRequest extends TransportRequest {
+    public static class ClusterStatsNodeRequest extends BaseNodeRequest {
 
         ClusterStatsRequest request;
 

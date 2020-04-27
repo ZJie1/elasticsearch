@@ -21,7 +21,7 @@ package org.elasticsearch.repositories.s3;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.Protocol;
-import org.elasticsearch.cluster.metadata.RepositoryMetadata;
+import org.elasticsearch.cluster.metadata.RepositoryMetaData;
 import org.elasticsearch.common.settings.SecureSetting;
 import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Setting;
@@ -35,7 +35,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
 
 /**
  * A container for settings used to create an S3 client.
@@ -104,14 +103,6 @@ final class S3ClientSettings {
     static final Setting.AffixSetting<Boolean> DISABLE_CHUNKED_ENCODING = Setting.affixKeySetting(PREFIX, "disable_chunked_encoding",
         key -> Setting.boolSetting(key, false, Property.NodeScope));
 
-    /** An override for the s3 region to use for signing requests. */
-    static final Setting.AffixSetting<String> REGION = Setting.affixKeySetting(PREFIX, "region",
-        key -> new Setting<>(key, "", Function.identity(), Property.NodeScope));
-
-    /** An override for the signer to use. */
-    static final Setting.AffixSetting<String> SIGNER_OVERRIDE = Setting.affixKeySetting(PREFIX, "signer_override",
-        key -> new Setting<>(key, "", Function.identity(), Property.NodeScope));
-
     /** Credentials to authenticate with s3. */
     final S3BasicCredentials credentials;
 
@@ -150,16 +141,10 @@ final class S3ClientSettings {
     /** Whether chunked encoding should be disabled or not. */
     final boolean disableChunkedEncoding;
 
-    /** Region to use for signing requests or empty string to use default. */
-    final String region;
-
-    /** Signer override to use or empty string to use default. */
-    final String signerOverride;
-
     private S3ClientSettings(S3BasicCredentials credentials, String endpoint, Protocol protocol,
                              String proxyHost, int proxyPort, String proxyUsername, String proxyPassword,
                              int readTimeoutMillis, int maxRetries, boolean throttleRetries,
-                             boolean pathStyleAccess, boolean disableChunkedEncoding, String region, String signerOverride) {
+                             boolean pathStyleAccess, boolean disableChunkedEncoding) {
         this.credentials = credentials;
         this.endpoint = endpoint;
         this.protocol = protocol;
@@ -172,17 +157,15 @@ final class S3ClientSettings {
         this.throttleRetries = throttleRetries;
         this.pathStyleAccess = pathStyleAccess;
         this.disableChunkedEncoding = disableChunkedEncoding;
-        this.region = region;
-        this.signerOverride = signerOverride;
     }
 
     /**
      * Overrides the settings in this instance with settings found in repository metadata.
      *
-     * @param metadata RepositoryMetadata
+     * @param metadata RepositoryMetaData
      * @return S3ClientSettings
      */
-    S3ClientSettings refine(RepositoryMetadata metadata) {
+    S3ClientSettings refine(RepositoryMetaData metadata) {
         final Settings repoSettings = metadata.settings();
         // Normalize settings to placeholder client settings prefix so that we can use the affix settings directly
         final Settings normalizedSettings =
@@ -196,17 +179,13 @@ final class S3ClientSettings {
             getRepoSettingOrDefault(READ_TIMEOUT_SETTING, normalizedSettings, TimeValue.timeValueMillis(readTimeoutMillis)).millis());
         final int newMaxRetries = getRepoSettingOrDefault(MAX_RETRIES_SETTING, normalizedSettings, maxRetries);
         final boolean newThrottleRetries = getRepoSettingOrDefault(USE_THROTTLE_RETRIES_SETTING, normalizedSettings, throttleRetries);
-        final boolean newPathStyleAccess = getRepoSettingOrDefault(USE_PATH_STYLE_ACCESS, normalizedSettings, pathStyleAccess);
+        final boolean usePathStyleAccess = getRepoSettingOrDefault(USE_PATH_STYLE_ACCESS, normalizedSettings, pathStyleAccess);
         final boolean newDisableChunkedEncoding = getRepoSettingOrDefault(
             DISABLE_CHUNKED_ENCODING, normalizedSettings, disableChunkedEncoding);
-        final String newRegion = getRepoSettingOrDefault(REGION, normalizedSettings, region);
-        final String newSignerOverride = getRepoSettingOrDefault(SIGNER_OVERRIDE, normalizedSettings, signerOverride);
         if (Objects.equals(endpoint, newEndpoint) && protocol == newProtocol && Objects.equals(proxyHost, newProxyHost)
             && proxyPort == newProxyPort && newReadTimeoutMillis == readTimeoutMillis && maxRetries == newMaxRetries
             && newThrottleRetries == throttleRetries
-            && newPathStyleAccess == pathStyleAccess
-            && newDisableChunkedEncoding == disableChunkedEncoding
-            && Objects.equals(region, newRegion) && Objects.equals(signerOverride, newSignerOverride)) {
+            && newDisableChunkedEncoding == disableChunkedEncoding) {
             return this;
         }
         return new S3ClientSettings(
@@ -220,10 +199,8 @@ final class S3ClientSettings {
             newReadTimeoutMillis,
             newMaxRetries,
             newThrottleRetries,
-            newPathStyleAccess,
-            newDisableChunkedEncoding,
-            newRegion,
-            newSignerOverride
+            usePathStyleAccess,
+            newDisableChunkedEncoding
         );
     }
 
@@ -289,9 +266,7 @@ final class S3ClientSettings {
                 getConfigValue(settings, clientName, MAX_RETRIES_SETTING),
                 getConfigValue(settings, clientName, USE_THROTTLE_RETRIES_SETTING),
                 getConfigValue(settings, clientName, USE_PATH_STYLE_ACCESS),
-                getConfigValue(settings, clientName, DISABLE_CHUNKED_ENCODING),
-                getConfigValue(settings, clientName, REGION),
-                getConfigValue(settings, clientName, SIGNER_OVERRIDE)
+                getConfigValue(settings, clientName, DISABLE_CHUNKED_ENCODING)
             );
         }
     }
@@ -315,15 +290,13 @@ final class S3ClientSettings {
             Objects.equals(proxyHost, that.proxyHost) &&
             Objects.equals(proxyUsername, that.proxyUsername) &&
             Objects.equals(proxyPassword, that.proxyPassword) &&
-            Objects.equals(disableChunkedEncoding, that.disableChunkedEncoding) &&
-            Objects.equals(region, that.region) &&
-            Objects.equals(signerOverride, that.signerOverride);
+            Objects.equals(disableChunkedEncoding, that.disableChunkedEncoding);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(credentials, endpoint, protocol, proxyHost, proxyPort, proxyUsername, proxyPassword,
-            readTimeoutMillis, maxRetries, throttleRetries, disableChunkedEncoding, region, signerOverride);
+            readTimeoutMillis, maxRetries, throttleRetries, disableChunkedEncoding);
     }
 
     private static <T> T getConfigValue(Settings settings, String clientName,

@@ -134,6 +134,7 @@ teardown:
             "docs": [
               {
                 "_index": "index",
+                "_type": "type",
                 "_id": "id",
                 "_source": {
                   "field": "abc2xyz"
@@ -152,5 +153,5 @@ teardown:
 "Test Grok Patterns Retrieval":
   - do:
       ingest.processor_grok: {}
-  - length: { patterns: 312 }
+  - length: { patterns: 303 }
   - match: { patterns.PATH: "(?:%{UNIXPATH}|%{WINPATH})" }

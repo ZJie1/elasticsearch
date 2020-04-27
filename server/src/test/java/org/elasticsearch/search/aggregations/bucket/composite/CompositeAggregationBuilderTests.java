@@ -19,10 +19,8 @@
 
 package org.elasticsearch.search.aggregations.bucket.composite;
 
-import org.elasticsearch.common.geo.GeoBoundingBoxTests;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.search.aggregations.BaseAggregationTestCase;
-import org.elasticsearch.search.aggregations.bucket.geogrid.GeoTileUtils;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramInterval;
 import org.elasticsearch.search.sort.SortOrder;
 
@@ -51,17 +49,6 @@ public class CompositeAggregationBuilderTests extends BaseAggregationTestCase<Co
             histo.missingBucket(true);
         }
         return histo;
-    }
-
-    private GeoTileGridValuesSourceBuilder randomGeoTileGridValuesSourceBuilder() {
-        GeoTileGridValuesSourceBuilder geoTile = new GeoTileGridValuesSourceBuilder(randomAlphaOfLengthBetween(5, 10));
-        if (randomBoolean()) {
-            geoTile.precision(randomIntBetween(0, GeoTileUtils.MAX_ZOOM));
-        }
-        if (randomBoolean()) {
-            geoTile.geoBoundingBox(GeoBoundingBoxTests.randomBBox());
-        }
-        return geoTile;
     }
 
     private TermsValuesSourceBuilder randomTermsSourceBuilder() {
@@ -95,11 +82,9 @@ public class CompositeAggregationBuilderTests extends BaseAggregationTestCase<Co
     @Override
     protected CompositeAggregationBuilder createTestAggregatorBuilder() {
         int numSources = randomIntBetween(1, 10);
-        numSources = 1;
         List<CompositeValuesSourceBuilder<?>> sources = new ArrayList<>();
         for (int i = 0; i < numSources; i++) {
-            int type = randomIntBetween(0, 3);
-            type = 3;
+            int type = randomIntBetween(0, 2);
             switch (type) {
                 case 0:
                     sources.add(randomTermsSourceBuilder());
@@ -109,9 +94,6 @@ public class CompositeAggregationBuilderTests extends BaseAggregationTestCase<Co
                     break;
                 case 2:
                     sources.add(randomHistogramSourceBuilder());
-                    break;
-                case 3:
-                    sources.add(randomGeoTileGridValuesSourceBuilder());
                     break;
                 default:
                     throw new AssertionError("wrong branch");

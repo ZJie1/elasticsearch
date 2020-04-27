@@ -24,7 +24,7 @@ import org.elasticsearch.cluster.ClusterInfoService;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.MockInternalClusterInfoService;
 import org.elasticsearch.cluster.block.ClusterBlockException;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.routing.RoutingNode;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.Priority;
@@ -71,7 +71,7 @@ public class MockDiskUsagesIT extends ESIntegTestCase {
     @Override
     public Settings indexSettings() {
         // ensure that indices do not use custom data paths
-        return Settings.builder().put(super.indexSettings()).putNull(IndexMetadata.SETTING_DATA_PATH).build();
+        return Settings.builder().put(super.indexSettings()).putNull(IndexMetaData.SETTING_DATA_PATH).build();
     }
 
     private static FsInfo.Path setDiskUsage(FsInfo.Path original, long totalBytes, long freeBytes) {
@@ -179,23 +179,23 @@ public class MockDiskUsagesIT extends ESIntegTestCase {
             assertThat("node2 has 2 shards", shardCountByNodeId.get(nodeIds.get(2)), equalTo(2));
         }
 
-        client().prepareIndex("test").setId("1").setSource("foo", "bar").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
+        client().prepareIndex("test", "doc", "1").setSource("foo", "bar").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
         assertSearchHits(client().prepareSearch("test").get(), "1");
 
         // Move all nodes above the low watermark so no shard movement can occur, and at least one node above the flood stage watermark so
         // the index is blocked
         clusterInfoService.diskUsageFunction = (discoveryNode, fsInfoPath) -> setDiskUsage(fsInfoPath, 100,
-            discoveryNode.getId().equals(nodeIds.get(2)) ? between(0, 4) : between(0, 9));
+            discoveryNode.getId().equals(nodeIds.get(2)) ? between(0, 4) : between(0, 14));
 
         assertBusy(() -> assertBlocked(
-            client().prepareIndex().setIndex("test").setId("1").setSource("foo", "bar"),
-            IndexMetadata.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK));
+            client().prepareIndex().setIndex("test").setType("doc").setId("1").setSource("foo", "bar"),
+            IndexMetaData.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK));
 
         assertFalse(client().admin().cluster().prepareHealth("test").setWaitForEvents(Priority.LANGUID).get().isTimedOut());
 
         // Cannot add further documents
-        assertBlocked(client().prepareIndex().setIndex("test").setId("2").setSource("foo", "bar"),
-            IndexMetadata.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK);
+        assertBlocked(client().prepareIndex().setIndex("test").setType("doc").setId("2").setSource("foo", "bar"),
+            IndexMetaData.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK);
         assertSearchHits(client().prepareSearch("test").get(), "1");
 
         logger.info("--> index is confirmed read-only, releasing disk space");
@@ -206,7 +206,7 @@ public class MockDiskUsagesIT extends ESIntegTestCase {
         // Attempt to create a new document until DiskUsageMonitor unblocks the index
         assertBusy(() -> {
             try {
-                client().prepareIndex("test").setId("3").setSource("foo", "bar")
+                client().prepareIndex("test", "doc", "3").setSource("foo", "bar")
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
             } catch (ClusterBlockException e) {
                 throw new AssertionError("retrying", e);
@@ -313,7 +313,7 @@ public class MockDiskUsagesIT extends ESIntegTestCase {
         assertAcked(prepareCreate("test").setSettings(Settings.builder()
             .put("number_of_shards", 6)
             .put("number_of_replicas", 0)
-            .put(IndexMetadata.INDEX_ROUTING_EXCLUDE_GROUP_SETTING.getConcreteSettingForNamespace("_id").getKey(), nodeIds.get(2))));
+            .put(IndexMetaData.INDEX_ROUTING_EXCLUDE_GROUP_SETTING.getConcreteSettingForNamespace("_id").getKey(), nodeIds.get(2))));
         ensureGreen("test");
 
         assertBusy(() -> {
@@ -324,7 +324,7 @@ public class MockDiskUsagesIT extends ESIntegTestCase {
         });
 
         assertAcked(client().admin().indices().prepareUpdateSettings("test").setSettings(Settings.builder()
-            .putNull(IndexMetadata.INDEX_ROUTING_EXCLUDE_GROUP_SETTING.getConcreteSettingForNamespace("_id").getKey())));
+            .putNull(IndexMetaData.INDEX_ROUTING_EXCLUDE_GROUP_SETTING.getConcreteSettingForNamespace("_id").getKey())));
 
         logger.info("--> waiting for shards to relocate onto node [{}]", nodeIds.get(2));
 

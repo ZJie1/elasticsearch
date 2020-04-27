@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.core.PageParams;
 import org.elasticsearch.client.ml.job.config.Job;
 import org.elasticsearch.client.ml.job.results.Result;
@@ -33,7 +34,7 @@ import java.util.Objects;
 /**
  * A request to retrieve buckets of a given job
  */
-public class GetBucketsRequest implements Validatable, ToXContentObject {
+public class GetBucketsRequest extends ActionRequest implements ToXContentObject {
 
     public static final ParseField EXPAND = new ParseField("expand");
     public static final ParseField EXCLUDE_INTERIM = new ParseField("exclude_interim");
@@ -196,6 +197,11 @@ public class GetBucketsRequest implements Validatable, ToXContentObject {
      */
     public void setDescending(boolean descending) {
         this.descending = descending;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

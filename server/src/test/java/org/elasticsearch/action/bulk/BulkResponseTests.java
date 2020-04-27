@@ -73,15 +73,16 @@ public class BulkResponseTests extends ESTestCase {
                 expectedBulkItems[i] = new BulkItemResponse(i, opType, randomDocWriteResponses.v2());
             } else {
                 String index = randomAlphaOfLength(5);
+                String type = randomAlphaOfLength(5);
                 String id = randomAlphaOfLength(5);
 
                 Tuple<Throwable, ElasticsearchException> failures = randomExceptions();
 
                 Exception bulkItemCause = (Exception) failures.v1();
                 bulkItems[i] = new BulkItemResponse(i, opType,
-                        new BulkItemResponse.Failure(index, id, bulkItemCause));
+                        new BulkItemResponse.Failure(index, type, id, bulkItemCause));
                 expectedBulkItems[i] = new BulkItemResponse(i, opType,
-                        new BulkItemResponse.Failure(index, id, failures.v2(), ExceptionsHelper.status(bulkItemCause)));
+                        new BulkItemResponse.Failure(index, type, id, failures.v2(), ExceptionsHelper.status(bulkItemCause)));
             }
         }
 

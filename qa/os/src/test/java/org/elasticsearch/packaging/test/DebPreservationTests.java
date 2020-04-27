@@ -22,11 +22,10 @@ package org.elasticsearch.packaging.test;
 import org.elasticsearch.packaging.util.Distribution;
 import org.junit.BeforeClass;
 
+import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import static org.elasticsearch.packaging.util.FileExistenceMatchers.fileExists;
-import static org.elasticsearch.packaging.util.FileUtils.append;
-import static org.elasticsearch.packaging.util.FileUtils.assertPathsDoNotExist;
+import static org.elasticsearch.packaging.util.FileUtils.assertPathsDontExist;
 import static org.elasticsearch.packaging.util.FileUtils.assertPathsExist;
 import static org.elasticsearch.packaging.util.Packages.SYSVINIT_SCRIPT;
 import static org.elasticsearch.packaging.util.Packages.assertInstalled;
@@ -48,23 +47,21 @@ public class DebPreservationTests extends PackagingTestCase {
 
     public void test10Install() throws Exception {
         assertRemoved(distribution());
-        installation = installPackage(sh, distribution());
+        installation = installPackage(distribution());
         assertInstalled(distribution());
-        verifyPackageInstallation(installation, distribution(), sh);
+        verifyPackageInstallation(installation, distribution(), newShell());
     }
 
     public void test20Remove() throws Exception {
-        append(installation.config(Paths.get("jvm.options.d", "heap.options")), "# foo");
-
         remove(distribution());
 
         // some config files were not removed
+
         assertPathsExist(
             installation.config,
             installation.config("elasticsearch.yml"),
             installation.config("jvm.options"),
-            installation.config("log4j2.properties"),
-            installation.config(Paths.get("jvm.options.d", "heap.options"))
+            installation.config("log4j2.properties")
         );
 
         if (distribution().isDefault()) {
@@ -79,30 +76,35 @@ public class DebPreservationTests extends PackagingTestCase {
 
         // keystore was removed
 
-        assertPathsDoNotExist(installation.config("elasticsearch.keystore"), installation.config(".elasticsearch.keystore.initial_md5sum"));
+        assertPathsDontExist(
+            installation.config("elasticsearch.keystore"),
+            installation.config(".elasticsearch.keystore.initial_md5sum")
+        );
 
         // doc files were removed
 
-        assertPathsDoNotExist(
+        assertPathsDontExist(
             Paths.get("/usr/share/doc/" + distribution().flavor.name),
             Paths.get("/usr/share/doc/" + distribution().flavor.name + "/copyright")
         );
 
         // sysvinit service file was not removed
-        assertThat(SYSVINIT_SCRIPT, fileExists());
+        assertTrue(Files.exists(SYSVINIT_SCRIPT));
 
         // defaults file was not removed
-        assertThat(installation.envFile, fileExists());
+        assertTrue(Files.exists(installation.envFile));
     }
 
     public void test30Purge() throws Exception {
-        append(installation.config(Paths.get("jvm.options.d", "heap.options")), "# foo");
-
         sh.run("dpkg --purge " + distribution().flavor.name);
 
         assertRemoved(distribution());
 
-        assertPathsDoNotExist(installation.config, installation.envFile, SYSVINIT_SCRIPT);
+        assertPathsDontExist(
+            installation.config,
+            installation.envFile,
+            SYSVINIT_SCRIPT
+        );
 
         assertThat(packageStatus(distribution()).exitCode, is(1));
     }

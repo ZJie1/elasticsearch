@@ -66,7 +66,8 @@ abstract class SortedDocsProducer {
             @Override
             public void collect(int doc, long bucket) throws IOException {
                 hasCollected[0] = true;
-                if (queue.addIfCompetitive()) {
+                int slot = queue.addIfCompetitive();
+                if (slot != -1) {
                     topCompositeCollected[0]++;
                     if (adder != null && doc != lastDoc) {
                         if (remainingBits == 0) {

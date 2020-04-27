@@ -61,8 +61,7 @@ public class FileRealmTests extends ESTestCase {
         userPasswdStore = mock(FileUserPasswdStore.class);
         userRolesStore = mock(FileUserRolesStore.class);
         globalSettings = Settings.builder().put("path.home", createTempDir()).put("xpack.security.authc.password_hashing.algorithm",
-            randomFrom("bcrypt9", "pbkdf2")).
-            put(RealmSettings.realmSettingPrefix(REALM_IDENTIFIER) + "order", 0).build();
+            randomFrom("bcrypt9", "pbkdf2")).build();
         threadPool = mock(ThreadPool.class);
         threadContext = new ThreadContext(globalSettings);
         when(threadPool.getThreadContext()).thenReturn(threadContext);
@@ -244,8 +243,8 @@ public class FileRealmTests extends ESTestCase {
 
         final int order = randomIntBetween(0, 10);
         Settings settings = Settings.builder()
-            .put(globalSettings)
             .put(RealmSettings.realmSettingPrefix(REALM_IDENTIFIER) + "order", order)
+            .put(globalSettings)
             .build();
 
         RealmConfig config = getRealmConfig(settings);

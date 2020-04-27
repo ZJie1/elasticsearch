@@ -31,7 +31,6 @@ import org.elasticsearch.common.component.AbstractLifecycleComponent;
 import org.elasticsearch.common.network.CloseableChannel;
 import org.elasticsearch.common.network.NetworkAddress;
 import org.elasticsearch.common.network.NetworkService;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.BoundTransportAddress;
 import org.elasticsearch.common.transport.NetworkExceptionHelper;
@@ -87,10 +86,8 @@ public abstract class AbstractHttpServerTransport extends AbstractLifecycleCompo
     private final Set<HttpChannel> httpChannels = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<HttpServerChannel> httpServerChannels = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private final HttpTracer tracer;
-
     protected AbstractHttpServerTransport(Settings settings, NetworkService networkService, BigArrays bigArrays, ThreadPool threadPool,
-                                          NamedXContentRegistry xContentRegistry, Dispatcher dispatcher, ClusterSettings clusterSettings) {
+                                          NamedXContentRegistry xContentRegistry, Dispatcher dispatcher) {
         this.settings = settings;
         this.networkService = networkService;
         this.bigArrays = bigArrays;
@@ -112,7 +109,6 @@ public abstract class AbstractHttpServerTransport extends AbstractLifecycleCompo
         this.port = SETTING_HTTP_PORT.get(settings);
 
         this.maxContentLength = SETTING_HTTP_MAX_CONTENT_LENGTH.get(settings);
-        this.tracer = new HttpTracer(settings, clusterSettings);
     }
 
     @Override
@@ -178,10 +174,7 @@ public abstract class AbstractHttpServerTransport extends AbstractLifecycleCompo
             return true;
         });
         if (!success) {
-            throw new BindHttpException(
-                "Failed to bind to " + NetworkAddress.format(hostAddress, port),
-                lastException.get()
-            );
+            throw new BindHttpException("Failed to bind to [" + port.getPortRangeString() + "]", lastException.get());
         }
 
         if (logger.isDebugEnabled()) {
@@ -356,8 +349,6 @@ public abstract class AbstractHttpServerTransport extends AbstractLifecycleCompo
             restRequest = innerRestRequest;
         }
 
-        final HttpTracer trace = tracer.maybeTraceRequest(restRequest, exception);
-
         /*
          * We now want to create a channel used to send the response on. However, creating this channel can fail if there are invalid
          * parameter values for any of the filter_path, human, or pretty parameters. We detect these specific failures via an
@@ -369,13 +360,11 @@ public abstract class AbstractHttpServerTransport extends AbstractLifecycleCompo
             RestChannel innerChannel;
             ThreadContext threadContext = threadPool.getThreadContext();
             try {
-                innerChannel =
-                    new DefaultRestChannel(httpChannel, httpRequest, restRequest, bigArrays, handlingSettings, threadContext, trace);
+                innerChannel = new DefaultRestChannel(httpChannel, httpRequest, restRequest, bigArrays, handlingSettings, threadContext);
             } catch (final IllegalArgumentException e) {
                 badRequestCause = ExceptionsHelper.useOrSuppress(badRequestCause, e);
                 final RestRequest innerRequest = RestRequest.requestWithoutParameters(xContentRegistry, httpRequest, httpChannel);
-                innerChannel =
-                    new DefaultRestChannel(httpChannel, httpRequest, innerRequest, bigArrays, handlingSettings, threadContext, trace);
+                innerChannel = new DefaultRestChannel(httpChannel, httpRequest, innerRequest, bigArrays, handlingSettings, threadContext);
             }
             channel = innerChannel;
         }

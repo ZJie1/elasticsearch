@@ -19,68 +19,114 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.DefBootstrap;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.CallSubDefNode;
-import org.elasticsearch.painless.ir.ClassNode;
+import org.elasticsearch.painless.MethodWriter;
 import org.elasticsearch.painless.lookup.def;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.objectweb.asm.Type;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a method call made on a def type. (Internal only.)
  */
-public class PSubDefCall extends AExpression {
+final class PSubDefCall extends AExpression {
 
-    protected final String name;
-    protected final List<AExpression> arguments;
+    private final String name;
+    private final List<AExpression> arguments;
+
+    private StringBuilder recipe = null;
+    private List<String> pointers = new ArrayList<>();
 
     PSubDefCall(Location location, String name, List<AExpression> arguments) {
         super(location);
 
         this.name = Objects.requireNonNull(name);
-        this.arguments = Collections.unmodifiableList(Objects.requireNonNull(arguments));
+        this.arguments = Objects.requireNonNull(arguments);
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        List<Output> argumentOutputs = new ArrayList<>(arguments.size());
+    void storeSettings(CompilerSettings settings) {
+        throw createError(new IllegalStateException("illegal tree structure"));
+    }
 
-        for (AExpression argument : arguments) {
-            Input expressionInput = new Input();
-            expressionInput.internal = true;
-            Output expressionOutput = argument.analyze(classNode, scriptRoot, scope, expressionInput);
-            argumentOutputs.add(expressionOutput);
+    @Override
+    void extractVariables(Set<String> variables) {
+        throw createError(new IllegalStateException("Illegal tree structure."));
+    }
 
-            if (expressionOutput.actual == void.class) {
+    @Override
+    void analyze(Locals locals) {
+        recipe = new StringBuilder();
+        int totalCaptures = 0;
+
+        for (int argument = 0; argument < arguments.size(); ++argument) {
+            AExpression expression = arguments.get(argument);
+
+            expression.internal = true;
+            expression.analyze(locals);
+
+            if (expression instanceof ILambda) {
+                ILambda lambda = (ILambda) expression;
+                pointers.add(lambda.getPointer());
+                // encode this parameter as a deferred reference
+                char ch = (char) (argument + totalCaptures);
+                recipe.append(ch);
+                totalCaptures += lambda.getCaptureCount();
+            }
+
+            if (expression.actual == void.class) {
                 throw createError(new IllegalArgumentException("Argument(s) cannot be of [void] type when calling method [" + name + "]."));
             }
 
-            expressionInput.expected = expressionOutput.actual;
-            argument.cast(expressionInput, expressionOutput);
+            expression.expected = expression.actual;
+            arguments.set(argument, expression.cast(locals));
         }
 
-        Output output = new Output();
         // TODO: remove ZonedDateTime exception when JodaCompatibleDateTime is removed
-        output.actual = input.expected == null || input.expected == ZonedDateTime.class || input.explicit ? def.class : input.expected;
+        actual = expected == null || expected == ZonedDateTime.class || explicit ? def.class : expected;
+    }
 
-        CallSubDefNode callSubDefNode = new CallSubDefNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
 
-        for (int argument = 0; argument < arguments.size(); ++ argument) {
-            callSubDefNode.addArgumentNode(arguments.get(argument).cast(argumentOutputs.get(argument)));
+        List<Type> parameterTypes = new ArrayList<>();
+
+        // first parameter is the receiver, we never know its type: always Object
+        parameterTypes.add(org.objectweb.asm.Type.getType(Object.class));
+
+        // append each argument
+        for (AExpression argument : arguments) {
+            parameterTypes.add(MethodWriter.getType(argument.actual));
+
+            if (argument instanceof ILambda) {
+                ILambda lambda = (ILambda) argument;
+                Collections.addAll(parameterTypes, lambda.getCaptures());
+            }
+
+            argument.write(writer, globals);
         }
 
-        callSubDefNode.setLocation(location);
-        callSubDefNode.setExpressionType(output.actual);
-        callSubDefNode.setName(name);
+        // create method type from return value and arguments
+        Type methodType = Type.getMethodType(MethodWriter.getType(actual), parameterTypes.toArray(new Type[0]));
 
-        output.expressionNode = callSubDefNode;
+        List<Object> args = new ArrayList<>();
+        args.add(recipe.toString());
+        args.addAll(pointers);
+        writer.invokeDefCall(name, methodType, DefBootstrap.METHOD_CALL, args.toArray());
+    }
 
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToStringWithOptionalArgs(arguments, prefix, name);
     }
 }

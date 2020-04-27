@@ -19,18 +19,17 @@
 
 package org.elasticsearch.common.settings;
 
-import org.elasticsearch.cli.Command;
-import org.elasticsearch.cli.ExitCodes;
-import org.elasticsearch.cli.UserException;
-import org.elasticsearch.env.Environment;
-
 import java.io.ByteArrayInputStream;
 import java.io.CharArrayWriter;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-import static org.hamcrest.Matchers.anyOf;
+import org.elasticsearch.cli.Command;
+import org.elasticsearch.cli.ExitCodes;
+import org.elasticsearch.cli.UserException;
+import org.elasticsearch.env.Environment;
+
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasToString;
 
@@ -44,7 +43,6 @@ public class AddStringKeyStoreCommandTests extends KeyStoreCommandTestCase {
             protected Environment createEnv(Map<String, String> settings) throws UserException {
                 return env;
             }
-
             @Override
             InputStream getStdin() {
                 return input;
@@ -52,37 +50,17 @@ public class AddStringKeyStoreCommandTests extends KeyStoreCommandTestCase {
         };
     }
 
-    public void testInvalidPassphrease() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password, "foo", "bar");
-        terminal.addSecretInput("thewrongpassword");
-        UserException e = expectThrows(UserException.class, () -> execute("foo2"));
-        assertEquals(e.getMessage(), ExitCodes.DATA_ERROR, e.exitCode);
-        if (inFipsJvm()) {
-            assertThat(
-                e.getMessage(),
-                anyOf(
-                    containsString("Provided keystore password was incorrect"),
-                    containsString("Keystore has been corrupted or tampered with")
-                )
-            );
-        } else {
-            assertThat(e.getMessage(), containsString("Provided keystore password was incorrect"));
-        }
-
-    }
-
-    public void testMissingPromptCreateWithoutPasswordWhenPrompted() throws Exception {
+    public void testMissingPromptCreate() throws Exception {
         terminal.addTextInput("y");
         terminal.addSecretInput("bar");
         execute("foo");
-        assertSecureString("foo", "bar", "");
+        assertSecureString("foo", "bar");
     }
 
-    public void testMissingPromptCreateWithoutPasswordWithoutPromptIfForced() throws Exception {
+    public void testMissingForceCreate() throws Exception {
         terminal.addSecretInput("bar");
         execute("-f", "foo");
-        assertSecureString("foo", "bar", "");
+        assertSecureString("foo", "bar");
     }
 
     public void testMissingNoCreate() throws Exception {
@@ -92,142 +70,92 @@ public class AddStringKeyStoreCommandTests extends KeyStoreCommandTestCase {
     }
 
     public void testOverwritePromptDefault() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password, "foo", "bar");
-        terminal.addSecretInput(password);
+        createKeystore("", "foo", "bar");
         terminal.addTextInput("");
         execute("foo");
-        assertSecureString("foo", "bar", password);
+        assertSecureString("foo", "bar");
     }
 
     public void testOverwritePromptExplicitNo() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password, "foo", "bar");
-        terminal.addSecretInput(password);
+        createKeystore("", "foo", "bar");
         terminal.addTextInput("n"); // explicit no
         execute("foo");
-        assertSecureString("foo", "bar", password);
+        assertSecureString("foo", "bar");
     }
 
     public void testOverwritePromptExplicitYes() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password, "foo", "bar");
+        createKeystore("", "foo", "bar");
         terminal.addTextInput("y");
-        terminal.addSecretInput(password);
         terminal.addSecretInput("newvalue");
         execute("foo");
-        assertSecureString("foo", "newvalue", password);
+        assertSecureString("foo", "newvalue");
     }
 
     public void testOverwriteForceShort() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password, "foo", "bar");
-        terminal.addSecretInput(password);
+        createKeystore("", "foo", "bar");
         terminal.addSecretInput("newvalue");
         execute("-f", "foo"); // force
-        assertSecureString("foo", "newvalue", password);
+        assertSecureString("foo", "newvalue");
     }
 
     public void testOverwriteForceLong() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password, "foo", "bar");
-        terminal.addSecretInput(password);
+        createKeystore("", "foo", "bar");
         terminal.addSecretInput("and yet another secret value");
         execute("--force", "foo"); // force
-        assertSecureString("foo", "and yet another secret value", password);
+        assertSecureString("foo", "and yet another secret value");
     }
 
     public void testForceNonExistent() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password);
-        terminal.addSecretInput(password);
+        createKeystore("");
         terminal.addSecretInput("value");
         execute("--force", "foo"); // force
-        assertSecureString("foo", "value", password);
+        assertSecureString("foo", "value");
     }
 
     public void testPromptForValue() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         terminal.addSecretInput("secret value");
         execute("foo");
-        assertSecureString("foo", "secret value", password);
-    }
-
-    public void testPromptForMultipleValues() throws Exception {
-        final String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
-        terminal.addSecretInput("bar1");
-        terminal.addSecretInput("bar2");
-        terminal.addSecretInput("bar3");
-        execute("foo1", "foo2", "foo3");
-        assertSecureString("foo1", "bar1", password);
-        assertSecureString("foo2", "bar2", password);
-        assertSecureString("foo3", "bar3", password);
+        assertSecureString("foo", "secret value");
     }
 
     public void testStdinShort() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         setInput("secret value 1");
         execute("-x", "foo");
-        assertSecureString("foo", "secret value 1", password);
+        assertSecureString("foo", "secret value 1");
     }
 
     public void testStdinLong() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         setInput("secret value 2");
         execute("--stdin", "foo");
-        assertSecureString("foo", "secret value 2", password);
+        assertSecureString("foo", "secret value 2");
     }
 
     public void testStdinNoInput() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         setInput("");
         execute("-x", "foo");
-        assertSecureString("foo", "", password);
+        assertSecureString("foo", "");
     }
 
     public void testStdinInputWithLineBreaks() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         setInput("Typedthisandhitenter\n");
         execute("-x", "foo");
-        assertSecureString("foo", "Typedthisandhitenter", password);
+        assertSecureString("foo", "Typedthisandhitenter");
     }
 
     public void testStdinInputWithCarriageReturn() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         setInput("Typedthisandhitenter\r");
         execute("-x", "foo");
-        assertSecureString("foo", "Typedthisandhitenter", password);
-    }
-
-    public void testStdinWithMultipleValues() throws Exception {
-        final String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
-        setInput("bar1\nbar2\nbar3");
-        execute(randomFrom("-x", "--stdin"), "foo1", "foo2", "foo3");
-        assertSecureString("foo1", "bar1", password);
-        assertSecureString("foo2", "bar2", password);
-        assertSecureString("foo3", "bar3", password);
+        assertSecureString("foo", "Typedthisandhitenter");
     }
 
     public void testAddUtf8String() throws Exception {
-        String password = "keystorepassword";
-        KeyStoreWrapper.create().save(env.configFile(), password.toCharArray());
-        terminal.addSecretInput(password);
+        KeyStoreWrapper.create().save(env.configFile(), new char[0]);
         final int stringSize = randomIntBetween(8, 16);
         try (CharArrayWriter secretChars = new CharArrayWriter(stringSize)) {
             for (int i = 0; i < stringSize; i++) {
@@ -235,19 +163,16 @@ public class AddStringKeyStoreCommandTests extends KeyStoreCommandTestCase {
             }
             setInput(secretChars.toString());
             execute("-x", "foo");
-            assertSecureString("foo", secretChars.toString(), password);
+            assertSecureString("foo", secretChars.toString());
         }
     }
 
     public void testMissingSettingName() throws Exception {
-        String password = "keystorepassword";
-        createKeystore(password);
-        terminal.addSecretInput(password);
-        terminal.addSecretInput(password);
+        createKeystore("");
         terminal.addTextInput("");
         UserException e = expectThrows(UserException.class, this::execute);
         assertEquals(ExitCodes.USAGE, e.exitCode);
-        assertThat(e.getMessage(), containsString("the setting names can not be empty"));
+        assertThat(e.getMessage(), containsString("The setting name can not be null"));
     }
 
     public void testSpecialCharacterInName() throws Exception {
@@ -255,17 +180,10 @@ public class AddStringKeyStoreCommandTests extends KeyStoreCommandTestCase {
         terminal.addSecretInput("value");
         final String key = randomAlphaOfLength(4) + '@' + randomAlphaOfLength(4);
         final UserException e = expectThrows(UserException.class, () -> execute(key));
-        final String exceptionString = "Setting name [" + key + "] does not match the allowed setting name pattern [[A-Za-z0-9_\\-.]+]";
-        assertThat(e, hasToString(containsString(exceptionString)));
-    }
-
-    public void testAddToUnprotectedKeystore() throws Exception {
-        String password = "";
-        createKeystore(password, "foo", "bar");
-        terminal.addTextInput("");
-        // will not be prompted for a password
-        execute("foo");
-        assertSecureString("foo", "bar", password);
+        final String exceptionString= "Setting name [" + key + "] does not match the allowed setting name pattern [[A-Za-z0-9_\\-.]+]";
+        assertThat(
+                e,
+                hasToString(containsString(exceptionString)));
     }
 
     void setInput(String inputStr) {

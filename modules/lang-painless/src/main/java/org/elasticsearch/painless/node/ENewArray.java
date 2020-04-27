@@ -19,77 +19,102 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.NewArrayNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents an array instantiation.
  */
-public class ENewArray extends AExpression {
+public final class ENewArray extends AExpression {
 
-    protected final String type;
-    protected final List<AExpression> arguments;
-    protected final boolean initialize;
+    private final String type;
+    private final List<AExpression> arguments;
+    private final boolean initialize;
 
     public ENewArray(Location location, String type, List<AExpression> arguments, boolean initialize) {
         super(location);
 
         this.type = Objects.requireNonNull(type);
-        this.arguments = Collections.unmodifiableList(Objects.requireNonNull(arguments));
+        this.arguments = Objects.requireNonNull(arguments);
         this.initialize = initialize;
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException("invalid assignment: cannot assign a value to new array"));
+    void storeSettings(CompilerSettings settings) {
+        for (AExpression argument : arguments) {
+            argument.storeSettings(settings);
+        }
+    }
+
+    @Override
+    void extractVariables(Set<String> variables) {
+        for (AExpression argument : arguments) {
+            argument.extractVariables(variables);
+        }
+    }
+
+    @Override
+    void analyze(Locals locals) {
+        if (!read) {
+             throw createError(new IllegalArgumentException("A newly created array must be read from."));
         }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException("not a statement: result not used from new array"));
-        }
-
-        Output output = new Output();
-
-        Class<?> clazz = scriptRoot.getPainlessLookup().canonicalTypeNameToType(this.type);
+        Class<?> clazz = locals.getPainlessLookup().canonicalTypeNameToType(this.type);
 
         if (clazz == null) {
             throw createError(new IllegalArgumentException("Not a type [" + this.type + "]."));
         }
 
-        List<Output> argumentOutputs = new ArrayList<>();
+        for (int argument = 0; argument < arguments.size(); ++argument) {
+            AExpression expression = arguments.get(argument);
 
-        for (AExpression expression : arguments) {
-            Input expressionInput = new Input();
-            expressionInput.expected = initialize ? clazz.getComponentType() : int.class;
-            expressionInput.internal = true;
-            Output expressionOutput = expression.analyze(classNode, scriptRoot, scope, expressionInput);
-            expression.cast(expressionInput, expressionOutput);
-            argumentOutputs.add(expressionOutput);
+            expression.expected = initialize ? clazz.getComponentType() : int.class;
+            expression.internal = true;
+            expression.analyze(locals);
+            arguments.set(argument, expression.cast(locals));
         }
 
-        output.actual = clazz;
+        actual = clazz;
+    }
 
-        NewArrayNode newArrayNode = new NewArrayNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
 
-        for (int i = 0; i < arguments.size(); ++ i) {
-            newArrayNode.addArgumentNode(arguments.get(i).cast(argumentOutputs.get(i)));
+        if (initialize) {
+            writer.push(arguments.size());
+            writer.newArray(MethodWriter.getType(actual.getComponentType()));
+
+            for (int index = 0; index < arguments.size(); ++index) {
+                AExpression argument = arguments.get(index);
+
+                writer.dup();
+                writer.push(index);
+                argument.write(writer, globals);
+                writer.arrayStore(MethodWriter.getType(actual.getComponentType()));
+            }
+        } else {
+            for (AExpression argument : arguments) {
+                argument.write(writer, globals);
+            }
+
+            if (arguments.size() > 1) {
+                writer.visitMultiANewArrayInsn(MethodWriter.getType(actual).getDescriptor(), arguments.size());
+            } else {
+                writer.newArray(MethodWriter.getType(actual.getComponentType()));
+            }
         }
+    }
 
-        newArrayNode.setLocation(location);
-        newArrayNode.setExpressionType(output.actual);
-        newArrayNode.setInitialize(initialize);
-
-        output.expressionNode = newArrayNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToStringWithOptionalArgs(arguments, type, initialize ? "init" : "dims");
     }
 }

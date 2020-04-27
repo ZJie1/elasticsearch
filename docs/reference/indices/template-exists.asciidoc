@@ -8,10 +8,11 @@ Checks if an index template exists.
 
 
 
-[source,console]
+[source,js]
 -----------------------------------------------
 HEAD /_template/template_1
 -----------------------------------------------
+// CONSOLE
 
 
 [[template-exists-api-request]]

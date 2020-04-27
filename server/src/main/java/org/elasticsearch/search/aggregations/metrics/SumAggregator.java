@@ -29,10 +29,12 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.LeafBucketCollector;
 import org.elasticsearch.search.aggregations.LeafBucketCollectorBase;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 class SumAggregator extends NumericMetricsAggregator.SingleValue {
@@ -44,8 +46,8 @@ class SumAggregator extends NumericMetricsAggregator.SingleValue {
     private DoubleArray compensations;
 
     SumAggregator(String name, ValuesSource.Numeric valuesSource, DocValueFormat formatter, SearchContext context,
-            Aggregator parent, Map<String, Object> metadata) throws IOException {
-        super(name, context, parent, metadata);
+            Aggregator parent, List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData) throws IOException {
+        super(name, context, parent, pipelineAggregators, metaData);
         this.valuesSource = valuesSource;
         this.format = formatter;
         if (valuesSource != null) {
@@ -67,7 +69,6 @@ class SumAggregator extends NumericMetricsAggregator.SingleValue {
         }
         final BigArrays bigArrays = context.bigArrays();
         final SortedNumericDoubleValues values = valuesSource.doubleValues(ctx);
-        final CompensatedSum kahanSummation = new CompensatedSum(0, 0);
         return new LeafBucketCollectorBase(sub, values) {
             @Override
             public void collect(int doc, long bucket) throws IOException {
@@ -80,15 +81,19 @@ class SumAggregator extends NumericMetricsAggregator.SingleValue {
                     // accurate than naive summation.
                     double sum = sums.get(bucket);
                     double compensation = compensations.get(bucket);
-                    kahanSummation.reset(sum, compensation);
-
                     for (int i = 0; i < valuesCount; i++) {
                         double value = values.nextValue();
-                        kahanSummation.add(value);
+                        if (Double.isFinite(value) == false) {
+                            sum += value;
+                        } else if (Double.isFinite(sum)) {
+                            double corrected = value - compensation;
+                            double newSum = sum + corrected;
+                            compensation = (newSum - sum) - corrected;
+                            sum = newSum;
+                        }
                     }
-
-                    compensations.set(bucket, kahanSummation.delta());
-                    sums.set(bucket, kahanSummation.value());
+                    compensations.set(bucket, compensation);
+                    sums.set(bucket, sum);
                 }
             }
         };
@@ -107,12 +112,12 @@ class SumAggregator extends NumericMetricsAggregator.SingleValue {
         if (valuesSource == null || bucket >= sums.size()) {
             return buildEmptyAggregation();
         }
-        return new InternalSum(name, sums.get(bucket), format, metadata());
+        return new InternalSum(name, sums.get(bucket), format, pipelineAggregators(), metaData());
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new InternalSum(name, 0.0, format, metadata());
+        return new InternalSum(name, 0.0, format, pipelineAggregators(), metaData());
     }
 
     @Override

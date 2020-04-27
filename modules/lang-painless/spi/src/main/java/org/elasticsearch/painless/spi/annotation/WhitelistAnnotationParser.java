@@ -34,8 +34,7 @@ public interface WhitelistAnnotationParser {
     Map<String, WhitelistAnnotationParser> BASE_ANNOTATION_PARSERS = Collections.unmodifiableMap(
             Stream.of(
                     new AbstractMap.SimpleEntry<>(NoImportAnnotation.NAME, NoImportAnnotationParser.INSTANCE),
-                    new AbstractMap.SimpleEntry<>(DeprecatedAnnotation.NAME, DeprecatedAnnotationParser.INSTANCE),
-                    new AbstractMap.SimpleEntry<>(NonDeterministicAnnotation.NAME, NonDeterministicAnnotationParser.INSTANCE)
+                    new AbstractMap.SimpleEntry<>(DeprecatedAnnotation.NAME, DeprecatedAnnotationParser.INSTANCE)
             ).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
     );
 

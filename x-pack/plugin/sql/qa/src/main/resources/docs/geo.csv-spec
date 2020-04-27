@@ -1,5 +1,3 @@
-// To mute tests follow example in file: example.csv-spec
-
 //
 // CSV spec used by the geo docs
 //
@@ -15,7 +13,7 @@ selectAsWKT
 SELECT city, ST_AsWKT(location) location FROM "geo" WHERE city = 'Amsterdam';
 
      city:s    |     location:s
-Amsterdam      |POINT (4.850311987102032 52.347556999884546)
+Amsterdam      |point (4.850311987102032 52.347556999884546)
 // end::aswkt
 ;
 
@@ -24,7 +22,7 @@ selectWKTToSQL
 SELECT CAST(ST_WKTToSQL('POINT (10 20)') AS STRING) location;
 
    location:s
-POINT (10.0 20.0)
+point (10.0 20.0)
 // end::wkttosql
 ;
 

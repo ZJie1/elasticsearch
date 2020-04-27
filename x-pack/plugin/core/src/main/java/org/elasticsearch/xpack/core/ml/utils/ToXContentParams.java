@@ -19,6 +19,12 @@ public final class ToXContentParams {
     public static final String FOR_INTERNAL_STORAGE = "for_internal_storage";
 
     /**
+     * When serialising POJOs to X Content this indicates whether the type field
+     * should be included or not
+     */
+    public static final String INCLUDE_TYPE = "include_type";
+
+    /**
      * When serialising POJOs to X Content this indicates whether the calculated (i.e. not stored) fields
      * should be included or not
      */

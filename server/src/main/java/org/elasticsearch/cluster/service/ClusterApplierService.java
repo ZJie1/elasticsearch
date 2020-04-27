@@ -390,7 +390,7 @@ public class ClusterApplierService extends AbstractLifecycleComponent implements
         return true;
     }
 
-    private void runTask(UpdateTask task) {
+    protected void runTask(UpdateTask task) {
         if (!lifecycle.started()) {
             logger.debug("processing [{}]: ignoring, cluster applier service not started", task.source);
             return;
@@ -447,9 +447,6 @@ public class ClusterApplierService extends AbstractLifecycleComponent implements
                             "failed to apply updated cluster state in [{}]:\nversion [{}], uuid [{}], source [{}]",
                             executionTime, newClusterState.version(), newClusterState.stateUUID(), task.source), e);
                 }
-                // failing to apply a cluster state with an exception indicates a bug in validation or in one of the appliers; if we
-                // continue we will retry with the same cluster state but that might not help.
-                assert applicationMayFail();
                 task.listener.onFailure(task.source, e);
             }
         }
@@ -473,9 +470,9 @@ public class ClusterApplierService extends AbstractLifecycleComponent implements
         }
 
         // nothing to do until we actually recover from the gateway or any other block indicates we need to disable persistency
-        if (clusterChangedEvent.state().blocks().disableStatePersistence() == false && clusterChangedEvent.metadataChanged()) {
+        if (clusterChangedEvent.state().blocks().disableStatePersistence() == false && clusterChangedEvent.metaDataChanged()) {
             logger.debug("applying settings from cluster state with version {}", newClusterState.version());
-            final Settings incomingSettings = clusterChangedEvent.state().metadata().settings();
+            final Settings incomingSettings = clusterChangedEvent.state().metaData().settings();
             try (Releasable ignored = stopWatch.timing("applying settings")) {
                 clusterSettings.applySettings(incomingSettings);
             }
@@ -664,8 +661,4 @@ public class ClusterApplierService extends AbstractLifecycleComponent implements
         return threadPool.relativeTimeInMillis();
     }
 
-    // overridden by tests that need to check behaviour in the event of an application failure
-    protected boolean applicationMayFail() {
-        return false;
-    }
 }

@@ -28,7 +28,7 @@ include::common-options.asciidoc[]
 
 This processor can also be used to copy data from one field to another. For example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/set_os
 {
@@ -54,16 +54,17 @@ POST _ingest/pipeline/set_os/_simulate
   ]
 }
 --------------------------------------------------
+// CONSOLE
 
 Result:
-
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "docs" : [
     {
       "doc" : {
         "_index" : "_index",
+        "_type" : "_doc",
         "_id" : "_id",
         "_source" : {
           "host" : {

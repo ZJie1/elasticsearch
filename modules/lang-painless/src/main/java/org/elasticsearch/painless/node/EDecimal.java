@@ -19,20 +19,21 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.ConstantNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a decimal constant.
  */
-public class EDecimal extends AExpression {
+public final class EDecimal extends AExpression {
 
-    protected final String value;
+    private final String value;
 
     public EDecimal(Location location, String value) {
         super(location);
@@ -41,23 +42,25 @@ public class EDecimal extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException(
-                    "invalid assignment: cannot assign a value to decimal constant [" + value + "]"));
-        }
+    void storeSettings(CompilerSettings settings) {
+        // Do nothing.
+    }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException("not a statement: decimal constant [" + value + "] not used"));
-        }
+    @Override
+    void extractVariables(Set<String> variables) {
+        // Do nothing.
+    }
 
-        Output output = new Output();
-        Object constant;
+    @Override
+    void analyze(Locals locals) {
+        if (!read) {
+            throw createError(new IllegalArgumentException("Must read from constant [" + value + "]."));
+        }
 
         if (value.endsWith("f") || value.endsWith("F")) {
             try {
                 constant = Float.parseFloat(value.substring(0, value.length() - 1));
-                output.actual = float.class;
+                actual = float.class;
             } catch (NumberFormatException exception) {
                 throw createError(new IllegalArgumentException("Invalid float constant [" + value + "]."));
             }
@@ -68,19 +71,20 @@ public class EDecimal extends AExpression {
             }
             try {
                 constant = Double.parseDouble(toParse);
-                output.actual = double.class;
+                actual = double.class;
             } catch (NumberFormatException exception) {
                 throw createError(new IllegalArgumentException("Invalid double constant [" + value + "]."));
             }
         }
+    }
 
-        ConstantNode constantNode = new ConstantNode();
-        constantNode.setLocation(location);
-        constantNode.setExpressionType(output.actual);
-        constantNode.setConstant(constant);
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        throw createError(new IllegalStateException("Illegal tree structure."));
+    }
 
-        output.expressionNode = constantNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString(value);
     }
 }

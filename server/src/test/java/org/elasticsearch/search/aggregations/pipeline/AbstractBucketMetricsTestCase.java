@@ -40,4 +40,5 @@ public abstract class AbstractBucketMetricsTestCase<PAF extends BucketMetricsPip
     }
 
     protected abstract PAF doCreateTestAggregatorFactory(String name, String bucketsPath);
+
 }

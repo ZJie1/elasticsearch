@@ -16,7 +16,7 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.coordination.ElectionStrategy;
 import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
-import org.elasticsearch.cluster.metadata.IndexTemplateMetadata;
+import org.elasticsearch.cluster.metadata.IndexTemplateMetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodeRole;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
@@ -59,11 +59,9 @@ import org.elasticsearch.plugins.PersistentTaskPlugin;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.plugins.RepositoryPlugin;
 import org.elasticsearch.plugins.ScriptPlugin;
-import org.elasticsearch.repositories.RepositoriesService;
 import org.elasticsearch.repositories.Repository;
 import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestHandler;
-import org.elasticsearch.rest.RestHeaderDefinition;
 import org.elasticsearch.script.ScriptContext;
 import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.threadpool.ExecutorBuilder;
@@ -102,7 +100,7 @@ public class LocalStateCompositeXPackPlugin extends XPackPlugin implements Scrip
     private LicenseService licenseService;
     protected List<Plugin> plugins = new ArrayList<>();
 
-    public LocalStateCompositeXPackPlugin(final Settings settings, final Path configPath) {
+    public LocalStateCompositeXPackPlugin(final Settings settings, final Path configPath) throws Exception {
         super(settings, configPath);
     }
 
@@ -141,23 +139,21 @@ public class LocalStateCompositeXPackPlugin extends XPackPlugin implements Scrip
     public Collection<Object> createComponents(Client client, ClusterService clusterService, ThreadPool threadPool,
                                                ResourceWatcherService resourceWatcherService, ScriptService scriptService,
                                                NamedXContentRegistry xContentRegistry, Environment environment,
-                                               NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry,
-                                               IndexNameExpressionResolver expressionResolver,
-                                               Supplier<RepositoriesService> repositoriesServiceSupplier) {
+                                               NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry) {
         List<Object> components = new ArrayList<>();
         components.addAll(super.createComponents(client, clusterService, threadPool, resourceWatcherService, scriptService,
-                xContentRegistry, environment, nodeEnvironment, namedWriteableRegistry, expressionResolver, repositoriesServiceSupplier));
+                xContentRegistry, environment, nodeEnvironment, namedWriteableRegistry));
 
         filterPlugins(Plugin.class).stream().forEach(p ->
             components.addAll(p.createComponents(client, clusterService, threadPool, resourceWatcherService, scriptService,
-                    xContentRegistry, environment, nodeEnvironment, namedWriteableRegistry, expressionResolver, null))
+                    xContentRegistry, environment, nodeEnvironment, namedWriteableRegistry))
         );
         return components;
     }
 
     @Override
-    public Collection<RestHeaderDefinition> getRestHeaders() {
-        List<RestHeaderDefinition> headers = new ArrayList<>();
+    public Collection<String> getRestHeaders() {
+        List<String> headers = new ArrayList<>();
         headers.addAll(super.getRestHeaders());
         filterPlugins(ActionPlugin.class).stream().forEach(p -> headers.addAll(p.getRestHeaders()));
         return headers;
@@ -294,11 +290,10 @@ public class LocalStateCompositeXPackPlugin extends XPackPlugin implements Scrip
                                                                         CircuitBreakerService circuitBreakerService,
                                                                         NamedXContentRegistry xContentRegistry,
                                                                         NetworkService networkService,
-                                                                        HttpServerTransport.Dispatcher dispatcher,
-                                                                        ClusterSettings clusterSettings) {
+                                                                        HttpServerTransport.Dispatcher dispatcher) {
         Map<String, Supplier<HttpServerTransport>> transports = new HashMap<>();
         filterPlugins(NetworkPlugin.class).stream().forEach(p -> transports.putAll(p.getHttpTransports(settings, threadPool, bigArrays,
-            pageCacheRecycler, circuitBreakerService, xContentRegistry, networkService, dispatcher, clusterSettings)));
+            pageCacheRecycler, circuitBreakerService, xContentRegistry, networkService, dispatcher)));
         return transports;
     }
 
@@ -333,10 +328,10 @@ public class LocalStateCompositeXPackPlugin extends XPackPlugin implements Scrip
     }
 
     @Override
-    public UnaryOperator<Map<String, IndexTemplateMetadata>> getIndexTemplateMetadataUpgrader() {
+    public UnaryOperator<Map<String, IndexTemplateMetaData>> getIndexTemplateMetaDataUpgrader() {
         return templates -> {
             for(Plugin p: plugins) {
-                templates = p.getIndexTemplateMetadataUpgrader().apply(templates);
+                templates = p.getIndexTemplateMetaDataUpgrader().apply(templates);
             }
             return templates;
         };
@@ -401,31 +396,28 @@ public class LocalStateCompositeXPackPlugin extends XPackPlugin implements Scrip
     public List<PersistentTasksExecutor<?>> getPersistentTasksExecutor(ClusterService clusterService,
                                                                        ThreadPool threadPool,
                                                                        Client client,
-                                                                       SettingsModule settingsModule,
-                                                                       IndexNameExpressionResolver expressionResolver) {
+                                                                       SettingsModule settingsModule) {
         return filterPlugins(PersistentTaskPlugin.class).stream()
-                .map(p -> p.getPersistentTasksExecutor(clusterService, threadPool, client, settingsModule, expressionResolver))
+                .map(p -> p.getPersistentTasksExecutor(clusterService, threadPool, client, settingsModule))
                 .flatMap(List::stream)
                 .collect(toList());
     }
 
     @Override
     public Map<String, Repository.Factory> getRepositories(Environment env, NamedXContentRegistry namedXContentRegistry,
-                                                           ClusterService clusterService) {
-        HashMap<String, Repository.Factory> repositories =
-            new HashMap<>(super.getRepositories(env, namedXContentRegistry, clusterService));
-        filterPlugins(RepositoryPlugin.class).forEach(
-            r -> repositories.putAll(r.getRepositories(env, namedXContentRegistry, clusterService)));
+                                                           ThreadPool threadPool) {
+        HashMap<String, Repository.Factory> repositories = new HashMap<>(super.getRepositories(env, namedXContentRegistry, threadPool));
+        filterPlugins(RepositoryPlugin.class).forEach(r -> repositories.putAll(r.getRepositories(env, namedXContentRegistry, threadPool)));
         return repositories;
     }
 
     @Override
     public Map<String, Repository.Factory> getInternalRepositories(Environment env, NamedXContentRegistry namedXContentRegistry,
-                                                                   ClusterService clusterService) {
+                                                                   ThreadPool threadPool) {
         HashMap<String, Repository.Factory> internalRepositories =
-            new HashMap<>(super.getInternalRepositories(env, namedXContentRegistry, clusterService));
+            new HashMap<>(super.getInternalRepositories(env, namedXContentRegistry, threadPool));
         filterPlugins(RepositoryPlugin.class).forEach(r ->
-            internalRepositories.putAll(r.getInternalRepositories(env, namedXContentRegistry, clusterService)));
+            internalRepositories.putAll(r.getInternalRepositories(env, namedXContentRegistry, threadPool)));
         return internalRepositories;
     }
 

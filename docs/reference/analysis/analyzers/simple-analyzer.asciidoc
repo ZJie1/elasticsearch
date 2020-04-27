@@ -7,7 +7,7 @@ and changes uppercase to lowercase.
 
 ==== Example
 
-[source,console]
+[source,js]
 ---------------------------
 POST _analyze
 {
@@ -15,10 +15,11 @@ POST _analyze
   "text": "The 2 QUICK Brown-Foxes jumped over the lazy dog's bone."
 }
 ---------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -102,6 +103,7 @@ POST _analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 
@@ -131,7 +133,7 @@ adding token filters.
 
 ===== Example
 
-[source,console]
+[source,js]
 ----------------------------------------------------
 PUT /simple_example
 {
@@ -148,6 +150,6 @@ PUT /simple_example
   }
 }
 ----------------------------------------------------
+// CONSOLE
 // TEST[s/\n$/\nstartyaml\n  - compare_analyzers: {index: simple_example, first: simple, second: rebuilt_simple}\nendyaml\n/]
-
 <1> Add token filters here.

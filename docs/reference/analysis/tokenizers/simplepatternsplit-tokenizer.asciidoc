@@ -1,6 +1,8 @@
 [[analysis-simplepatternsplit-tokenizer]]
 === Simple Pattern Split Tokenizer
 
+experimental[This functionality is marked as experimental in Lucene]
+
 The `simple_pattern_split` tokenizer uses a regular expression to split the
 input into terms at pattern matches. The set of regular expression features it
 supports is more limited than the <<analysis-pattern-tokenizer,`pattern`>>
@@ -33,7 +35,7 @@ The `simple_pattern_split` tokenizer accepts the following parameters:
 This example configures the `simple_pattern_split` tokenizer to split the input
 text on underscores.
 
-[source,console]
+[source,js]
 ----------------------------
 PUT my_index
 {
@@ -60,10 +62,11 @@ POST my_index/_analyze
   "text": "an_underscored_phrase"
 }
 ----------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens" : [
@@ -91,6 +94,7 @@ POST my_index/_analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 

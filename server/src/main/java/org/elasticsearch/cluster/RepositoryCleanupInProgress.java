@@ -24,7 +24,6 @@ import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.repositories.RepositoryOperation;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -52,13 +51,9 @@ public final class RepositoryCleanupInProgress extends AbstractNamedDiffable<Clu
         return new Entry(repository, repositoryStateId);
     }
 
-    public boolean hasCleanupInProgress() {
+    public boolean cleanupInProgress() {
         // TODO: Should we allow parallelism across repositories here maybe?
-        return entries.isEmpty() == false;
-    }
-
-    public List<Entry> entries() {
-        return List.copyOf(entries);
+        return entries.isEmpty();
     }
 
     @Override
@@ -95,7 +90,7 @@ public final class RepositoryCleanupInProgress extends AbstractNamedDiffable<Clu
         return Version.V_7_4_0;
     }
 
-    public static final class Entry implements Writeable, RepositoryOperation {
+    public static final class Entry implements Writeable {
 
         private final String repository;
 
@@ -106,19 +101,9 @@ public final class RepositoryCleanupInProgress extends AbstractNamedDiffable<Clu
             repositoryStateId = in.readLong();
         }
 
-        public Entry(String repository, long repositoryStateId) {
+        private Entry(String repository, long repositoryStateId) {
             this.repository = repository;
             this.repositoryStateId = repositoryStateId;
-        }
-
-        @Override
-        public long repositoryStateId() {
-            return repositoryStateId;
-        }
-
-        @Override
-        public String repository() {
-            return repository;
         }
 
         @Override

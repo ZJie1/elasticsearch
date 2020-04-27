@@ -6,12 +6,13 @@
 
 Returns information about one or more index aliases.
 
-include::{docdir}/glossary.asciidoc[tag=index-alias-desc]
+include::alias-exists.asciidoc[tag=index-alias-def]
 
-[source,console]
+[source,js]
 ----
 GET /twitter/_alias/alias1
 ----
+// CONSOLE
 // TEST[setup:twitter]
 // TEST[s/^/PUT twitter\/_alias\/alias1\n/]
 
@@ -43,8 +44,6 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=index]
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `true`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +
@@ -72,7 +71,7 @@ with two aliases:
 in the `logs_20302801` index
 with a `year` field value of `2030`
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /logs_20302801
 {
@@ -86,19 +85,21 @@ PUT /logs_20302801
   }
 }
 --------------------------------------------------
+// CONSOLE
 
 The following get index alias API request returns all aliases
 for the index `logs_20302801`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /logs_20302801/_alias/*
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 The API returns the following response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
  "logs_20302801" : {
@@ -116,6 +117,7 @@ The API returns the following response:
  }
 }
 --------------------------------------------------
+// TESTRESPONSE
 
 
 [[get-alias-api-named-ex]]
@@ -123,15 +125,16 @@ The API returns the following response:
 
 The following index alias API request returns the `2030` alias:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_alias/2030
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 The API returns the following response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "logs_20302801" : {
@@ -147,22 +150,23 @@ The API returns the following response:
   }
 }
 --------------------------------------------------
-
+// TESTRESPONSE
 
 [[get-alias-api-wildcard-ex]]
 ===== Get aliases based on a wildcard
 
 The following index alias API request returns any alias that begin with `20`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_alias/20*
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 The API returns the following response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "logs_20302801" : {
@@ -178,3 +182,4 @@ The API returns the following response:
   }
 }
 --------------------------------------------------
+// TESTRESPONSE

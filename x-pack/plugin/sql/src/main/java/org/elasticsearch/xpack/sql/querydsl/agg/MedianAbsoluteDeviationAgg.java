@@ -6,19 +6,18 @@
 
 package org.elasticsearch.xpack.sql.querydsl.agg;
 
-import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 
-import java.util.function.Function;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.medianAbsoluteDeviation;
 
-public class MedianAbsoluteDeviationAgg extends DefaultAggSourceLeafAgg {
+public class MedianAbsoluteDeviationAgg extends LeafAgg {
 
-    public MedianAbsoluteDeviationAgg(String id, AggSource source) {
-        super(id, source);
+    public MedianAbsoluteDeviationAgg(String id, String fieldName) {
+        super(id, fieldName);
     }
 
     @Override
-    Function<String, ValuesSourceAggregationBuilder<?>> builder() {
-        return AggregationBuilders::medianAbsoluteDeviation;
+    AggregationBuilder toBuilder() {
+        return medianAbsoluteDeviation(id()).field(fieldName());
     }
 }

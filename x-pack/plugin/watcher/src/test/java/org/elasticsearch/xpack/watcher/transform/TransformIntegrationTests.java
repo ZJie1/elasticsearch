@@ -159,7 +159,7 @@ public class TransformIntegrationTests extends AbstractWatcherIntegrationTestCas
         createIndex("my-condition-index", "my-payload-index");
         ensureGreen("my-condition-index", "my-payload-index");
 
-        indexDoc("my-payload-index", "mytestresult");
+        index("my-payload-index", "payload", "mytestresult");
         refresh();
 
         WatcherSearchTemplateRequest inputRequest = templateRequest(searchSource().query(matchAllQuery()), "my-condition-index");
@@ -170,7 +170,7 @@ public class TransformIntegrationTests extends AbstractWatcherIntegrationTestCas
                                 .trigger(schedule(interval("5s")))
                                 .input(searchInput(inputRequest))
                                 .transform(searchTransform(transformRequest))
-                                .addAction("_id", indexAction("output1"))
+                                .addAction("_id", indexAction("output1", "result"))
                 ).get();
         assertThat(putWatchResponse.isCreated(), is(true));
         putWatchResponse = new PutWatchRequestBuilder(client(), "_id2")

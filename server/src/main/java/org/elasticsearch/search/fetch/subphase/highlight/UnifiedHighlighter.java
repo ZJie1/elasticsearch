@@ -36,12 +36,11 @@ import org.elasticsearch.common.text.Text;
 import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.mapper.DocumentMapper;
 import org.elasticsearch.index.mapper.IdFieldMapper;
-import org.elasticsearch.index.mapper.KeywordFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
-import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.search.fetch.FetchPhaseExecutionException;
 import org.elasticsearch.search.fetch.FetchSubPhase;
 import org.elasticsearch.search.fetch.FetchSubPhase.HitContext;
+import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
 import java.text.BreakIterator;
@@ -57,28 +56,23 @@ public class UnifiedHighlighter implements Highlighter {
     public boolean canHighlight(MappedFieldType fieldType) {
         return true;
     }
-
+    
     @Override
     public HighlightField highlight(HighlighterContext highlighterContext) {
         MappedFieldType fieldType = highlighterContext.fieldType;
         SearchContextHighlight.Field field = highlighterContext.field;
-        QueryShardContext context = highlighterContext.context;
+        SearchContext context = highlighterContext.context;
         FetchSubPhase.HitContext hitContext = highlighterContext.hitContext;
         Encoder encoder = field.fieldOptions().encoder().equals("html") ? HighlightUtils.Encoders.HTML : HighlightUtils.Encoders.DEFAULT;
-        final int maxAnalyzedOffset = context.getIndexSettings().getHighlightMaxAnalyzedOffset();
-        Integer keywordIgnoreAbove = null;
-        if (fieldType instanceof KeywordFieldMapper.KeywordFieldType) {
-            KeywordFieldMapper mapper = (KeywordFieldMapper) context.getMapperService().documentMapper()
-                .mappers().getMapper(highlighterContext.fieldName);
-            keywordIgnoreAbove = mapper.ignoreAbove();
-        }
+        final int maxAnalyzedOffset = context.indexShard().indexSettings().getHighlightMaxAnalyzedOffset();
 
         List<Snippet> snippets = new ArrayList<>();
-        int numberOfFragments = field.fieldOptions().numberOfFragments();
+        int numberOfFragments;
         try {
-            final Analyzer analyzer = getAnalyzer(context.getMapperService().documentMapper(), hitContext);
-            List<Object> fieldValues = loadFieldValues(fieldType, field, context, hitContext,
-                highlighterContext.highlight.forceSource(field));
+
+            final Analyzer analyzer = getAnalyzer(context.mapperService().documentMapper(hitContext.hit().getType()),
+                    hitContext);
+            List<Object> fieldValues = loadFieldValues(fieldType, field, context, hitContext);
             if (fieldValues.size() == 0) {
                 return null;
             }
@@ -87,28 +81,22 @@ public class UnifiedHighlighter implements Highlighter {
             final CustomUnifiedHighlighter highlighter;
             final String fieldValue = mergeFieldValues(fieldValues, MULTIVAL_SEP_CHAR);
             final OffsetSource offsetSource = getOffsetSource(fieldType);
-            int fieldValueLength = fieldValue.length();
-            if (keywordIgnoreAbove != null  && fieldValueLength > keywordIgnoreAbove) {
-                return null; // skip highlighting keyword terms that were ignored during indexing
-            }
-            if ((offsetSource == OffsetSource.ANALYSIS) && (fieldValueLength > maxAnalyzedOffset)) {
+            if ((offsetSource == OffsetSource.ANALYSIS) && (fieldValue.length() > maxAnalyzedOffset)) {
                 throw new IllegalArgumentException(
                     "The length of [" + highlighterContext.fieldName + "] field of [" + hitContext.hit().getId() +
-                        "] doc of [" + context.index().getName() + "] index " + "has exceeded [" +
+                        "] doc of [" + context.indexShard().shardId().getIndexName() + "] index " + "has exceeded [" +
                         maxAnalyzedOffset + "] - maximum allowed to be analyzed for highlighting. " +
                         "This maximum can be set by changing the [" + IndexSettings.MAX_ANALYZED_OFFSET_SETTING.getKey() +
                         "] index level setting. " + "For large texts, indexing with offsets or term vectors is recommended!");
             }
-            if (numberOfFragments == 0
-                    // non-tokenized fields should not use any break iterator (ignore boundaryScannerType)
-                    || fieldType.tokenized() == false) {
+            if (field.fieldOptions().numberOfFragments() == 0) {
                 // we use a control char to separate values, which is the only char that the custom break iterator
                 // breaks the text on, so we don't lose the distinction between the different values of a field and we
                 // get back a snippet per value
                 CustomSeparatorBreakIterator breakIterator = new CustomSeparatorBreakIterator(MULTIVAL_SEP_CHAR);
                 highlighter = new CustomUnifiedHighlighter(searcher, analyzer, offsetSource, passageFormatter,
                     field.fieldOptions().boundaryScannerLocale(), breakIterator, fieldValue, field.fieldOptions().noMatchSize());
-                numberOfFragments = numberOfFragments == 0 ? fieldValues.size() : numberOfFragments;
+                numberOfFragments = fieldValues.size(); // we are highlighting the whole content, one snippet per value
             } else {
                 //using paragraph separator we make sure that each field value holds a discrete passage for highlighting
                 BreakIterator bi = getBreakIterator(field);
@@ -135,7 +123,7 @@ public class UnifiedHighlighter implements Highlighter {
                 }
             }
         } catch (IOException e) {
-            throw new FetchPhaseExecutionException(highlighterContext.shardTarget,
+            throw new FetchPhaseExecutionException(context,
                 "Failed to highlight field [" + highlighterContext.fieldName + "]", e);
         }
 
@@ -161,17 +149,14 @@ public class UnifiedHighlighter implements Highlighter {
         return passageFormatter;
     }
 
-
+    
     protected Analyzer getAnalyzer(DocumentMapper docMapper, HitContext hitContext) {
         return docMapper.mappers().indexAnalyzer();
     }
-
-    protected List<Object> loadFieldValues(MappedFieldType fieldType,
-                                           SearchContextHighlight.Field field,
-                                           QueryShardContext context,
-                                           FetchSubPhase.HitContext hitContext,
-                                           boolean forceSource) throws IOException {
-        List<Object> fieldValues = HighlightUtils.loadFieldValues(fieldType, context, hitContext, forceSource);
+    
+    protected List<Object> loadFieldValues(MappedFieldType fieldType, SearchContextHighlight.Field field, SearchContext context,
+            FetchSubPhase.HitContext hitContext) throws IOException {
+        List<Object> fieldValues = HighlightUtils.loadFieldValues(field, fieldType, context, hitContext);
         fieldValues = fieldValues.stream()
             .map((s) -> convertFieldValue(fieldType, s))
             .collect(Collectors.toList());

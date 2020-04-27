@@ -15,18 +15,19 @@ except you can search for multiple values.
 The following search returns documents where the `user` field contains `kimchy`
 or `elasticsearch`.
 
-[source,console]
+[source,js]
 ----
 GET /_search
 {
     "query" : {
         "terms" : {
             "user" : ["kimchy", "elasticsearch"],
-            "boost" : 1.0
+            "boost" : 1.0 
         }
     }
 }
 ----
+// CONSOLE
 
 [[terms-top-level-params]]
 ==== Top-level parameters for `terms`
@@ -93,16 +94,16 @@ To perform a terms lookup, use the following parameters.
 [[query-dsl-terms-lookup-params]]
 ====== Terms lookup parameters
 `index`::
-(Required, string) Name of the index from which to fetch field values.
+(Optional, string) Name of the index from which to fetch field values.
 
 `id`::
-(Required, string) <<mapping-id-field,ID>> of the document from which to fetch
+(Optional, string) <<mapping-id-field,ID>> of the document from which to fetch
 field values.
 
 `path`::
 +
 --
-(Required, string) Name of the field from which to fetch field values. {es} uses
+(Optional, string) Name of the field from which to fetch field values. {es} uses
 these values as search terms for the query.
 
 If the field values include an array of nested inner objects, you can access
@@ -117,13 +118,13 @@ when the document was indexed, this parameter is required.
 [[query-dsl-terms-lookup-example]]
 ====== Terms lookup example
 
-To see how terms lookup works, try the following example.
+To see how terms lookup works, try the following example.  
 
 . Create an index with a `keyword` field named `color`.
 +
 --
 
-[source,console]
+[source,js]
 ----
 PUT my_index
 {
@@ -134,6 +135,7 @@ PUT my_index
     }
 }
 ----
+// CONSOLE
 --
 
 . Index a document with an ID of 1 and values of `["blue", "green"]` in the
@@ -141,13 +143,14 @@ PUT my_index
 +
 --
 
-[source,console]
+[source,js]
 ----
 PUT my_index/_doc/1
 {
   "color":   ["blue", "green"]
 }
 ----
+// CONSOLE
 // TEST[continued]
 --
 
@@ -156,13 +159,14 @@ field.
 +
 --
 
-[source,console]
+[source,js]
 ----
 PUT my_index/_doc/2
 {
   "color":   "blue"
 }
 ----
+// CONSOLE
 // TEST[continued]
 --
 
@@ -174,15 +178,16 @@ parameter so the response is more readable.
 
 ////
 
-[source,console]
+[source,js]
 ----
 POST my_index/_refresh
 ----
+// CONSOLE
 // TEST[continued]
 
 ////
 
-[source,console]
+[source,js]
 ----
 GET my_index/_search?pretty
 {
@@ -197,12 +202,13 @@ GET my_index/_search?pretty
   }
 }
 ----
+// CONSOLE
 // TEST[continued]
 
 Because document 2 and document 1 both contain `blue` as a value in the `color`
 field, {es} returns both documents.
 
-[source,console-result]
+[source,js]
 ----
 {
   "took" : 17,
@@ -222,6 +228,7 @@ field, {es} returns both documents.
     "hits" : [
       {
         "_index" : "my_index",
+        "_type" : "_doc",
         "_id" : "1",
         "_score" : 1.0,
         "_source" : {
@@ -233,6 +240,7 @@ field, {es} returns both documents.
       },
       {
         "_index" : "my_index",
+        "_type" : "_doc",
         "_id" : "2",
         "_score" : 1.0,
         "_source" : {

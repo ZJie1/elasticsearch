@@ -41,7 +41,7 @@ the request URL.
 
 . Create {ref}/mapping.html[mappings] for the sample data:
 +
-[source,console]
+[source,js]
 ----
 PUT /seats
 {
@@ -62,6 +62,7 @@ PUT /seats
 }
 ----
 +
+// CONSOLE
 
 . Run the <<painless-ingest-processor-context, ingest processor context>>
 example. This sets up a script ingest processor used on each document as the

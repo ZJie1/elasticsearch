@@ -5,9 +5,9 @@
  */
 package org.elasticsearch.xpack.sql.expression.function.scalar.datetime;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.tree.Source;
+import org.elasticsearch.xpack.sql.expression.Expression;
 import org.elasticsearch.xpack.sql.expression.function.scalar.datetime.DateTimeProcessor.DateTimeExtractor;
+import org.elasticsearch.xpack.sql.tree.Source;
 
 import java.time.ZoneId;
 
@@ -22,13 +22,7 @@ public abstract class DateTimeHistogramFunction extends DateTimeFunction {
     }
 
     /**
-     * used for aggregation (date histogram)
+     * used for aggregration (date histogram)
      */
-    public long fixedInterval() {
-        return -1;
-    }
-    
-    public String calendarInterval() {
-        return null;
-    }
+    public abstract long interval();
 }

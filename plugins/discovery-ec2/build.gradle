@@ -1,5 +1,3 @@
-import org.elasticsearch.gradle.info.BuildParams
-
 /*
  * Licensed to Elasticsearch under one or more contributor
  * license agreements. See the NOTICE file distributed with
@@ -25,7 +23,7 @@ esplugin {
 }
 
 versions << [
-  'aws': '1.11.749'
+  'aws': '1.11.562'
 ]
 
 dependencies {
@@ -36,14 +34,8 @@ dependencies {
   compile "commons-logging:commons-logging:${versions.commonslogging}"
   compile "org.apache.logging.log4j:log4j-1.2-api:${versions.log4j}"
   compile "commons-codec:commons-codec:${versions.commonscodec}"
-  compile "com.fasterxml.jackson.core:jackson-databind:${versions.jackson}"
+  compile 'com.fasterxml.jackson.core:jackson-databind:2.8.11.3'
   compile "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
-}
-
-restResources {
-  restApi {
-    includeCore '_common', 'cluster', 'nodes'
-  }
 }
 
 dependencyLicenses {
@@ -64,34 +56,12 @@ task writeTestJavaPolicy {
       throw new GradleException("failed to create temporary directory [${tmp}]")
     }
     final File javaPolicy = file("${tmp}/java.policy")
-    if (BuildParams.inFipsJvm) {
-      javaPolicy.write(
-        [
-          "grant {",
-          "permission java.security.SecurityPermission \"putProviderProperty.BCFIPS\";",
-          "permission java.security.SecurityPermission \"putProviderProperty.BCJSSE\";",
-          "permission java.lang.RuntimePermission \"getProtectionDomain\";",
-          "permission java.util.PropertyPermission \"java.runtime.name\", \"read\";",
-          "permission org.bouncycastle.crypto.CryptoServicesPermission \"tlsAlgorithmsEnabled\";",
-          "permission java.lang.RuntimePermission \"accessClassInPackage.sun.security.internal.spec\";",
-          "permission java.lang.RuntimePermission \"accessDeclaredMembers\";",
-          "permission java.util.PropertyPermission \"intellij.debug.agent\", \"read\";",
-          "permission java.util.PropertyPermission \"intellij.debug.agent\", \"write\";",
-          "permission org.bouncycastle.crypto.CryptoServicesPermission \"exportSecretKey\";",
-          "permission org.bouncycastle.crypto.CryptoServicesPermission \"exportPrivateKey\";",
-          "permission java.io.FilePermission \"\${javax.net.ssl.trustStore}\", \"read\";",
-          "  permission java.util.PropertyPermission \"com.amazonaws.sdk.ec2MetadataServiceEndpointOverride\", \"write\";",
-          "};"
-        ].join("\n")
-      )
-    } else {
-      javaPolicy.write(
-        [
-          "grant {",
-          "  permission java.util.PropertyPermission \"com.amazonaws.sdk.ec2MetadataServiceEndpointOverride\", \"write\";",
-          "};"
-        ].join("\n"))
-    }
+    javaPolicy.write(
+    [
+            "grant {",
+            "  permission java.util.PropertyPermission \"com.amazonaws.sdk.ec2MetadataServiceEndpointOverride\", \"write\";",
+            "};"
+    ].join("\n"))
   }
 }
 
@@ -99,14 +69,10 @@ test {
   dependsOn writeTestJavaPolicy
   // this is needed for insecure plugins, remove if possible!
   systemProperty 'tests.artifact', project.name
-
+  
   // this is needed to manipulate com.amazonaws.sdk.ec2MetadataServiceEndpointOverride system property
   // it is better rather disable security manager at all with `systemProperty 'tests.security.manager', 'false'`
-  if (BuildParams.inFipsJvm){
-    systemProperty 'java.security.policy', "=file://${buildDir}/tmp/java.policy"
-  } else {
-    systemProperty 'java.security.policy', "file://${buildDir}/tmp/java.policy"
-  }
+  systemProperty 'java.security.policy', "file://${buildDir}/tmp/java.policy"
 }
 
 check {
@@ -114,7 +80,7 @@ check {
   dependsOn 'qa:amazon-ec2:check'
 }
 
-thirdPartyAudit.ignoreMissingClasses(
+thirdPartyAudit.ignoreMissingClasses (
   // classes are missing
   'com.amazonaws.jmespath.JmesPathEvaluationVisitor',
   'com.amazonaws.jmespath.JmesPathExpression',
@@ -136,14 +102,14 @@ thirdPartyAudit.ignoreMissingClasses(
   'software.amazon.ion.system.IonSystemBuilder',
   'software.amazon.ion.system.IonTextWriterBuilder',
   'software.amazon.ion.system.IonWriterBuilder',
-  'javax.servlet.ServletContextEvent',
-  'javax.servlet.ServletContextListener',
-  'org.apache.avalon.framework.logger.Logger',
-  'org.apache.log.Hierarchy',
+  'javax.servlet.ServletContextEvent', 
+  'javax.servlet.ServletContextListener', 
+  'org.apache.avalon.framework.logger.Logger', 
+  'org.apache.log.Hierarchy', 
   'org.apache.log.Logger'
 )
 
-thirdPartyAudit.ignoreMissingClasses(
+thirdPartyAudit.ignoreMissingClasses (
   'javax.xml.bind.DatatypeConverter',
   'javax.xml.bind.JAXBContext'
 )

@@ -43,8 +43,6 @@ import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.ParseContext;
 import org.elasticsearch.index.mapper.StringFieldType;
 import org.elasticsearch.index.query.QueryShardContext;
-import org.elasticsearch.search.aggregations.support.CoreValuesSourceType;
-import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -85,7 +83,7 @@ public final class ParentJoinFieldMapper extends FieldMapper {
      */
     public static ParentJoinFieldMapper getMapper(MapperService service) {
         MetaJoinFieldMapper.MetaJoinFieldType fieldType =
-            (MetaJoinFieldMapper.MetaJoinFieldType) service.fieldType(MetaJoinFieldMapper.NAME);
+            (MetaJoinFieldMapper.MetaJoinFieldType) service.fullName(MetaJoinFieldMapper.NAME);
         return fieldType == null ? null : fieldType.getMapper();
     }
 
@@ -94,7 +92,7 @@ public final class ParentJoinFieldMapper extends FieldMapper {
     }
 
     private static void checkIndexCompatibility(IndexSettings settings, String name) {
-        if (settings.getIndexMetadata().isRoutingPartitionedIndex()) {
+        if (settings.getIndexMetaData().isRoutingPartitionedIndex()) {
             throw new IllegalStateException("cannot create join field [" + name + "] " +
                 "for the partitioned index " + "[" + settings.getIndex().getName() + "]");
         }
@@ -227,11 +225,6 @@ public final class ParentJoinFieldMapper extends FieldMapper {
         public IndexFieldData.Builder fielddataBuilder(String fullyQualifiedIndexName) {
             failIfNoDocValues();
             return new DocValuesIndexFieldData.Builder();
-        }
-
-        @Override
-        public ValuesSourceType getValuesSourceType() {
-            return CoreValuesSourceType.BYTES;
         }
 
         @Override

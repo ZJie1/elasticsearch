@@ -71,7 +71,7 @@ public class EvilThreadPoolTests extends ESTestCase {
 
     public void testExecutionErrorOnFixedESThreadPoolExecutor() throws InterruptedException {
         final EsThreadPoolExecutor fixedExecutor = EsExecutors.newFixed("test", 1, 1,
-            EsExecutors.daemonThreadFactory("test"), threadPool.getThreadContext(), randomBoolean());
+            EsExecutors.daemonThreadFactory("test"), threadPool.getThreadContext());
         try {
             checkExecutionError(getExecuteRunner(fixedExecutor));
             checkExecutionError(getSubmitRunner(fixedExecutor));
@@ -88,6 +88,17 @@ public class EvilThreadPoolTests extends ESTestCase {
             checkExecutionError(getSubmitRunner(scalingExecutor));
         } finally {
             ThreadPool.terminate(scalingExecutor, 10, TimeUnit.SECONDS);
+        }
+    }
+
+    public void testExecutionErrorOnAutoQueueFixedESThreadPoolExecutor() throws InterruptedException {
+        final EsThreadPoolExecutor autoQueueFixedExecutor = EsExecutors.newAutoQueueFixed("test", 1, 1,
+            1, 1, 1, TimeValue.timeValueSeconds(10), EsExecutors.daemonThreadFactory("test"), threadPool.getThreadContext());
+        try {
+            checkExecutionError(getExecuteRunner(autoQueueFixedExecutor));
+            checkExecutionError(getSubmitRunner(autoQueueFixedExecutor));
+        } finally {
+            ThreadPool.terminate(autoQueueFixedExecutor, 10, TimeUnit.SECONDS);
         }
     }
 
@@ -169,7 +180,7 @@ public class EvilThreadPoolTests extends ESTestCase {
 
     public void testExecutionExceptionOnFixedESThreadPoolExecutor() throws InterruptedException {
         final EsThreadPoolExecutor fixedExecutor = EsExecutors.newFixed("test", 1, 1,
-            EsExecutors.daemonThreadFactory("test"), threadPool.getThreadContext(), randomBoolean());
+            EsExecutors.daemonThreadFactory("test"), threadPool.getThreadContext());
         try {
             checkExecutionException(getExecuteRunner(fixedExecutor), true);
             checkExecutionException(getSubmitRunner(fixedExecutor), false);
@@ -186,6 +197,18 @@ public class EvilThreadPoolTests extends ESTestCase {
             checkExecutionException(getSubmitRunner(scalingExecutor), false);
         } finally {
             ThreadPool.terminate(scalingExecutor, 10, TimeUnit.SECONDS);
+        }
+    }
+
+    public void testExecutionExceptionOnAutoQueueFixedESThreadPoolExecutor() throws InterruptedException {
+        final EsThreadPoolExecutor autoQueueFixedExecutor = EsExecutors.newAutoQueueFixed("test", 1, 1,
+            1, 1, 1, TimeValue.timeValueSeconds(10), EsExecutors.daemonThreadFactory("test"), threadPool.getThreadContext());
+        try {
+            // fixed_auto_queue_size wraps stuff into TimedRunnable, which is an AbstractRunnable
+            checkExecutionException(getExecuteRunner(autoQueueFixedExecutor), true);
+            checkExecutionException(getSubmitRunner(autoQueueFixedExecutor), false);
+        } finally {
+            ThreadPool.terminate(autoQueueFixedExecutor, 10, TimeUnit.SECONDS);
         }
     }
 

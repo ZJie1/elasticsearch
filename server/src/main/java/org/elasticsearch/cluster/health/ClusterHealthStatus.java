@@ -52,7 +52,10 @@ public enum ClusterHealthStatus implements Writeable {
      * @throws IllegalArgumentException if the value is unrecognized
      */
     public static ClusterHealthStatus readFrom(StreamInput in) throws IOException {
-        byte value = in.readByte();
+        return fromValue(in.readByte());
+    }
+
+    public static ClusterHealthStatus fromValue(byte value) throws IOException {
         switch (value) {
             case 0:
                 return GREEN;

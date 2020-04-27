@@ -35,9 +35,6 @@ import java.util.concurrent.TimeUnit;
 
 import javax.net.ServerSocketFactory;
 
-import static org.elasticsearch.test.ESTestCase.assertBusy;
-import static org.junit.Assert.assertTrue;
-
 /**
  * Utility wrapper around Apache {@link SimpleKdcServer} backed by Unboundid
  * {@link InMemoryDirectoryServer}.<br>
@@ -93,7 +90,9 @@ public class SimpleKdcLdapServer {
         AccessController.doPrivileged(new PrivilegedExceptionAction<Void>() {
             @Override
             public Void run() throws Exception {
-                assertBusy(() -> assertTrue("Failed to initialize SimpleKdcLdapServer", init()));
+                if (ESTestCase.awaitBusy(() -> init()) == false) {
+                    throw new IllegalStateException("could not initialize SimpleKdcLdapServer");
+                }
                 return null;
             }
         });
@@ -219,7 +218,7 @@ public class SimpleKdcLdapServer {
 
     /**
      * Stop Simple Kdc Server
-     *
+     * 
      * @throws PrivilegedActionException when privileged action threw exception
      */
     public synchronized void stop() throws PrivilegedActionException {

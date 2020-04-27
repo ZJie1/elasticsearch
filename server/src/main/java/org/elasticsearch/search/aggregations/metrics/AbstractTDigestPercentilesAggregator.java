@@ -30,10 +30,12 @@ import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.LeafBucketCollector;
 import org.elasticsearch.search.aggregations.LeafBucketCollectorBase;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 abstract class AbstractTDigestPercentilesAggregator extends NumericMetricsAggregator.MultiValue {
@@ -43,16 +45,16 @@ abstract class AbstractTDigestPercentilesAggregator extends NumericMetricsAggreg
     }
 
     protected final double[] keys;
-    protected final ValuesSource valuesSource;
+    protected final ValuesSource.Numeric valuesSource;
     protected final DocValueFormat formatter;
     protected ObjectArray<TDigestState> states;
     protected final double compression;
     protected final boolean keyed;
 
-    AbstractTDigestPercentilesAggregator(String name, ValuesSource valuesSource, SearchContext context, Aggregator parent,
+    AbstractTDigestPercentilesAggregator(String name, ValuesSource.Numeric valuesSource, SearchContext context, Aggregator parent,
             double[] keys, double compression, boolean keyed, DocValueFormat formatter,
-            Map<String, Object> metadata) throws IOException {
-        super(name, context, parent, metadata);
+            List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData) throws IOException {
+        super(name, context, parent, pipelineAggregators, metaData);
         this.valuesSource = valuesSource;
         this.keyed = keyed;
         this.formatter = formatter;
@@ -73,11 +75,18 @@ abstract class AbstractTDigestPercentilesAggregator extends NumericMetricsAggreg
             return LeafBucketCollector.NO_OP_COLLECTOR;
         }
         final BigArrays bigArrays = context.bigArrays();
-        final SortedNumericDoubleValues values = ((ValuesSource.Numeric)valuesSource).doubleValues(ctx);
+        final SortedNumericDoubleValues values = valuesSource.doubleValues(ctx);
         return new LeafBucketCollectorBase(sub, values) {
             @Override
             public void collect(int doc, long bucket) throws IOException {
-                TDigestState state = getExistingOrNewHistogram(bigArrays, bucket);
+                states = bigArrays.grow(states, bucket + 1);
+
+                TDigestState state = states.get(bucket);
+                if (state == null) {
+                    state = new TDigestState(compression);
+                    states.set(bucket, state);
+                }
+
                 if (values.advanceExact(doc)) {
                     final int valueCount = values.docValueCount();
                     for (int i = 0; i < valueCount; i++) {
@@ -86,16 +95,6 @@ abstract class AbstractTDigestPercentilesAggregator extends NumericMetricsAggreg
                 }
             }
         };
-    }
-
-    private TDigestState getExistingOrNewHistogram(final BigArrays bigArrays, long bucket) {
-        states = bigArrays.grow(states, bucket + 1);
-        TDigestState state = states.get(bucket);
-        if (state == null) {
-            state = new TDigestState(compression);
-            states.set(bucket, state);
-        }
-        return state;
     }
 
     @Override

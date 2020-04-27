@@ -43,13 +43,9 @@ import org.elasticsearch.test.ESTestCase;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.List;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.startsWith;
 
 public class DefaultShardOperationFailedExceptionTests extends ESTestCase {
 
@@ -57,22 +53,19 @@ public class DefaultShardOperationFailedExceptionTests extends ESTestCase {
         {
             DefaultShardOperationFailedException exception = new DefaultShardOperationFailedException(
                 new ElasticsearchException("foo", new IllegalArgumentException("bar", new RuntimeException("baz"))));
-            assertThat(exception.toString(), startsWith("[null][-1] failed, reason [org.elasticsearch.ElasticsearchException: foo"));
+            assertEquals("[null][-1] failed, reason [ElasticsearchException[foo]; nested: " +
+                "IllegalArgumentException[bar]; nested: RuntimeException[baz]; ]", exception.toString());
         }
-
         {
             ElasticsearchException elasticsearchException = new ElasticsearchException("foo");
             elasticsearchException.setIndex(new Index("index1", "_na_"));
             elasticsearchException.setShard(new ShardId("index1", "_na_", 1));
             DefaultShardOperationFailedException exception = new DefaultShardOperationFailedException(elasticsearchException);
-            assertThat(
-                exception.toString(),
-                startsWith("[index1][1] failed, reason [[index1][[index1][1]] org.elasticsearch.ElasticsearchException: foo"));
+            assertEquals("[index1][1] failed, reason [ElasticsearchException[foo]]", exception.toString());
         }
-
         {
             DefaultShardOperationFailedException exception = new DefaultShardOperationFailedException("index2", 2, new Exception("foo"));
-            assertThat(exception.toString(), startsWith("[index2][2] failed, reason [java.lang.Exception: foo"));
+            assertEquals("[index2][2] failed, reason [Exception[foo]]", exception.toString());
         }
     }
 
@@ -141,17 +134,7 @@ public class DefaultShardOperationFailedExceptionTests extends ESTestCase {
                 assertNotSame(exception, deserializedException);
                 assertThat(deserializedException.index(), equalTo(exception.index()));
                 assertThat(deserializedException.shardId(), equalTo(exception.shardId()));
-
-                // Serialising and deserialising an exception seems to remove the "java.base/" part from the stack trace
-                // in the `reason` property, so we don't compare it directly. Instead, check that the first lines match,
-                // and that the stack trace has the same number of lines.
-                List<String> expectedReasonLines = exception.reason().lines().collect(Collectors.toList());
-                List<String> actualReasonLines = deserializedException.reason().lines().collect(Collectors.toList());
-                assertThat(actualReasonLines.get(0), equalTo(expectedReasonLines.get(0)));
-                assertThat("Exceptions have a different number of lines",
-                    actualReasonLines,
-                    hasSize(expectedReasonLines.size()));
-
+                assertThat(deserializedException.reason(), equalTo(exception.reason()));
                 assertThat(deserializedException.getCause().getMessage(), equalTo(exception.getCause().getMessage()));
                 assertThat(deserializedException.getCause().getClass(), equalTo(exception.getCause().getClass()));
                 assertArrayEquals(deserializedException.getCause().getStackTrace(), exception.getCause().getStackTrace());

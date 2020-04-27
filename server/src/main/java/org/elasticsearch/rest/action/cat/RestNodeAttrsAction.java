@@ -29,22 +29,20 @@ import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.Table;
-import org.elasticsearch.monitor.process.ProcessInfo;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.action.RestActionListener;
 import org.elasticsearch.rest.action.RestResponseListener;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.elasticsearch.rest.RestRequest.Method.GET;
 
 public class RestNodeAttrsAction extends AbstractCatAction {
 
-    @Override
-    public List<Route> routes() {
-        return List.of(new Route(GET, "/_cat/nodeattrs"));
+    public RestNodeAttrsAction(RestController controller) {
+        controller.registerHandler(GET, "/_cat/nodeattrs", this);
     }
 
     @Override
@@ -68,8 +66,7 @@ public class RestNodeAttrsAction extends AbstractCatAction {
             @Override
             public void processResponse(final ClusterStateResponse clusterStateResponse) {
                 NodesInfoRequest nodesInfoRequest = new NodesInfoRequest();
-                nodesInfoRequest.clear()
-                    .addMetric(NodesInfoRequest.Metric.PROCESS.metricName());
+                nodesInfoRequest.clear().jvm(false).os(false).process(true);
                 client.admin().cluster().nodesInfo(nodesInfoRequest, new RestResponseListener<NodesInfoResponse>(channel) {
                     @Override
                     public RestResponse buildResponse(NodesInfoResponse nodesInfoResponse) throws Exception {
@@ -108,7 +105,7 @@ public class RestNodeAttrsAction extends AbstractCatAction {
                 table.startRow();
                 table.addCell(node.getName());
                 table.addCell(fullId ? node.getId() : Strings.substring(node.getId(), 0, 4));
-                table.addCell(info == null ? null : info.getInfo(ProcessInfo.class).getId());
+                table.addCell(info == null ? null : info.getProcess().getId());
                 table.addCell(node.getHostName());
                 table.addCell(node.getHostAddress());
                 table.addCell(node.getAddress().address().getPort());

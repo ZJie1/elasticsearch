@@ -1,5 +1,5 @@
 [[analysis-ngram-tokenizer]]
-=== N-gram tokenizer
+=== NGram Tokenizer
 
 The `ngram` tokenizer first breaks text down into words whenever it encounters
 one of a list of specified characters, then it emits
@@ -17,7 +17,7 @@ With the default settings, the `ngram` tokenizer treats the initial text as a
 single token and produces N-grams with minimum length `1` and maximum length
 `2`:
 
-[source,console]
+[source,js]
 ---------------------------
 POST _analyze
 {
@@ -25,10 +25,11 @@ POST _analyze
   "text": "Quick Fox"
 }
 ---------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -154,6 +155,7 @@ POST _analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 
@@ -190,14 +192,6 @@ Character classes may be any of the following:
 * `whitespace` --  for example `" "` or `"\n"`
 * `punctuation` -- for example `!` or `"`
 * `symbol` --      for example `$` or `√`
-* `custom` --      custom characters which need to be set using the
-`custom_token_chars` setting.
-
-`custom_token_chars`::
-
-    Custom characters that should be treated as part of a token. For example,
-    setting this to `+-_` will make the tokenizer treat the plus, minus and
-    underscore sign  as part of a token.
 
 TIP:  It usually makes sense to set `min_gram` and `max_gram` to the same
 value.  The smaller the length, the more documents will match but the lower
@@ -213,7 +207,7 @@ difference between `max_gram` and `min_gram`.
 In this example, we configure the `ngram` tokenizer to treat letters and
 digits as tokens, and to produce tri-grams (grams of length `3`):
 
-[source,console]
+[source,js]
 ----------------------------
 PUT my_index
 {
@@ -245,10 +239,11 @@ POST my_index/_analyze
   "text": "2 Quick Foxes."
 }
 ----------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -297,6 +292,7 @@ POST my_index/_analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 

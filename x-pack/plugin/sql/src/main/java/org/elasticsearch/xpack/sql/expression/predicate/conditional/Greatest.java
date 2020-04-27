@@ -6,16 +6,14 @@
 
 package org.elasticsearch.xpack.sql.expression.predicate.conditional;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.expression.Foldables;
-import org.elasticsearch.xpack.ql.tree.NodeInfo;
-import org.elasticsearch.xpack.ql.tree.Source;
-import org.elasticsearch.xpack.sql.type.SqlDataTypeConverter;
+import org.elasticsearch.xpack.sql.expression.Expression;
+import org.elasticsearch.xpack.sql.expression.Foldables;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.tree.NodeInfo;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.elasticsearch.xpack.sql.expression.predicate.conditional.ConditionalProcessor.ConditionalOperation.GREATEST;
 
@@ -37,10 +35,6 @@ public class Greatest extends ArbitraryConditionalFunction {
 
     @Override
     public Object fold() {
-        Set<Object> values = new LinkedHashSet<>(children().size());
-        for (Expression e : children()) {
-            values.add(SqlDataTypeConverter.convert(Foldables.valueOf(e), dataType));
-        }
-        return GREATEST.apply(values);
+        return GREATEST.apply(Foldables.valuesOfNoDuplicates(children(), dataType));
     }
 }

@@ -53,7 +53,7 @@ public class CreateSnapshotResponse extends ActionResponse implements ToXContent
 
     CreateSnapshotResponse() {}
 
-    public CreateSnapshotResponse(@Nullable SnapshotInfo snapshotInfo) {
+    CreateSnapshotResponse(@Nullable SnapshotInfo snapshotInfo) {
         this.snapshotInfo = snapshotInfo;
     }
 

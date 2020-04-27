@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -69,7 +68,6 @@ public final class GeoIpProcessor extends AbstractProcessor {
     private final Set<Property> properties;
     private final boolean ignoreMissing;
     private final GeoIpCache cache;
-    private final boolean firstOnly;
 
     /**
      * Construct a geo-IP processor.
@@ -81,17 +79,15 @@ public final class GeoIpProcessor extends AbstractProcessor {
      * @param properties    the properties; ideally this is lazily-loaded once on first use
      * @param ignoreMissing true if documents with a missing value for the field should be ignored
      * @param cache         a geo-IP cache
-     * @param firstOnly     true if only first result should be returned in case of array
      */
     GeoIpProcessor(
-        final String tag,
-        final String field,
-        final DatabaseReaderLazyLoader lazyLoader,
-        final String targetField,
-        final Set<Property> properties,
-        final boolean ignoreMissing,
-        final GeoIpCache cache,
-        boolean firstOnly) {
+            final String tag,
+            final String field,
+            final DatabaseReaderLazyLoader lazyLoader,
+            final String targetField,
+            final Set<Property> properties,
+            final boolean ignoreMissing,
+            final GeoIpCache cache) {
         super(tag);
         this.field = field;
         this.targetField = targetField;
@@ -99,7 +95,6 @@ public final class GeoIpProcessor extends AbstractProcessor {
         this.properties = properties;
         this.ignoreMissing = ignoreMissing;
         this.cache = cache;
-        this.firstOnly = firstOnly;
     }
 
     boolean isIgnoreMissing() {
@@ -108,7 +103,7 @@ public final class GeoIpProcessor extends AbstractProcessor {
 
     @Override
     public IngestDocument execute(IngestDocument ingestDocument) throws IOException {
-        Object ip = ingestDocument.getFieldValue(field, Object.class, ignoreMissing);
+        String ip = ingestDocument.getFieldValue(field, String.class, ignoreMissing);
 
         if (ip == null && ignoreMissing) {
             return ingestDocument;
@@ -116,43 +111,11 @@ public final class GeoIpProcessor extends AbstractProcessor {
             throw new IllegalArgumentException("field [" + field + "] is null, cannot extract geoip information.");
         }
 
-        if (ip instanceof String) {
-            Map<String, Object> geoData = getGeoData((String) ip);
-            if (geoData.isEmpty() == false) {
-                ingestDocument.setFieldValue(targetField, geoData);
-            }
-        } else if (ip instanceof List) {
-            boolean match = false;
-            List<Map<String, Object>> geoDataList = new ArrayList<>(((List) ip).size());
-            for (Object ipAddr : (List) ip) {
-                if (ipAddr instanceof String == false) {
-                    throw new IllegalArgumentException("array in field [" + field + "] should only contain strings");
-                }
-                Map<String, Object> geoData = getGeoData((String) ipAddr);
-                if (geoData.isEmpty()) {
-                    geoDataList.add(null);
-                    continue;
-                }
-                if (firstOnly) {
-                    ingestDocument.setFieldValue(targetField, geoData);
-                    return ingestDocument;
-                }
-                match = true;
-                geoDataList.add(geoData);
-            }
-            if (match) {
-                ingestDocument.setFieldValue(targetField, geoDataList);
-            }
-        } else {
-            throw new IllegalArgumentException("field [" + field + "] should contain only string or array of strings");
-        }
-        return ingestDocument;
-    }
-
-    private Map<String, Object> getGeoData(String ip) throws IOException {
-        String databaseType = lazyLoader.getDatabaseType();
         final InetAddress ipAddress = InetAddresses.forString(ip);
+
         Map<String, Object> geoData;
+        String databaseType = lazyLoader.getDatabaseType();
+
         if (databaseType.endsWith(CITY_DB_SUFFIX)) {
             try {
                 geoData = retrieveCityGeoData(ipAddress);
@@ -173,9 +136,12 @@ public final class GeoIpProcessor extends AbstractProcessor {
             }
         } else {
             throw new ElasticsearchParseException("Unsupported database type [" + lazyLoader.getDatabaseType()
-                + "]", new IllegalStateException());
+                    + "]", new IllegalStateException());
         }
-        return geoData;
+        if (geoData.isEmpty() == false) {
+            ingestDocument.setFieldValue(targetField, geoData);
+        }
+        return ingestDocument;
     }
 
     @Override
@@ -394,15 +360,14 @@ public final class GeoIpProcessor extends AbstractProcessor {
 
         @Override
         public GeoIpProcessor create(
-            final Map<String, Processor.Factory> registry,
-            final String processorTag,
-            final Map<String, Object> config) throws IOException {
+                final Map<String, Processor.Factory> registry,
+                final String processorTag,
+                final Map<String, Object> config) throws IOException {
             String ipField = readStringProperty(TYPE, processorTag, config, "field");
             String targetField = readStringProperty(TYPE, processorTag, config, "target_field", "geoip");
             String databaseFile = readStringProperty(TYPE, processorTag, config, "database_file", "GeoLite2-City.mmdb");
             List<String> propertyNames = readOptionalList(TYPE, processorTag, config, "properties");
             boolean ignoreMissing = readBooleanProperty(TYPE, processorTag, config, "ignore_missing", false);
-            boolean firstOnly = readBooleanProperty(TYPE, processorTag, config, "first_only", true);
 
             DatabaseReaderLazyLoader lazyLoader = databaseReaders.get(databaseFile);
             if (lazyLoader == null) {
@@ -432,11 +397,11 @@ public final class GeoIpProcessor extends AbstractProcessor {
                     properties = DEFAULT_ASN_PROPERTIES;
                 } else {
                     throw newConfigurationException(TYPE, processorTag, "database_file", "Unsupported database type ["
-                        + databaseType + "]");
+                            + databaseType + "]");
                 }
             }
 
-            return new GeoIpProcessor(processorTag, ipField, lazyLoader, targetField, properties, ignoreMissing, cache, firstOnly);
+            return new GeoIpProcessor(processorTag, ipField, lazyLoader, targetField, properties, ignoreMissing, cache);
         }
     }
 
@@ -495,7 +460,7 @@ public final class GeoIpProcessor extends AbstractProcessor {
                 return property;
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("illegal property value [" + value + "]. valid values are " +
-                    Arrays.toString(validProperties.toArray()));
+                        Arrays.toString(validProperties.toArray()));
             }
         }
     }

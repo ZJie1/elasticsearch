@@ -71,8 +71,7 @@ public class BucketScriptTests extends BasePipelineAggregationTestCase<BucketScr
                    .field("lang", "expression")
               .endObject()
             .endObject();
-        BucketScriptPipelineAggregationBuilder builder1 = BucketScriptPipelineAggregationBuilder.PARSER.parse(
-                createParser(content), "count");
+        BucketScriptPipelineAggregationBuilder builder1 = BucketScriptPipelineAggregationBuilder.parse("count", createParser(content));
         assertEquals(builder1.getBucketsPaths().length , 1);
         assertEquals(builder1.getBucketsPaths()[0], "_count");
 
@@ -87,8 +86,7 @@ public class BucketScriptTests extends BasePipelineAggregationTestCase<BucketScr
                 .field("lang", "expression")
               .endObject()
             .endObject();
-        BucketScriptPipelineAggregationBuilder builder2 = BucketScriptPipelineAggregationBuilder.PARSER.parse(
-                createParser(content), "count");
+        BucketScriptPipelineAggregationBuilder builder2 = BucketScriptPipelineAggregationBuilder.parse("count", createParser(content));
         assertEquals(builder2.getBucketsPaths().length , 2);
         assertEquals(builder2.getBucketsPaths()[0], "_count1");
         assertEquals(builder2.getBucketsPaths()[1], "_count2");
@@ -101,8 +99,7 @@ public class BucketScriptTests extends BasePipelineAggregationTestCase<BucketScr
                 .field("lang", "expression")
                .endObject()
             .endObject();
-        BucketScriptPipelineAggregationBuilder builder3 = BucketScriptPipelineAggregationBuilder.PARSER.parse(
-                createParser(content), "count");
+        BucketScriptPipelineAggregationBuilder builder3 = BucketScriptPipelineAggregationBuilder.parse("count", createParser(content));
         assertEquals(builder3.getBucketsPaths().length , 2);
         assertEquals(builder3.getBucketsPaths()[0], "_count1");
         assertEquals(builder3.getBucketsPaths()[1], "_count2");

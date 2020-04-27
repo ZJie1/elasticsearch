@@ -27,7 +27,7 @@ import org.apache.lucene.index.OrdinalMap;
 /**
  * Specialization of {@link IndexFieldData} for data that is indexed with ordinals.
  */
-public interface IndexOrdinalsFieldData extends IndexFieldData.Global<LeafOrdinalsFieldData> {
+public interface IndexOrdinalsFieldData extends IndexFieldData.Global<AtomicOrdinalsFieldData> {
 
     /**
      * Load a global view of the ordinals for the given {@link IndexReader},

@@ -20,24 +20,32 @@
 package org.elasticsearch.painless.node;
 
 import org.elasticsearch.painless.AnalyzerCaster;
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.DefBootstrap;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
+import org.elasticsearch.painless.MethodWriter;
 import org.elasticsearch.painless.Operation;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.UnaryMathNode;
 import org.elasticsearch.painless.lookup.PainlessLookupUtility;
 import org.elasticsearch.painless.lookup.def;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a unary math expression.
  */
-public class EUnary extends AExpression {
+public final class EUnary extends AExpression {
 
-    protected final Operation operation;
-    protected final AExpression child;
+    private final Operation operation;
+    private AExpression child;
+
+    private Class<?> promote;
+    private boolean originallyExplicit = false; // record whether there was originally an explicit cast
 
     public EUnary(Location location, Operation operation, AExpression child) {
         super(location);
@@ -47,68 +55,207 @@ public class EUnary extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
+    void storeSettings(CompilerSettings settings) {
+        child.storeSettings(settings);
+    }
 
-        if (input.write) {
-            throw createError(new IllegalArgumentException(
-                    "invalid assignment: cannot assign a value to " + operation.name + " operation " + "[" + operation.symbol + "]"));
-        }
+    @Override
+    void extractVariables(Set<String> variables) {
+        child.extractVariables(variables);
+    }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException(
-                    "not a statement: result not used from " + operation.name + " operation " + "[" + operation.symbol + "]"));
-        }
-
-        Output output = new Output();
-
-        Class<?> promote = null;
-        boolean originallyExplicit = input.explicit;
-
-        Input childInput = new Input();
-        Output childOutput;
+    @Override
+    void analyze(Locals locals) {
+        originallyExplicit = explicit;
 
         if (operation == Operation.NOT) {
-
-            childInput.expected = boolean.class;
-            childOutput = child.analyze(classNode, scriptRoot, scope, childInput);
-            child.cast(childInput, childOutput);
-
-            output.actual = boolean.class;
-        } else if (operation == Operation.BWNOT || operation == Operation.ADD || operation == Operation.SUB) {
-            childOutput = child.analyze(classNode, scriptRoot, scope, new Input());
-
-            promote = AnalyzerCaster.promoteNumeric(childOutput.actual, operation != Operation.BWNOT);
-
-            if (promote == null) {
-                throw createError(new ClassCastException("cannot apply the " + operation.name + " operator " +
-                        "[" + operation.symbol + "] to the type " +
-                        "[" + PainlessLookupUtility.typeToCanonicalTypeName(childOutput.actual) + "]"));
-            }
-
-            childInput.expected = promote;
-            child.cast(childInput, childOutput);
-
-            if (promote == def.class && input.expected != null) {
-                output.actual = input.expected;
-            } else {
-                output.actual = promote;
-            }
+            analyzeNot(locals);
+        } else if (operation == Operation.BWNOT) {
+            analyzeBWNot(locals);
+        } else if (operation == Operation.ADD) {
+            analyzerAdd(locals);
+        } else if (operation == Operation.SUB) {
+            analyzerSub(locals);
         } else {
-            throw createError(new IllegalStateException("unexpected unary operation [" + operation.name + "]"));
+            throw createError(new IllegalStateException("Illegal tree structure."));
+        }
+    }
+
+    void analyzeNot(Locals variables) {
+        child.expected = boolean.class;
+        child.analyze(variables);
+        child = child.cast(variables);
+
+        if (child.constant != null) {
+            constant = !(boolean)child.constant;
         }
 
-        UnaryMathNode unaryMathNode = new UnaryMathNode();
+        actual = boolean.class;
+    }
 
-        unaryMathNode.setChildNode(child.cast(childOutput));
+    void analyzeBWNot(Locals variables) {
+        child.analyze(variables);
 
-        unaryMathNode.setLocation(location);
-        unaryMathNode.setExpressionType(output.actual);
-        unaryMathNode.setUnaryType(promote);
-        unaryMathNode.setOperation(operation);
-        unaryMathNode.setOriginallExplicit(originallyExplicit);
+        promote = AnalyzerCaster.promoteNumeric(child.actual, false);
 
-        output.expressionNode = unaryMathNode;
+        if (promote == null) {
+            throw createError(new ClassCastException("Cannot apply not [~] to type " +
+                    "[" + PainlessLookupUtility.typeToCanonicalTypeName(child.actual) + "]."));
+        }
 
-        return output;
+        child.expected = promote;
+        child = child.cast(variables);
+
+        if (child.constant != null) {
+            if (promote == int.class) {
+                constant = ~(int)child.constant;
+            } else if (promote == long.class) {
+                constant = ~(long)child.constant;
+            } else {
+                throw createError(new IllegalStateException("Illegal tree structure."));
+            }
+        }
+
+        if (promote == def.class && expected != null) {
+            actual = expected;
+        } else {
+            actual = promote;
+        }
+    }
+
+    void analyzerAdd(Locals variables) {
+        child.analyze(variables);
+
+        promote = AnalyzerCaster.promoteNumeric(child.actual, true);
+
+        if (promote == null) {
+            throw createError(new ClassCastException("Cannot apply positive [+] to type " +
+                    "[" + PainlessLookupUtility.typeToJavaType(child.actual) + "]."));
+        }
+
+        child.expected = promote;
+        child = child.cast(variables);
+
+        if (child.constant != null) {
+            if (promote == int.class) {
+                constant = +(int)child.constant;
+            } else if (promote == long.class) {
+                constant = +(long)child.constant;
+            } else if (promote == float.class) {
+                constant = +(float)child.constant;
+            } else if (promote == double.class) {
+                constant = +(double)child.constant;
+            } else {
+                throw createError(new IllegalStateException("Illegal tree structure."));
+            }
+        }
+
+        if (promote == def.class && expected != null) {
+            actual = expected;
+        } else {
+            actual = promote;
+        }
+    }
+
+    void analyzerSub(Locals variables) {
+        child.analyze(variables);
+
+        promote = AnalyzerCaster.promoteNumeric(child.actual, true);
+
+        if (promote == null) {
+            throw createError(new ClassCastException("Cannot apply negative [-] to type " +
+                    "[" + PainlessLookupUtility.typeToJavaType(child.actual) + "]."));
+        }
+
+        child.expected = promote;
+        child = child.cast(variables);
+
+        if (child.constant != null) {
+            if (promote == int.class) {
+                constant = -(int)child.constant;
+            } else if (promote == long.class) {
+                constant = -(long)child.constant;
+            } else if (promote == float.class) {
+                constant = -(float)child.constant;
+            } else if (promote == double.class) {
+                constant = -(double)child.constant;
+            } else {
+                throw createError(new IllegalStateException("Illegal tree structure."));
+            }
+        }
+
+        if (promote == def.class && expected != null) {
+            actual = expected;
+        } else {
+            actual = promote;
+        }
+    }
+
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
+
+        if (operation == Operation.NOT) {
+            Label fals = new Label();
+            Label end = new Label();
+
+            child.write(writer, globals);
+            writer.ifZCmp(Opcodes.IFEQ, fals);
+
+            writer.push(false);
+            writer.goTo(end);
+            writer.mark(fals);
+            writer.push(true);
+            writer.mark(end);
+        } else {
+            child.write(writer, globals);
+
+            // Def calls adopt the wanted return value. If there was a narrowing cast,
+            // we need to flag that so that it's done at runtime.
+            int defFlags = 0;
+
+            if (originallyExplicit) {
+                defFlags |= DefBootstrap.OPERATOR_EXPLICIT_CAST;
+            }
+
+            Type actualType = MethodWriter.getType(actual);
+            Type childType = MethodWriter.getType(child.actual);
+
+            if (operation == Operation.BWNOT) {
+                if (promote == def.class) {
+                    org.objectweb.asm.Type descriptor = org.objectweb.asm.Type.getMethodType(actualType, childType);
+                    writer.invokeDefCall("not", descriptor, DefBootstrap.UNARY_OPERATOR, defFlags);
+                } else {
+                    if (promote == int.class) {
+                        writer.push(-1);
+                    } else if (promote == long.class) {
+                        writer.push(-1L);
+                    } else {
+                        throw createError(new IllegalStateException("Illegal tree structure."));
+                    }
+
+                    writer.math(MethodWriter.XOR, actualType);
+                }
+            } else if (operation == Operation.SUB) {
+                if (promote == def.class) {
+                    org.objectweb.asm.Type descriptor = org.objectweb.asm.Type.getMethodType(actualType, childType);
+                    writer.invokeDefCall("neg", descriptor, DefBootstrap.UNARY_OPERATOR, defFlags);
+                } else {
+                    writer.math(MethodWriter.NEG, actualType);
+                }
+            } else if (operation == Operation.ADD) {
+                if (promote == def.class) {
+                    org.objectweb.asm.Type descriptor = org.objectweb.asm.Type.getMethodType(actualType, childType);
+                    writer.invokeDefCall("plus", descriptor, DefBootstrap.UNARY_OPERATOR, defFlags);
+                }
+            } else {
+                throw createError(new IllegalStateException("Illegal tree structure."));
+            }
+        }
+    }
+
+    @Override
+    public String toString() {
+        return singleLineToString(operation.symbol, child);
     }
 }

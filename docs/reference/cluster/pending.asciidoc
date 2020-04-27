@@ -1,8 +1,5 @@
 [[cluster-pending]]
-=== Pending cluster tasks API
-++++
-<titleabbrev>Pending cluster tasks</titleabbrev>
-++++
+=== Pending cluster tasks
 
 Returns cluster-level changes that have not yet been executed.
 

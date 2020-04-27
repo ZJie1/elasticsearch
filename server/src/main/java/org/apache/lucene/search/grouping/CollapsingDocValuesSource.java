@@ -30,7 +30,6 @@ import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.index.fielddata.AbstractNumericDocValues;
 import org.elasticsearch.index.fielddata.AbstractSortedDocValues;
-import org.elasticsearch.index.mapper.MappedFieldType;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -59,8 +58,8 @@ abstract class CollapsingDocValuesSource<T> extends GroupSelector<T> {
         private long value;
         private boolean hasValue;
 
-        Numeric(MappedFieldType fieldType) {
-            super(fieldType.name());
+        Numeric(String field) {
+            super(field);
         }
 
         @Override
@@ -149,8 +148,8 @@ abstract class CollapsingDocValuesSource<T> extends GroupSelector<T> {
         private SortedDocValues values;
         private int ord;
 
-        Keyword(MappedFieldType fieldType) {
-            super(fieldType.name());
+        Keyword(String field) {
+            super(field);
         }
 
         @Override

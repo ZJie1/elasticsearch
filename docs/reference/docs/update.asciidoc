@@ -9,12 +9,12 @@ Updates a document using the specified script.
 [[docs-update-api-request]]
 ==== {api-request-title}
 
-`POST /<index>/_update/<_id>`
+`POST /<index/_update/<_id>`
 
 [[update-api-desc]]
 ==== {api-description-title}
 
-Enables you to script document updates. The script can update, delete, or skip
+Enables you script document updates. The script can update, delete, or skip
 modifying the document. The update API also supports passing a partial document,
 which is merged into the existing document. To fully replace an existing
 document, use the <<docs-index_,`index` API>>.
@@ -80,7 +80,7 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=wait_for_active_shards]
 
 First, let's index a simple doc:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT test/_doc/1
 {
@@ -88,11 +88,12 @@ PUT test/_doc/1
     "tags" : ["red"]
 }
 --------------------------------------------------
+// CONSOLE
 
 To increment the counter, you can submit an update request with the
 following script:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -105,12 +106,13 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 Similarly, you could use and update script to add a tag to the list of tags
 (this is just a list, so the tag is added even it exists):
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -123,6 +125,7 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 You could also remove a tag from the list of tags. The Painless
@@ -131,7 +134,7 @@ you want to remove. To avoid a possible runtime error, you first need to
 make sure the tag exists. If the list contains duplicates of the tag, this
 script just removes one occurrence.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -144,36 +147,39 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 You can also add and remove fields from a document. For example, this script
 adds the field `new_field`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
     "script" : "ctx._source.new_field = 'value_of_new_field'"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 Conversely, this script removes the field `new_field`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
     "script" : "ctx._source.remove('new_field')"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 Instead of updating the document, you can also change the operation that is
 executed from within the script.  For example, this request deletes the doc if
 the `tags` field contains `green`, otherwise it does nothing (`noop`):
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -186,6 +192,7 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 [float]
@@ -194,7 +201,7 @@ POST test/_update/1
 The following partial update adds a new field to the
 existing document:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -203,6 +210,7 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 If both `doc` and `script` are specified, then `doc` is ignored. If you
@@ -214,7 +222,7 @@ specify a scripted update, include the fields you want to update in the script.
 By default updates that don't change anything detect that they don't change
 anything and return `"result": "noop"`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -223,12 +231,13 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 If the value of `name` is already `new_name`, the update
 request is ignored and the `result` element in the response returns `noop`:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
    "_shards": {
@@ -237,6 +246,7 @@ request is ignored and the `result` element in the response returns `noop`:
         "failed": 0
    },
    "_index": "test",
+   "_type": "_doc",
    "_id": "1",
    "_version": 7,
    "_primary_term": 1,
@@ -244,10 +254,11 @@ request is ignored and the `result` element in the response returns `noop`:
    "result": "noop"
 }
 --------------------------------------------------
+// TESTRESPONSE
 
 You can disable this behavior by setting `"detect_noop": false`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -257,6 +268,7 @@ POST test/_update/1
     "detect_noop": false
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 [[upserts]]
@@ -267,7 +279,7 @@ If the document does not already exist, the contents of the `upsert` element
 are inserted as a new document.  If the document exists, the
 `script` is executed:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -283,6 +295,7 @@ POST test/_update/1
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 [float]
@@ -292,7 +305,7 @@ POST test/_update/1
 To run the script whether or not the document exists, set `scripted_upsert` to
 `true`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST sessions/_update/dh3sgudg8gsrgl
 {
@@ -310,6 +323,7 @@ POST sessions/_update/dh3sgudg8gsrgl
     "upsert" : {}
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[s/"id": "my_web_session_summariser"/"source": "ctx._source.page_view_event = params.pageViewEvent"/]
 // TEST[continued]
 
@@ -321,7 +335,7 @@ Instead of sending a partial `doc` plus an `upsert` doc, you can set
 `doc_as_upsert` to `true` to use the contents of `doc` as the `upsert`
 value:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST test/_update/1
 {
@@ -331,4 +345,5 @@ POST test/_update/1
     "doc_as_upsert" : true
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]

@@ -20,29 +20,32 @@ package org.elasticsearch.test.transport;
 
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.cluster.node.DiscoveryNode;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.transport.ConnectTransportException;
-import org.elasticsearch.transport.ConnectionProfile;
 import org.elasticsearch.transport.ConnectionManager;
+import org.elasticsearch.transport.ConnectionProfile;
 import org.elasticsearch.transport.Transport;
 import org.elasticsearch.transport.TransportConnectionListener;
 
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class StubbableConnectionManager implements ConnectionManager {
+public class StubbableConnectionManager extends ConnectionManager {
 
     private final ConnectionManager delegate;
     private final ConcurrentMap<TransportAddress, GetConnectionBehavior> getConnectionBehaviors;
     private volatile GetConnectionBehavior defaultGetConnectionBehavior = ConnectionManager::getConnection;
-    private volatile NodeConnectedBehavior defaultNodeConnectedBehavior = ConnectionManager::nodeConnected;
+    private volatile NodeConnectedBehavior defaultNodeConnectedBehavior = ConnectionManager::connectedNodes;
 
-    public StubbableConnectionManager(ConnectionManager delegate) {
+    public StubbableConnectionManager(ConnectionManager delegate, Settings settings, Transport transport) {
+        super(settings, transport);
         this.delegate = delegate;
         this.getConnectionBehaviors = new ConcurrentHashMap<>();
     }
 
-    public boolean addGetConnectionBehavior(TransportAddress transportAddress, GetConnectionBehavior connectBehavior) {
+    public boolean addConnectBehavior(TransportAddress transportAddress, GetConnectionBehavior connectBehavior) {
         return getConnectionBehaviors.put(transportAddress, connectBehavior) == null;
     }
 
@@ -61,6 +64,7 @@ public class StubbableConnectionManager implements ConnectionManager {
     public void clearBehaviors() {
         defaultGetConnectionBehavior = ConnectionManager::getConnection;
         getConnectionBehaviors.clear();
+        defaultNodeConnectedBehavior = ConnectionManager::connectedNodes;
     }
 
     public void clearBehavior(TransportAddress transportAddress) {
@@ -81,7 +85,12 @@ public class StubbableConnectionManager implements ConnectionManager {
 
     @Override
     public boolean nodeConnected(DiscoveryNode node) {
-        return defaultNodeConnectedBehavior.connectedNodes(delegate, node);
+        return defaultNodeConnectedBehavior.connectedNodes(delegate).contains(node);
+    }
+
+    @Override
+    public Set<DiscoveryNode> connectedNodes() {
+        return defaultNodeConnectedBehavior.connectedNodes(delegate);
     }
 
     @Override
@@ -116,16 +125,6 @@ public class StubbableConnectionManager implements ConnectionManager {
         delegate.close();
     }
 
-    @Override
-    public void closeNoBlock() {
-        delegate.closeNoBlock();
-    }
-
-    @Override
-    public ConnectionProfile getConnectionProfile() {
-        return delegate.getConnectionProfile();
-    }
-
     @FunctionalInterface
     public interface GetConnectionBehavior {
         Transport.Connection getConnection(ConnectionManager connectionManager, DiscoveryNode discoveryNode);
@@ -133,6 +132,6 @@ public class StubbableConnectionManager implements ConnectionManager {
 
     @FunctionalInterface
     public interface NodeConnectedBehavior {
-        boolean connectedNodes(ConnectionManager connectionManager, DiscoveryNode node);
+        Set<DiscoveryNode> connectedNodes(ConnectionManager connectionManager);
     }
 }

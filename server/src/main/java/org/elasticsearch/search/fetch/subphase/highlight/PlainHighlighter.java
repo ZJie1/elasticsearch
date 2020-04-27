@@ -36,11 +36,10 @@ import org.apache.lucene.util.CollectionUtil;
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.common.text.Text;
 import org.elasticsearch.index.IndexSettings;
-import org.elasticsearch.index.mapper.KeywordFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
-import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.search.fetch.FetchPhaseExecutionException;
 import org.elasticsearch.search.fetch.FetchSubPhase;
+import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -57,7 +56,7 @@ public class PlainHighlighter implements Highlighter {
     @Override
     public HighlightField highlight(HighlighterContext highlighterContext) {
         SearchContextHighlight.Field field = highlighterContext.field;
-        QueryShardContext context = highlighterContext.context;
+        SearchContext context = highlighterContext.context;
         FetchSubPhase.HitContext hitContext = highlighterContext.hitContext;
         MappedFieldType fieldType = highlighterContext.fieldType;
 
@@ -102,29 +101,18 @@ public class PlainHighlighter implements Highlighter {
         int numberOfFragments = field.fieldOptions().numberOfFragments() == 0 ? 1 : field.fieldOptions().numberOfFragments();
         ArrayList<TextFragment> fragsList = new ArrayList<>();
         List<Object> textsToHighlight;
-        Analyzer analyzer = context.getMapperService().documentMapper().mappers().indexAnalyzer();
-        Integer keywordIgnoreAbove = null;
-        if (fieldType instanceof KeywordFieldMapper.KeywordFieldType) {
-            KeywordFieldMapper mapper = (KeywordFieldMapper) context.getMapperService().documentMapper()
-                .mappers().getMapper(highlighterContext.fieldName);
-            keywordIgnoreAbove = mapper.ignoreAbove();
-        }
-        final int maxAnalyzedOffset = context.getIndexSettings().getHighlightMaxAnalyzedOffset();
+        Analyzer analyzer = context.mapperService().documentMapper(hitContext.hit().getType()).mappers().indexAnalyzer();
+        final int maxAnalyzedOffset = context.indexShard().indexSettings().getHighlightMaxAnalyzedOffset();
 
         try {
-            textsToHighlight = HighlightUtils.loadFieldValues(fieldType, context, hitContext,
-                highlighterContext.highlight.forceSource(field));
+            textsToHighlight = HighlightUtils.loadFieldValues(field, fieldType, context, hitContext);
 
             for (Object textToHighlight : textsToHighlight) {
                 String text = convertFieldValue(fieldType, textToHighlight);
-                int textLength = text.length();
-                if (keywordIgnoreAbove != null  && textLength > keywordIgnoreAbove) {
-                    continue; // skip highlighting keyword terms that were ignored during indexing
-                }
-                if (textLength > maxAnalyzedOffset) {
+                if (text.length() > maxAnalyzedOffset) {
                     throw new IllegalArgumentException(
                         "The length of [" + highlighterContext.fieldName + "] field of [" + hitContext.hit().getId() +
-                            "] doc of [" + context.index().getName() + "] index " +
+                            "] doc of [" + context.indexShard().shardId().getIndexName() + "] index " +
                             "has exceeded [" + maxAnalyzedOffset + "] - maximum allowed to be analyzed for highlighting. " +
                             "This maximum can be set by changing the [" + IndexSettings.MAX_ANALYZED_OFFSET_SETTING.getKey() +
                             "] index level setting. " + "For large texts, indexing with offsets or term vectors, and highlighting " +
@@ -151,8 +139,7 @@ public class PlainHighlighter implements Highlighter {
                 // the plain highlighter will parse the source and try to analyze it.
                 return null;
             } else {
-                throw new FetchPhaseExecutionException(highlighterContext.shardTarget,
-                    "Failed to highlight field [" + highlighterContext.fieldName + "]", e);
+                throw new FetchPhaseExecutionException(context, "Failed to highlight field [" + highlighterContext.fieldName + "]", e);
             }
         }
         if (field.fieldOptions().scoreOrdered()) {
@@ -191,8 +178,7 @@ public class PlainHighlighter implements Highlighter {
             try {
                 end = findGoodEndForNoHighlightExcerpt(noMatchSize, analyzer, fieldType.name(), fieldContents);
             } catch (Exception e) {
-                throw new FetchPhaseExecutionException(highlighterContext.shardTarget,
-                    "Failed to highlight field [" + highlighterContext.fieldName + "]", e);
+                throw new FetchPhaseExecutionException(context, "Failed to highlight field [" + highlighterContext.fieldName + "]", e);
             }
             if (end > 0) {
                 return new HighlightField(highlighterContext.fieldName, new Text[] { new Text(fieldContents.substring(0, end)) });

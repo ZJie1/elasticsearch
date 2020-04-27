@@ -247,23 +247,6 @@ public class ScriptedMetricIT extends ESIntegTestCase {
             return scripts;
         }
 
-        @Override
-        protected Map<String, Function<Map<String, Object>, Object>> nonDeterministicPluginScripts() {
-            Map<String, Function<Map<String, Object>, Object>> scripts = new HashMap<>();
-
-            scripts.put("state.data = Math.random()", vars ->
-                aggScript(vars, state -> state.put("data", ScriptedMetricIT.randomDouble())));
-
-
-            scripts.put("state['count'] = Math.random() >= 0.5 ? 1 : 0", vars ->
-                aggScript(vars, state -> state.put("count", ScriptedMetricIT.randomDouble() >= 0.5 ? 1 : 0)));
-
-
-            scripts.put("return Math.random()", vars -> ScriptedMetricIT.randomDouble());
-
-            return scripts;
-        }
-
         @SuppressWarnings("unchecked")
         static Map<String, Object> aggScript(Map<String, Object> vars, Consumer<Map<String, Object>> fn) {
             Map<String, Object> aggState = (Map<String, Object>) vars.get("state");
@@ -280,7 +263,7 @@ public class ScriptedMetricIT extends ESIntegTestCase {
 
         numDocs = randomIntBetween(10, 100);
         for (int i = 0; i < numDocs; i++) {
-            builders.add(client().prepareIndex("idx").setId("" + i).setSource(
+            builders.add(client().prepareIndex("idx", "type", "" + i).setSource(
                     jsonBuilder().startObject().field("value", randomAlphaOfLengthBetween(5, 15))
                             .field("l_value", i).endObject()));
         }
@@ -294,10 +277,10 @@ public class ScriptedMetricIT extends ESIntegTestCase {
         // "1". then each test will have
         // to check that this bucket exists with the appropriate sub
         // aggregations.
-        prepareCreate("empty_bucket_idx").setMapping("value", "type=integer").get();
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer").get();
         builders = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
-            builders.add(client().prepareIndex("empty_bucket_idx").setId("" + i).setSource(
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", "" + i).setSource(
                     jsonBuilder().startObject().field("value", i * 2).endObject()));
         }
 
@@ -1032,31 +1015,22 @@ public class ScriptedMetricIT extends ESIntegTestCase {
         assertThat(aggregationResult.get(0), equalTo(0));
     }
 
-
     /**
-     * Make sure that a request using a deterministic script gets cached and nondeterministic scripts do not get cached.
+     * Make sure that a request using a script does not get cached and a request
+     * not using a script does get cached.
      */
-    public void testScriptCaching() throws Exception {
+    public void testDontCacheScripts() throws Exception {
         Script mapScript = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "state['count'] = 1", Collections.emptyMap());
         Script combineScript =
             new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "no-op aggregation", Collections.emptyMap());
         Script reduceScript = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME,
             "no-op list aggregation", Collections.emptyMap());
 
-        Script ndInitScript = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "state.data = Math.random()",
-                                         Collections.emptyMap());
-
-        Script ndMapScript = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "state['count'] = Math.random() >= 0.5 ? 1 : 0",
-                                        Collections.emptyMap());
-
-        Script ndRandom = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "return Math.random()",
-                                     Collections.emptyMap());
-
-        assertAcked(prepareCreate("cache_test_idx").setMapping("d", "type=long")
+        assertAcked(prepareCreate("cache_test_idx").addMapping("type", "d", "type=long")
                 .setSettings(Settings.builder().put("requests.cache.enable", true).put("number_of_shards", 1).put("number_of_replicas", 1))
                 .get());
-        indexRandom(true, client().prepareIndex("cache_test_idx").setId("1").setSource("s", 1),
-                client().prepareIndex("cache_test_idx").setId("2").setSource("s", 2));
+        indexRandom(true, client().prepareIndex("cache_test_idx", "type", "1").setSource("s", 1),
+                client().prepareIndex("cache_test_idx", "type", "2").setSource("s", 2));
 
         // Make sure we are starting with a clear cache
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
@@ -1064,58 +1038,15 @@ public class ScriptedMetricIT extends ESIntegTestCase {
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
                 .getMissCount(), equalTo(0L));
 
-        // Test that a non-deterministic init script causes the result to not be cached
+        // Test that a request using a script does not get cached
         SearchResponse r = client().prepareSearch("cache_test_idx").setSize(0)
-            .addAggregation(scriptedMetric("foo").initScript(ndInitScript).mapScript(mapScript).combineScript(combineScript)
-                            .reduceScript(reduceScript)).get();
-        assertSearchResponse(r);
-
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getHitCount(), equalTo(0L));
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getMissCount(), equalTo(0L));
-
-        // Test that a non-deterministic map script causes the result to not be cached
-        r = client().prepareSearch("cache_test_idx").setSize(0)
-            .addAggregation(scriptedMetric("foo").mapScript(ndMapScript).combineScript(combineScript).reduceScript(reduceScript))
-            .get();
-        assertSearchResponse(r);
-
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getHitCount(), equalTo(0L));
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getMissCount(), equalTo(0L));
-
-        // Test that a non-deterministic combine script causes the result to not be cached
-        r = client().prepareSearch("cache_test_idx").setSize(0)
-            .addAggregation(scriptedMetric("foo").mapScript(mapScript).combineScript(ndRandom).reduceScript(reduceScript)).get();
-        assertSearchResponse(r);
-
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getHitCount(), equalTo(0L));
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getMissCount(), equalTo(0L));
-
-        // NOTE: random reduce scripts don't hit the query shard context (they are done on the coordinator) and so can be cached.
-        r = client().prepareSearch("cache_test_idx").setSize(0)
-            .addAggregation(scriptedMetric("foo").mapScript(mapScript).combineScript(combineScript).reduceScript(ndRandom)).get();
-        assertSearchResponse(r);
-
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getHitCount(), equalTo(0L));
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-            .getMissCount(), equalTo(1L));
-
-        // Test that all deterministic scripts cause the request to be cached
-        r = client().prepareSearch("cache_test_idx").setSize(0)
-                .addAggregation(scriptedMetric("foo").mapScript(mapScript).combineScript(combineScript).reduceScript(reduceScript))
-                .get();
+                .addAggregation(scriptedMetric("foo").mapScript(mapScript).combineScript(combineScript).reduceScript(reduceScript)).get();
         assertSearchResponse(r);
 
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
                 .getHitCount(), equalTo(0L));
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-                .getMissCount(), equalTo(2L));
+                .getMissCount(), equalTo(0L));
     }
 
     public void testConflictingAggAndScriptParams() {

@@ -5,10 +5,11 @@
  */
 package org.elasticsearch.xpack.sql.expression.predicate.operator.arithmetic;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.tree.NodeInfo;
-import org.elasticsearch.xpack.ql.tree.Source;
-import org.elasticsearch.xpack.sql.type.SqlDataTypes;
+import org.elasticsearch.xpack.sql.expression.Expression;
+import org.elasticsearch.xpack.sql.expression.predicate.operator.arithmetic.BinaryArithmeticProcessor.BinaryArithmeticOperation;
+import org.elasticsearch.xpack.sql.tree.NodeInfo;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.type.DataTypes;
 
 import static org.elasticsearch.common.logging.LoggerMessageFormat.format;
 
@@ -18,7 +19,7 @@ import static org.elasticsearch.common.logging.LoggerMessageFormat.format;
 public class Sub extends DateTimeArithmeticOperation {
 
     public Sub(Source source, Expression left, Expression right) {
-        super(source, left, right, SqlBinaryArithmeticOperation.SUB);
+        super(source, left, right, BinaryArithmeticOperation.SUB);
     }
 
     @Override
@@ -37,9 +38,9 @@ public class Sub extends DateTimeArithmeticOperation {
         if (resolution.unresolved()) {
             return resolution;
         }
-        if ((SqlDataTypes.isDateOrTimeBased(right().dataType())) && SqlDataTypes.isInterval(left().dataType())) {
+        if ((right().dataType().isDateOrTimeBased()) && DataTypes.isInterval(left().dataType())) {
             return new TypeResolution(format(null, "Cannot subtract a {}[{}] from an interval[{}]; do you mean the reverse?",
-                right().dataType().typeName(), right().source().text(), left().source().text()));
+                right().dataType().typeName, right().source().text(), left().source().text()));
         }
         return TypeResolution.TYPE_RESOLVED;
     }

@@ -45,12 +45,8 @@ public class ClusterStatsIndices implements ToXContentFragment {
     private QueryCacheStats queryCache;
     private CompletionStats completion;
     private SegmentsStats segments;
-    private AnalysisStats analysis;
-    private MappingStats mappings;
 
-    public ClusterStatsIndices(List<ClusterStatsNodeResponse> nodeResponses,
-            MappingStats mappingStats,
-            AnalysisStats analysisStats) {
+    public ClusterStatsIndices(List<ClusterStatsNodeResponse> nodeResponses) {
         ObjectObjectHashMap<String, ShardStats> countsPerIndex = new ObjectObjectHashMap<>();
 
         this.docs = new DocsStats();
@@ -89,9 +85,6 @@ public class ClusterStatsIndices implements ToXContentFragment {
         for (ObjectObjectCursor<String, ShardStats> indexCountsCursor : countsPerIndex) {
             shards.addIndexShardCount(indexCountsCursor.value);
         }
-
-        this.mappings = mappingStats;
-        this.analysis = analysisStats;
     }
 
     public int getIndexCount() {
@@ -126,14 +119,6 @@ public class ClusterStatsIndices implements ToXContentFragment {
         return segments;
     }
 
-    public MappingStats getMappings() {
-        return mappings;
-    }
-
-    public AnalysisStats getAnalysis() {
-        return analysis;
-    }
-
     static final class Fields {
         static final String COUNT = "count";
     }
@@ -148,12 +133,6 @@ public class ClusterStatsIndices implements ToXContentFragment {
         queryCache.toXContent(builder, params);
         completion.toXContent(builder, params);
         segments.toXContent(builder, params);
-        if (mappings != null) {
-            mappings.toXContent(builder, params);
-        }
-        if (analysis != null) {
-            analysis.toXContent(builder, params);
-        }
         return builder;
     }
 

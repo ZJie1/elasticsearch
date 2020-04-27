@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.job.config.MlFilter;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.Strings;
@@ -35,7 +36,7 @@ import java.util.TreeSet;
 /**
  * Updates an existing {@link MlFilter} configuration
  */
-public class UpdateFilterRequest implements Validatable, ToXContentObject {
+public class UpdateFilterRequest extends ActionRequest implements ToXContentObject {
 
     public static final ParseField ADD_ITEMS = new ParseField("add_items");
     public static final ParseField REMOVE_ITEMS = new ParseField("remove_items");
@@ -148,4 +149,8 @@ public class UpdateFilterRequest implements Validatable, ToXContentObject {
         return Strings.toString(this);
     }
 
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
+    }
 }

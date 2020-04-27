@@ -18,7 +18,7 @@ Forces any buffered data to be processed by the job.
 
 * If the {es} {security-features} are enabled, you must have `manage_ml` or
 `manage` cluster privileges to use this API. See
-<<security-privileges>>.
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ml-flush-job-desc]]
 ==== {api-description-title}
@@ -37,8 +37,7 @@ opened again before analyzing further data.
 ==== {api-path-parms-title}
 
 `<job_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=job-id-anomaly-detection]
+(string) Required. Identifier for the job.
 
 [[ml-flush-job-query-parms]]
 ==== {api-query-parms-title}
@@ -67,18 +66,20 @@ include::{docdir}/ml/ml-shared.asciidoc[tag=job-id-anomaly-detection]
 [[ml-flush-job-example]]
 ==== {api-examples-title}
 
-[source,console]
+The following example flushes the `total-requests` job:
+
+[source,js]
 --------------------------------------------------
-POST _ml/anomaly_detectors/low_request_rate/_flush
+POST _ml/anomaly_detectors/total-requests/_flush
 {
   "calc_interim": true
 }
 --------------------------------------------------
-// TEST[skip:Kibana sample data]
+// CONSOLE
+// TEST[skip:setup:server_metrics_openjob]
 
 When the operation succeeds, you receive the following results:
-
-[source,console-result]
+[source,js]
 ----
 {
   "flushed": true,
@@ -94,21 +95,22 @@ If you want to flush the job to a specific timestamp, you can use the
 `advance_time` or `skip_time` parameters.  For example, to advance to 11 AM GMT
 on January 1, 2018:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST _ml/anomaly_detectors/total-requests/_flush
 {
-  "advance_time": "1514804400000"
+  "advance_time": "1514804400"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:setup:server_metrics_openjob]
 
 When the operation succeeds, you receive the following results:
-
-[source,console-result]
+[source,js]
 ----
 {
   "flushed": true,
   "last_finalized_bucket_end": 1514804400000
 }
 ----
+// TESTRESPONSE

@@ -61,10 +61,6 @@ public abstract class AnalysisPredicateScript {
             this.keywordAtt = source.addAttribute(KeywordAttribute.class);
         }
 
-        public void reset() {
-            this.pos = -1;
-        }
-
         public void updatePosition() {
             this.pos = this.pos + posIncAtt.getPositionIncrement();
         }

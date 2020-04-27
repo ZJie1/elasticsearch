@@ -16,7 +16,7 @@ public abstract class AbstractLazyPropertyCollection {
         this.owner = owner;
     }
 
-    public abstract List<? extends Object> getNormalizedCollection();
+    abstract List<? extends Object> getNormalizedCollection();
 
     void assertNotNull(Object value, String description) {
         if (value == null) {

@@ -21,16 +21,17 @@
 package org.elasticsearch.search.aggregations.bucket.significant.heuristics;
 
 
-import java.io.IOException;
-
+import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
-import org.elasticsearch.common.xcontent.ObjectParser;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.query.QueryShardException;
+
+import java.io.IOException;
 
 public class JLHScore extends SignificanceHeuristic {
     public static final String NAME = "jlh";
-    public static final ObjectParser<JLHScore, Void> PARSER = new ObjectParser<>(NAME, JLHScore::new);
 
     public JLHScore() {
     }
@@ -100,6 +101,17 @@ public class JLHScore extends SignificanceHeuristic {
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject(NAME).endObject();
         return builder;
+    }
+
+    public static SignificanceHeuristic parse(XContentParser parser)
+            throws IOException, QueryShardException {
+        // move to the closing bracket
+        if (!parser.nextToken().equals(XContentParser.Token.END_OBJECT)) {
+            throw new ElasticsearchParseException(
+                    "failed to parse [jlh] significance heuristic. expected an empty object, but found [{}] instead",
+                    parser.currentToken());
+        }
+        return new JLHScore();
     }
 
     @Override

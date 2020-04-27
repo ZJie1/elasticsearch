@@ -12,6 +12,7 @@ import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.replication.TransportWriteAction;
 import org.elasticsearch.cluster.action.shard.ShardStateAction;
+import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.inject.Inject;
@@ -43,7 +44,8 @@ public class TransportBulkShardOperationsAction
             final IndicesService indicesService,
             final ThreadPool threadPool,
             final ShardStateAction shardStateAction,
-            final ActionFilters actionFilters) {
+            final ActionFilters actionFilters,
+            final IndexNameExpressionResolver indexNameExpressionResolver) {
         super(
                 settings,
                 BulkShardOperationsAction.NAME,
@@ -53,6 +55,7 @@ public class TransportBulkShardOperationsAction
                 threadPool,
                 shardStateAction,
                 actionFilters,
+                indexNameExpressionResolver,
                 BulkShardOperationsRequest::new,
                 BulkShardOperationsRequest::new,
                 ThreadPool.Names.WRITE, false);
@@ -74,6 +77,7 @@ public class TransportBulkShardOperationsAction
             case INDEX:
                 final Translog.Index index = (Translog.Index) operation;
                 operationWithPrimaryTerm = new Translog.Index(
+                    index.type(),
                     index.id(),
                     index.seqNo(),
                     primaryTerm,
@@ -85,6 +89,7 @@ public class TransportBulkShardOperationsAction
             case DELETE:
                 final Translog.Delete delete = (Translog.Delete) operation;
                 operationWithPrimaryTerm = new Translog.Delete(
+                    delete.type(),
                     delete.id(),
                     delete.uid(),
                     delete.seqNo(),
@@ -102,7 +107,7 @@ public class TransportBulkShardOperationsAction
     }
 
     // public for testing purposes only
-    public static WritePrimaryResult<BulkShardOperationsRequest, BulkShardOperationsResponse> shardOperationOnPrimary(
+    public static CcrWritePrimaryResult shardOperationOnPrimary(
             final ShardId shardId,
             final String historyUUID,
             final List<Translog.Operation> sourceOperations,
@@ -154,7 +159,7 @@ public class TransportBulkShardOperationsAction
         }
         final BulkShardOperationsRequest replicaRequest = new BulkShardOperationsRequest(
             shardId, historyUUID, appliedOperations, maxSeqNoOfUpdatesOrDeletes);
-        return new WritePrimaryResult<>(replicaRequest, new BulkShardOperationsResponse(), location, null, primary, logger);
+        return new CcrWritePrimaryResult(replicaRequest, location, primary, logger);
     }
 
     @Override
@@ -190,16 +195,26 @@ public class TransportBulkShardOperationsAction
         return new BulkShardOperationsResponse(in);
     }
 
-    @Override
-    protected void adaptResponse(BulkShardOperationsResponse response, IndexShard indexShard) {
-        adaptBulkShardOperationsResponse(response, indexShard);
-    }
+    /**
+     * Custom write result to include global checkpoint after ops have been replicated.
+     */
+    static final class CcrWritePrimaryResult extends WritePrimaryResult<BulkShardOperationsRequest, BulkShardOperationsResponse> {
+        CcrWritePrimaryResult(BulkShardOperationsRequest request, Translog.Location location, IndexShard primary, Logger logger) {
+            super(request, new BulkShardOperationsResponse(), location, null, primary, logger);
+        }
 
-    public static void adaptBulkShardOperationsResponse(BulkShardOperationsResponse response, IndexShard indexShard) {
-        final SeqNoStats seqNoStats = indexShard.seqNoStats();
-        // return a fresh global checkpoint after the operations have been replicated for the shard follow task
-        response.setGlobalCheckpoint(seqNoStats.getGlobalCheckpoint());
-        response.setMaxSeqNo(seqNoStats.getMaxSeqNo());
+        @Override
+        public synchronized void respond(ActionListener<BulkShardOperationsResponse> listener) {
+            final ActionListener<BulkShardOperationsResponse> wrappedListener = ActionListener.wrap(response -> {
+                final SeqNoStats seqNoStats = primary.seqNoStats();
+                // return a fresh global checkpoint after the operations have been replicated for the shard follow task
+                response.setGlobalCheckpoint(seqNoStats.getGlobalCheckpoint());
+                response.setMaxSeqNo(seqNoStats.getMaxSeqNo());
+                listener.onResponse(response);
+            }, listener::onFailure);
+            super.respond(wrappedListener);
+        }
+
     }
 
 }

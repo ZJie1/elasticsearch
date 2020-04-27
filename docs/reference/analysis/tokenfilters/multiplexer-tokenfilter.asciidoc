@@ -1,8 +1,5 @@
 [[analysis-multiplexer-tokenfilter]]
-=== Multiplexer token filter
-++++
-<titleabbrev>Multiplexer</titleabbrev>
-++++
+=== Multiplexer Token Filter
 
 A token filter of type `multiplexer` will emit multiple tokens at the same position,
 each version of the token having been run through a different filter.  Identical
@@ -32,7 +29,7 @@ preserve_original:: if `true` (the default) then emit the original token in
 
 You can set it up like:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /multiplexer_example
 {
@@ -54,10 +51,11 @@ PUT /multiplexer_example
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 And test it like:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /multiplexer_example/_analyze
 {
@@ -65,11 +63,12 @@ POST /multiplexer_example/_analyze
   "text" : "Going HOME"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 And it'd respond:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "tokens": [
@@ -111,6 +110,7 @@ And it'd respond:
   ]
 }
 --------------------------------------------------
+// TESTRESPONSE
 
 <1> The stemmer has also emitted a token `home` at position 1, but because it is a
 duplicate of this token it has been removed from the token stream

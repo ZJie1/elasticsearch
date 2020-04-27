@@ -19,16 +19,49 @@
 
 package org.elasticsearch.rest.action.admin.indices;
 
+import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentHelper;
-import org.elasticsearch.test.ESTestCase;
+import org.elasticsearch.rest.RestRequest;
+import org.elasticsearch.test.rest.FakeRestRequest;
+import org.elasticsearch.test.rest.RestActionTestCase;
+import org.junit.Before;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
-public class RestCreateIndexActionTests extends ESTestCase {
+import static org.elasticsearch.rest.BaseRestHandler.INCLUDE_TYPE_NAME_PARAMETER;
+import static org.mockito.Mockito.mock;
+
+public class RestCreateIndexActionTests extends RestActionTestCase {
+    private RestCreateIndexAction action;
+
+    @Before
+    public void setupAction() {
+        action = new RestCreateIndexAction(controller());
+    }
+
+    public void testIncludeTypeName() throws IOException {
+        Map<String, String> params = new HashMap<>();
+        params.put(INCLUDE_TYPE_NAME_PARAMETER, randomFrom("true", "false"));
+        RestRequest deprecatedRequest = new FakeRestRequest.Builder(xContentRegistry())
+            .withMethod(RestRequest.Method.PUT)
+            .withPath("/some_index")
+            .withParams(params)
+            .build();
+
+        action.prepareRequest(deprecatedRequest, mock(NodeClient.class));
+        assertWarnings(RestCreateIndexAction.TYPES_DEPRECATION_MESSAGE);
+
+        RestRequest validRequest = new FakeRestRequest.Builder(xContentRegistry())
+            .withMethod(RestRequest.Method.PUT)
+            .withPath("/some_index")
+            .build();
+        action.prepareRequest(validRequest, mock(NodeClient.class));
+    }
 
     public void testPrepareTypelessRequest() throws IOException {
         XContentBuilder content = XContentFactory.jsonBuilder().startObject()
@@ -45,7 +78,8 @@ public class RestCreateIndexActionTests extends ESTestCase {
 
         Map<String, Object> contentAsMap = XContentHelper.convertToMap(
             BytesReference.bytes(content), true, content.contentType()).v2();
-        Map<String, Object> source = RestCreateIndexAction.prepareMappings(contentAsMap);
+        boolean includeTypeName = false;
+        Map<String, Object> source = RestCreateIndexAction.prepareMappings(contentAsMap, includeTypeName);
 
         XContentBuilder expectedContent = XContentFactory.jsonBuilder().startObject()
             .startObject("mappings")
@@ -66,7 +100,30 @@ public class RestCreateIndexActionTests extends ESTestCase {
         assertEquals(expectedContentAsMap, source);
     }
 
-    public void testMalformedMappings() throws IOException {
+    public void testPrepareTypedRequest() throws IOException {
+        XContentBuilder content = XContentFactory.jsonBuilder().startObject()
+            .startObject("mappings")
+                .startObject("type")
+                    .startObject("properties")
+                        .startObject("field1").field("type", "keyword").endObject()
+                        .startObject("field2").field("type", "text").endObject()
+                    .endObject()
+                .endObject()
+            .endObject()
+            .startObject("aliases")
+                .startObject("read_alias").endObject()
+            .endObject()
+        .endObject();
+
+        Map<String, Object> contentAsMap = XContentHelper.convertToMap(
+            BytesReference.bytes(content), true, content.contentType()).v2();
+        boolean includeTypeName = true;
+        Map<String, Object> source = RestCreateIndexAction.prepareMappings(contentAsMap, includeTypeName);
+
+        assertEquals(contentAsMap, source);
+    }
+
+       public void testMalformedMappings() throws IOException {
         XContentBuilder content = XContentFactory.jsonBuilder().startObject()
             .field("mappings", "some string")
             .startObject("aliases")
@@ -77,7 +134,8 @@ public class RestCreateIndexActionTests extends ESTestCase {
         Map<String, Object> contentAsMap = XContentHelper.convertToMap(
             BytesReference.bytes(content), true, content.contentType()).v2();
 
-        Map<String, Object> source = RestCreateIndexAction.prepareMappings(contentAsMap);
+        boolean includeTypeName = false;
+        Map<String, Object> source = RestCreateIndexAction.prepareMappings(contentAsMap, includeTypeName);
         assertEquals(contentAsMap, source);
     }
 }

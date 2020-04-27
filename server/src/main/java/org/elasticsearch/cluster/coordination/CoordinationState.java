@@ -21,12 +21,10 @@ package org.elasticsearch.cluster.coordination;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.coordination.CoordinationMetadata.VotingConfiguration;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.coordination.CoordinationMetaData.VotingConfiguration;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -434,14 +432,15 @@ public class CoordinationState {
         assert publishVotes.isEmpty() || electionWon();
     }
 
-    public void close() throws IOException {
+    public void close() {
         persistedState.close();
     }
 
     /**
      * Pluggable persistence layer for {@link CoordinationState}.
+     *
      */
-    public interface PersistedState extends Closeable {
+    public interface PersistedState {
 
         /**
          * Returns the current term
@@ -475,31 +474,30 @@ public class CoordinationState {
          */
         default void markLastAcceptedStateAsCommitted() {
             final ClusterState lastAcceptedState = getLastAcceptedState();
-            Metadata.Builder metadataBuilder = null;
+            MetaData.Builder metaDataBuilder = null;
             if (lastAcceptedState.getLastAcceptedConfiguration().equals(lastAcceptedState.getLastCommittedConfiguration()) == false) {
-                final CoordinationMetadata coordinationMetadata = CoordinationMetadata.builder(lastAcceptedState.coordinationMetadata())
+                final CoordinationMetaData coordinationMetaData = CoordinationMetaData.builder(lastAcceptedState.coordinationMetaData())
                         .lastCommittedConfiguration(lastAcceptedState.getLastAcceptedConfiguration())
                         .build();
-                metadataBuilder = Metadata.builder(lastAcceptedState.metadata());
-                metadataBuilder.coordinationMetadata(coordinationMetadata);
+                metaDataBuilder = MetaData.builder(lastAcceptedState.metaData());
+                metaDataBuilder.coordinationMetaData(coordinationMetaData);
             }
-            assert lastAcceptedState.metadata().clusterUUID().equals(Metadata.UNKNOWN_CLUSTER_UUID) == false :
+            assert lastAcceptedState.metaData().clusterUUID().equals(MetaData.UNKNOWN_CLUSTER_UUID) == false :
                 "received cluster state with empty cluster uuid: " + lastAcceptedState;
-            if (lastAcceptedState.metadata().clusterUUID().equals(Metadata.UNKNOWN_CLUSTER_UUID) == false &&
-                lastAcceptedState.metadata().clusterUUIDCommitted() == false) {
-                if (metadataBuilder == null) {
-                    metadataBuilder = Metadata.builder(lastAcceptedState.metadata());
+            if (lastAcceptedState.metaData().clusterUUID().equals(MetaData.UNKNOWN_CLUSTER_UUID) == false &&
+                lastAcceptedState.metaData().clusterUUIDCommitted() == false) {
+                if (metaDataBuilder == null) {
+                    metaDataBuilder = MetaData.builder(lastAcceptedState.metaData());
                 }
-                metadataBuilder.clusterUUIDCommitted(true);
-                logger.info("cluster UUID set to [{}]", lastAcceptedState.metadata().clusterUUID());
+                metaDataBuilder.clusterUUIDCommitted(true);
+                logger.info("cluster UUID set to [{}]", lastAcceptedState.metaData().clusterUUID());
             }
-            if (metadataBuilder != null) {
-                setLastAcceptedState(ClusterState.builder(lastAcceptedState).metadata(metadataBuilder).build());
+            if (metaDataBuilder != null) {
+                setLastAcceptedState(ClusterState.builder(lastAcceptedState).metaData(metaDataBuilder).build());
             }
         }
 
-        default void close() throws IOException {
-        }
+        default void close() {}
     }
 
     /**

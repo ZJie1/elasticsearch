@@ -33,24 +33,19 @@ import org.apache.lucene.util.packed.PackedInts;
 import org.apache.lucene.util.packed.PackedLongValues;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.breaker.CircuitBreaker;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.IndexSettings;
-import org.elasticsearch.index.fielddata.LeafOrdinalsFieldData;
+import org.elasticsearch.index.fielddata.AtomicOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldDataCache;
 import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.RamAccountingTermsEnum;
-import org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.Nested;
 import org.elasticsearch.index.fielddata.fieldcomparator.BytesRefFieldComparatorSource;
 import org.elasticsearch.index.fielddata.ordinals.Ordinals;
 import org.elasticsearch.index.fielddata.ordinals.OrdinalsBuilder;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.indices.breaker.CircuitBreakerService;
-import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.MultiValueMode;
-import org.elasticsearch.search.sort.BucketedSort;
-import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 
@@ -90,21 +85,15 @@ public class PagedBytesIndexFieldData extends AbstractIndexOrdinalsFieldData {
     }
 
     @Override
-    public BucketedSort newBucketedSort(BigArrays bigArrays, Object missingValue, MultiValueMode sortMode, Nested nested,
-            SortOrder sortOrder, DocValueFormat format, int bucketSize, BucketedSort.ExtraData extra) {
-        throw new IllegalArgumentException("only supported on numeric fields");
-    }
-
-    @Override
-    public LeafOrdinalsFieldData loadDirect(LeafReaderContext context) throws Exception {
+    public AtomicOrdinalsFieldData loadDirect(LeafReaderContext context) throws Exception {
         LeafReader reader = context.reader();
-        LeafOrdinalsFieldData data = null;
+        AtomicOrdinalsFieldData data = null;
 
         PagedBytesEstimator estimator =
             new PagedBytesEstimator(context, breakerService.getBreaker(CircuitBreaker.FIELDDATA), getFieldName());
         Terms terms = reader.terms(getFieldName());
         if (terms == null) {
-            data = AbstractLeafOrdinalsFieldData.empty();
+            data = AbstractAtomicOrdinalsFieldData.empty();
             estimator.afterLoad(null, data.ramBytesUsed());
             return data;
         }
@@ -135,7 +124,7 @@ public class PagedBytesIndexFieldData extends AbstractIndexOrdinalsFieldData {
             PagedBytes.Reader bytesReader = bytes.freeze(true);
             final Ordinals ordinals = builder.build();
 
-            data = new PagedBytesLeafFieldData(bytesReader, termOrdToBytesOffset.build(), ordinals);
+            data = new PagedBytesAtomicFieldData(bytesReader, termOrdToBytesOffset.build(), ordinals);
             success = true;
             return data;
         } finally {

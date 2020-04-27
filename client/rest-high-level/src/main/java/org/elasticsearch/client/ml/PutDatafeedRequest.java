@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.datafeed.DatafeedConfig;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.xcontent.ToXContentObject;
@@ -30,7 +31,7 @@ import java.util.Objects;
 /**
  * Request to create a new Machine Learning Datafeed given a {@link DatafeedConfig} configuration
  */
-public class PutDatafeedRequest implements Validatable, ToXContentObject {
+public class PutDatafeedRequest extends ActionRequest implements ToXContentObject {
 
     private final DatafeedConfig datafeed;
 
@@ -76,4 +77,8 @@ public class PutDatafeedRequest implements Validatable, ToXContentObject {
         return Strings.toString(this);
     }
 
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
+    }
 }

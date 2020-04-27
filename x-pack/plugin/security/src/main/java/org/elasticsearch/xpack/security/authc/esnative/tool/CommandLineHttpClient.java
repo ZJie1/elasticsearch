@@ -53,9 +53,11 @@ public class CommandLineHttpClient {
      */
     private static final int READ_TIMEOUT = 35 * 1000;
 
+    private final Settings settings;
     private final Environment env;
 
-    public CommandLineHttpClient(Environment env) {
+    public CommandLineHttpClient(Settings settings, Environment env) {
+        this.settings = settings;
         this.env = env;
     }
 
@@ -80,7 +82,7 @@ public class CommandLineHttpClient {
         final HttpURLConnection conn;
         // If using SSL, need a custom service because it's likely a self-signed certificate
         if ("https".equalsIgnoreCase(url.getProtocol())) {
-            final SSLService sslService = new SSLService(env);
+            final SSLService sslService = new SSLService(settings, env);
             final HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
             AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
                 final SSLConfiguration sslConfiguration = sslService.getHttpTransportSSLConfiguration();
@@ -131,7 +133,6 @@ public class CommandLineHttpClient {
     }
 
     String getDefaultURL() {
-        final Settings settings = env.settings();
         final String scheme = XPackSettings.HTTP_SSL_ENABLED.get(settings) ? "https" : "http";
         List<String> httpPublishHost = SETTING_HTTP_PUBLISH_HOST.get(settings);
         if (httpPublishHost.isEmpty()) {
@@ -161,4 +162,5 @@ public class CommandLineHttpClient {
                 "provide the url", e);
         }
     }
+
 }

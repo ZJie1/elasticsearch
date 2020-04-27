@@ -81,7 +81,15 @@ public class GetPrivilegesResponseTests extends ESTestCase {
             "}";
 
         final GetPrivilegesResponse response = GetPrivilegesResponse.fromXContent(XContentType.JSON.xContent().createParser(
-            new NamedXContentRegistry(Collections.emptyList()), DeprecationHandler.IGNORE_DEPRECATIONS, json));
+            new NamedXContentRegistry(Collections.emptyList()), new DeprecationHandler() {
+                @Override
+                public void usedDeprecatedName(String usedName, String modernName) {
+                }
+
+                @Override
+                public void usedDeprecatedField(String usedName, String replacedWith) {
+                }
+            }, json));
 
         final ApplicationPrivilege readTestappPrivilege =
             new ApplicationPrivilege("testapp", "read", Arrays.asList("action:login", "data:read/*"), null);

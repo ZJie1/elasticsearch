@@ -22,7 +22,6 @@ import com.carrotsearch.randomizedtesting.generators.RandomPicks;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.StringField;
@@ -30,8 +29,6 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.util.TestUtil;
-import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.test.ESTestCase;
@@ -137,7 +134,7 @@ public class UUIDTests extends ESTestCase {
             random().nextBytes(macAddresses[i]);
         }
         UUIDGenerator generator = new TimeBasedUUIDGenerator() {
-            double currentTimeMillis = TestUtil.nextLong(random(), 0L, 10000000000L);
+            double currentTimeMillis = System.currentTimeMillis();
 
             @Override
             protected long currentTimeMillis() {
@@ -154,7 +151,6 @@ public class UUIDTests extends ESTestCase {
         // the quality of this test
         Directory dir = newFSDirectory(createTempDir());
         IndexWriterConfig config = new IndexWriterConfig()
-                .setCodec(Codec.forName(Lucene.LATEST_CODEC))
                 .setMergeScheduler(new SerialMergeScheduler()); // for reproducibility
         IndexWriter w = new IndexWriter(dir, config);
         Document doc = new Document();

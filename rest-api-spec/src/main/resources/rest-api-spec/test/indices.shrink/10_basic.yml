@@ -38,6 +38,7 @@
         id:    "1"
 
   - match: { _index:   source }
+  - match: { _type:    _doc   }
   - match: { _id:      "1"     }
   - match: { _source:  { foo: "hello world" } }
 
@@ -75,5 +76,6 @@
         id:    "1"
 
   - match: { _index:   target }
+  - match: { _type:    _doc   }
   - match: { _id:      "1"     }
   - match: { _source:  { foo: "hello world" } }

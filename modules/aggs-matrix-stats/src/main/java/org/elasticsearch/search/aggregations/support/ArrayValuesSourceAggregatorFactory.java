@@ -19,56 +19,52 @@
 
 package org.elasticsearch.search.aggregations.support;
 
-import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.AggregatorFactories;
 import org.elasticsearch.search.aggregations.AggregatorFactory;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-public abstract class ArrayValuesSourceAggregatorFactory
+public abstract class ArrayValuesSourceAggregatorFactory<VS extends ValuesSource>
     extends AggregatorFactory {
 
-    protected Map<String, ValuesSourceConfig> configs;
+    protected Map<String, ValuesSourceConfig<VS>> configs;
 
-    public ArrayValuesSourceAggregatorFactory(String name, Map<String, ValuesSourceConfig> configs,
-                                              QueryShardContext queryShardContext, AggregatorFactory parent,
+    public ArrayValuesSourceAggregatorFactory(String name, Map<String, ValuesSourceConfig<VS>> configs,
+                                              SearchContext context, AggregatorFactory parent,
                                               AggregatorFactories.Builder subFactoriesBuilder,
-                                              Map<String, Object> metadata) throws IOException {
-        super(name, queryShardContext, parent, subFactoriesBuilder, metadata);
+                                              Map<String, Object> metaData) throws IOException {
+        super(name, context, parent, subFactoriesBuilder, metaData);
         this.configs = configs;
     }
 
     @Override
-    public Aggregator createInternal(SearchContext searchContext,
-                                        Aggregator parent,
-                                        boolean collectsFromSingleBucket,
-                                        Map<String, Object> metadata) throws IOException {
-        HashMap<String, ValuesSource> valuesSources = new HashMap<>();
+    public Aggregator createInternal(Aggregator parent, boolean collectsFromSingleBucket, List<PipelineAggregator> pipelineAggregators,
+                                     Map<String, Object> metaData) throws IOException {
+        HashMap<String, VS> valuesSources = new HashMap<>();
 
-        for (Map.Entry<String, ValuesSourceConfig> config : configs.entrySet()) {
-            ValuesSource vs = config.getValue().toValuesSource();
+        for (Map.Entry<String, ValuesSourceConfig<VS>> config : configs.entrySet()) {
+            VS vs = config.getValue().toValuesSource(context.getQueryShardContext());
             if (vs != null) {
                 valuesSources.put(config.getKey(), vs);
             }
         }
         if (valuesSources.isEmpty()) {
-            return createUnmapped(searchContext, parent, metadata);
+            return createUnmapped(parent, pipelineAggregators, metaData);
         }
-        return doCreateInternal(valuesSources, searchContext, parent, collectsFromSingleBucket, metadata);
+        return doCreateInternal(valuesSources, parent, collectsFromSingleBucket, pipelineAggregators, metaData);
     }
 
-    protected abstract Aggregator createUnmapped(SearchContext searchContext,
-                                                    Aggregator parent,
-                                                    Map<String, Object> metadata) throws IOException;
+    protected abstract Aggregator createUnmapped(Aggregator parent, List<PipelineAggregator> pipelineAggregators,
+                                                 Map<String, Object> metaData) throws IOException;
 
-    protected abstract Aggregator doCreateInternal(Map<String, ValuesSource> valuesSources,
-                                                    SearchContext searchContext,
-                                                    Aggregator parent,
-                                                    boolean collectsFromSingleBucket,
-                                                    Map<String, Object> metadata) throws IOException;
+    protected abstract Aggregator doCreateInternal(Map<String, VS> valuesSources, Aggregator parent, boolean collectsFromSingleBucket,
+                                                   List<PipelineAggregator> pipelineAggregators,
+                                                   Map<String, Object> metaData) throws IOException;
 
 }

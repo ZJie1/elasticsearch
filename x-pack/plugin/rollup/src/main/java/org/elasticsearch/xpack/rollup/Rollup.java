@@ -25,7 +25,6 @@ import org.elasticsearch.persistent.PersistentTasksExecutor;
 import org.elasticsearch.plugins.ActionPlugin;
 import org.elasticsearch.plugins.PersistentTaskPlugin;
 import org.elasticsearch.plugins.Plugin;
-import org.elasticsearch.repositories.RepositoriesService;
 import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestHandler;
 import org.elasticsearch.script.ScriptService;
@@ -106,9 +105,7 @@ public class Rollup extends Plugin implements ActionPlugin, PersistentTaskPlugin
     public Collection<Object> createComponents(Client client, ClusterService clusterService, ThreadPool threadPool,
                                                ResourceWatcherService resourceWatcherService, ScriptService scriptService,
                                                NamedXContentRegistry xContentRegistry, Environment environment,
-                                               NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry,
-                                               IndexNameExpressionResolver expressionResolver,
-                                               Supplier<RepositoriesService> repositoriesServiceSupplier) {
+                                               NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry) {
         return emptyList();
     }
 
@@ -122,14 +119,14 @@ public class Rollup extends Plugin implements ActionPlugin, PersistentTaskPlugin
         }
 
         return Arrays.asList(
-            new RestRollupSearchAction(),
-            new RestPutRollupJobAction(),
-            new RestStartRollupJobAction(),
-            new RestStopRollupJobAction(),
-            new RestDeleteRollupJobAction(),
-            new RestGetRollupJobsAction(),
-            new RestGetRollupCapsAction(),
-            new RestGetRollupIndexCapsAction()
+            new RestRollupSearchAction(restController),
+            new RestPutRollupJobAction(restController),
+            new RestStartRollupJobAction(restController),
+            new RestStopRollupJobAction(restController),
+            new RestDeleteRollupJobAction(restController),
+            new RestGetRollupJobsAction(restController),
+            new RestGetRollupCapsAction(restController),
+            new RestGetRollupIndexCapsAction(restController)
         );
 
     }
@@ -161,7 +158,7 @@ public class Rollup extends Plugin implements ActionPlugin, PersistentTaskPlugin
         }
 
         FixedExecutorBuilder indexing = new FixedExecutorBuilder(settings, Rollup.TASK_THREAD_POOL_NAME,
-                4, 4, "xpack.rollup.task_thread_pool", false);
+                4, 4, "xpack.rollup.task_thread_pool");
 
         return Collections.singletonList(indexing);
     }
@@ -170,8 +167,7 @@ public class Rollup extends Plugin implements ActionPlugin, PersistentTaskPlugin
     public List<PersistentTasksExecutor<?>> getPersistentTasksExecutor(ClusterService clusterService,
                                                                        ThreadPool threadPool,
                                                                        Client client,
-                                                                       SettingsModule settingsModule,
-                                                                       IndexNameExpressionResolver expressionResolver) {
+                                                                       SettingsModule settingsModule) {
         if (enabled == false) {
             return emptyList();
         }

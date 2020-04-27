@@ -5,7 +5,6 @@
  */
 package org.elasticsearch.xpack.core.ml.job.results;
 
-import org.elasticsearch.client.ml.job.config.DetectorFunction;
 import org.elasticsearch.common.io.stream.Writeable.Reader;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
@@ -60,8 +59,7 @@ public class AnomalyCauseTests extends AbstractSerializingTestCase<AnomalyCause>
             anomalyCause.setPartitionFieldValue(randomAlphaOfLengthBetween(1, 20));
         }
         if (randomBoolean()) {
-            anomalyCause.setFunction(DetectorFunction.LAT_LONG.getFullName());
-            anomalyCause.setGeoResults(GeoResultsTests.createTestGeoResults());
+            anomalyCause.setFunction(randomAlphaOfLengthBetween(1, 20));
         }
         if (randomBoolean()) {
             anomalyCause.setFunctionDescription(randomAlphaOfLengthBetween(1, 20));

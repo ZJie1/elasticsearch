@@ -6,7 +6,7 @@
 
 Changes an <<index-modules-settings,index setting>> in real time.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /twitter/_settings
 {
@@ -15,6 +15,7 @@ PUT /twitter/_settings
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 
@@ -37,8 +38,6 @@ use `_all` or exclude this parameter.
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `false`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +
@@ -55,21 +54,21 @@ Defaults to `false`.
 include::{docdir}/rest-api/common-parms.asciidoc[tag=timeoutparms]
 
 
-[[update-index-settings-api-request-body]]
-==== {api-request-body-title}
+[[sample-api-query-params]]
+==== {api-query-parms-title}
 
 `settings`::
 (Optional, <<index-modules-settings,index setting object>>) Configuration
 options for the index. See <<index-modules-settings>>.
 
-[[update-index-settings-api-example]]
+[[sample-api-example]]
 ==== {api-examples-title}
 
 [[reset-index-setting]]
 ===== Reset an index setting
 To revert a setting to the default value, use `null`. For example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /twitter/_settings
 {
@@ -78,6 +77,7 @@ PUT /twitter/_settings
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 The list of per-index settings which can be updated dynamically on live
@@ -93,7 +93,7 @@ the index from being more performant for bulk indexing, and then move it
 to more real time indexing state. Before the bulk indexing is started,
 use:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /twitter/_settings
 {
@@ -102,6 +102,7 @@ PUT /twitter/_settings
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 (Another optimization option is to start the index without any replicas,
@@ -110,7 +111,7 @@ and only later adding them, but that really depends on the use case).
 Then, once bulk indexing is done, the settings can be updated (back to
 the defaults for example):
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /twitter/_settings
 {
@@ -119,14 +120,16 @@ PUT /twitter/_settings
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 And, a force merge should be called:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /twitter/_forcemerge?max_num_segments=5
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 [[update-settings-analysis]]
@@ -141,7 +144,7 @@ and reopen the index.
 For example,
 the following commands add the `content` analyzer to `myindex`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /twitter/_close
 
@@ -159,4 +162,5 @@ PUT /twitter/_settings
 
 POST /twitter/_open
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]

@@ -1,8 +1,7 @@
-[role="xpack"]
 [[schedule-cron]]
 ==== `cron` schedule
 
-A <<trigger-schedule,`schedule`>> trigger that enables you to use a
+A <<trigger-schedule, `schedule`>> trigger that enables you to use a
 https://en.wikipedia.org/wiki/Cron[cron] style expression to specify when you
 want the scheduler to start the watch execution. {watcher} uses the cron parser
 from the http://www.quartz-scheduler.org[Quartz Job Scheduler]. For more
@@ -13,11 +12,10 @@ WARNING:  While `cron` triggers are super powerful, we recommend using one of
           the other schedule types if you can, as they are much more
           straightforward to configure. If you use `cron`, construct your `cron`
           expressions with care to be sure you are actually setting the schedule
-          you want. You can use the <<croneval,`elasticsearch-croneval`>> tool to validate
+          you want. You can use the <<croneval, `elasticsearch-croneval`>> tool to validate
           your cron expressions and see what the resulting trigger times will be.
 
-[[_cron_expressions]]
-===== Cron expressions
+===== Cron Expressions
 
 A cron expression is a string of the following form:
 
@@ -30,7 +28,7 @@ All elements are required except for `year`. <<schedule-cron-elements>> shows
 the valid values for each element in a cron expression.
 
 [[schedule-cron-elements]]
-.Cron expression elements
+.Cron Expression Elements
 [cols=",^,,", options="header"]
 |======
 | Name           | Required  | Valid Values            | Valid Special Characters
@@ -51,7 +49,7 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
       `day_of_month`. Explicitly specifying both values is not supported.
 
 [[schedule-cron-special-characters]]
-.Cron special characters
+.Cron Special Characters
 [options="header"]
 |======
 | Special Character | Description
@@ -118,7 +116,7 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
 
 |======
 
-.Setting daily triggers
+.Setting Daily Triggers
 [options="header"]
 |======
 | Cron Expression       | Description
@@ -126,7 +124,7 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
 | `0 5 9 * * ? 2015`    | Trigger at 9:05 AM every day during the year 2015.
 |======
 
-.Restricting triggers to a range of days or times
+.Restricting Triggers to a Range of Days or Times
 [options="header"]
 |======
 | Cron Expression       | Description
@@ -135,7 +133,7 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
                           at 9:05 AM every day.
 |======
 
-.Setting interval triggers
+.Setting Interval Triggers
 [options="header"]
 |======
 | Cron Expression       | Description
@@ -145,7 +143,7 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
                           on the first day of the month.
 |======
 
-.Setting schedules that trigger on a particular day
+.Setting Schedules that Trigger on a Particular Day
 [options="header"]
 |======
 | Cron Expression       | Description
@@ -158,7 +156,7 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
 | `0 5 9 ? * 6#1`       | Trigger at 9:05 AM on the first Friday of every month.
 |======
 
-.Setting triggers using last
+.Setting Triggers Using Last
 [options="header"]
 |======
 | Cron Expression       | Description
@@ -167,8 +165,8 @@ NOTE: Currently, you must specify `?` for either the `day_of_week` or
 | `0 5 9 LW * ?`        | Trigger at 9:05 AM on the last weekday of every month.
 |======
 
-[[_configuring_a_cron_schedule]]
-===== Configuring a cron schedule
+
+===== Configuring a Cron Schedule
 
 To configure a `cron` schedule, you simply specify the cron expression as a
 string value. For example, the following snippet configures a `cron` schedule
@@ -188,8 +186,7 @@ that triggers every day at noon:
 --------------------------------------------------
 // NOTCONSOLE
 
-[[_configuring_a_multiple_times_cron_schedule]]
-===== Configuring a multiple times cron schedule
+===== Configuring a Multiple Times Cron Schedule
 
 To configure a `cron` schedule that triggers multiple times, you can
 specify an array of cron expressions. For example, the following `cron`
@@ -217,7 +214,7 @@ minute during the weekend:
 ===== Verifying cron expressions
 
 The {es} {alert-features} provide a
-<<elasticsearch-croneval,`elasticsearch-croneval`>> command line tool
+{ref}/elasticsearch-croneval.html[`elasticsearch-croneval`] command line tool
 that you can use to verify that your cron expressions are valid and produce the
 expected results. This tool is provided in the `$ES_HOME/bin` directory.
 

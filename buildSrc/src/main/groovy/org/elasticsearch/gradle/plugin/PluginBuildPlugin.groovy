@@ -23,11 +23,10 @@ import org.elasticsearch.gradle.BuildPlugin
 import org.elasticsearch.gradle.NoticeTask
 import org.elasticsearch.gradle.Version
 import org.elasticsearch.gradle.VersionProperties
-import org.elasticsearch.gradle.info.BuildParams
-import org.elasticsearch.gradle.test.rest.RestResourcesPlugin
 import org.elasticsearch.gradle.test.RestIntegTestTask
-import org.elasticsearch.gradle.testclusters.RunTask
+import org.elasticsearch.gradle.test.RunTask
 import org.elasticsearch.gradle.testclusters.TestClustersPlugin
+import org.elasticsearch.gradle.tool.ClasspathUtils
 import org.gradle.api.InvalidUserDataException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -37,7 +36,6 @@ import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.publish.maven.plugins.MavenPublishPlugin
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.SourceSet
-import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Zip
 
 import java.util.regex.Matcher
@@ -52,70 +50,66 @@ class PluginBuildPlugin implements Plugin<Project> {
     @Override
     void apply(Project project) {
         project.pluginManager.apply(BuildPlugin)
-        project.pluginManager.apply(TestClustersPlugin)
-        project.pluginManager.apply(RestResourcesPlugin)
 
         PluginPropertiesExtension extension = project.extensions.create(PLUGIN_EXTENSION_NAME, PluginPropertiesExtension, project)
         configureDependencies(project)
 
-        boolean isXPackModule = project.path.startsWith(':x-pack:plugin')
-        boolean isModule = project.path.startsWith(':modules:') || isXPackModule
-
-        createIntegTestTask(project)
-        createBundleTasks(project, extension)
-        project.tasks.integTest.dependsOn(project.tasks.bundlePlugin)
-        if (isModule) {
-            project.testClusters.integTest.module(project.tasks.bundlePlugin.archiveFile)
-        } else {
-            project.testClusters.integTest.plugin(project.tasks.bundlePlugin.archiveFile)
-        }
-
+        // this afterEvaluate must happen before the afterEvaluate added by integTest creation,
+        // so that the file name resolution for installing the plugin will be setup
         project.afterEvaluate {
-            project.extensions.getByType(PluginPropertiesExtension).extendedPlugins.each { pluginName ->
-                // Auto add dependent modules to the test cluster
-                if (project.findProject(":modules:${pluginName}") != null) {
-                    project.integTest.dependsOn(project.project(":modules:${pluginName}").tasks.bundlePlugin)
+            boolean isXPackModule = project.path.startsWith(':x-pack:plugin')
+            boolean isModule = project.path.startsWith(':modules:') || isXPackModule
+            String name = extension.name
+            project.archivesBaseName = name
+
+            // set the project description so it will be picked up by publishing
+            project.description = extension.description
+
+            configurePublishing(project, extension)
+
+            if (project.plugins.hasPlugin(TestClustersPlugin.class) == false) {
+                project.integTestCluster.dependsOn(project.tasks.bundlePlugin)
+                if (isModule) {
+                    project.integTestCluster.module(project)
+                } else {
+                    project.integTestCluster.plugin(project.path)
+                }
+            } else {
+                project.tasks.integTest.dependsOn(project.tasks.bundlePlugin)
+                if (isModule) {
                     project.testClusters.integTest.module(
-                        project.project(":modules:${pluginName}").tasks.bundlePlugin.archiveFile
+                            project.file(project.tasks.bundlePlugin.archiveFile)
+                    )
+                } else {
+                    project.testClusters.integTest.plugin(
+                            project.file(project.tasks.bundlePlugin.archiveFile)
                     )
                 }
-            }
-            PluginPropertiesExtension extension1 = project.getExtensions().getByType(PluginPropertiesExtension.class)
-            configurePublishing(project, extension1)
-            String name = extension1.name
-            project.archivesBaseName = name
-            project.description = extension1.description
 
-            if (extension1.name == null) {
-                throw new InvalidUserDataException('name is a required setting for esplugin')
-            }
-            if (extension1.description == null) {
-                throw new InvalidUserDataException('description is a required setting for esplugin')
-            }
-            if (extension1.classname == null) {
-                throw new InvalidUserDataException('classname is a required setting for esplugin')
+                project.extensions.getByType(PluginPropertiesExtension).extendedPlugins.each { pluginName ->
+                    // Auto add dependent modules to the test cluster
+                    if (project.findProject(":modules:${pluginName}") != null) {
+                        project.integTest.dependsOn(project.project(":modules:${pluginName}").tasks.bundlePlugin)
+                        project.testClusters.integTest.module(
+                                project.file(project.project(":modules:${pluginName}").tasks.bundlePlugin.archiveFile)
+                        )
+                    }
+                }
             }
 
-            Map<String, String> properties = [
-                'name'                : extension1.name,
-                'description'         : extension1.description,
-                'version'             : extension1.version,
-                'elasticsearchVersion': Version.fromString(VersionProperties.elasticsearch).toString(),
-                'javaVersion'         : project.targetCompatibility as String,
-                'classname'           : extension1.classname,
-                'extendedPlugins'     : extension1.extendedPlugins.join(','),
-                'hasNativeController' : extension1.hasNativeController,
-                'requiresKeystore'    : extension1.requiresKeystore
-            ]
-            project.tasks.named('pluginProperties').configure {
-                expand(properties)
-                inputs.properties(properties)
+            project.tasks.run.dependsOn(project.tasks.bundlePlugin)
+            if (isModule) {
+                project.tasks.run.clusterConfig.distribution = System.getProperty(
+                        'run.distribution', isXPackModule ? 'default' : 'oss'
+                )
+            } else {
+                project.tasks.run.clusterConfig.plugin(project.path)
             }
+
             if (isModule == false || isXPackModule) {
-                addNoticeGeneration(project, extension1)
+                addNoticeGeneration(project, extension)
             }
         }
-
         project.tasks.named('testingConventions').configure {
             naming.clear()
             naming {
@@ -129,25 +123,22 @@ class PluginBuildPlugin implements Plugin<Project> {
                 }
             }
         }
-        project.configurations.getByName('default')
-            .extendsFrom(project.configurations.getByName('runtimeClasspath'))
-        // allow running ES with this plugin in the foreground of a build
-        project.tasks.register('run', RunTask) {
-            dependsOn(project.tasks.bundlePlugin)
-            useCluster project.testClusters.integTest
-        }
+        createIntegTestTask(project)
+        createBundleTasks(project, extension)
+        project.configurations.getByName('default').extendsFrom(project.configurations.getByName('runtime'))
+        project.tasks.create('run', RunTask) // allow running ES with this plugin in the foreground of a build
     }
 
-
-    private static void configurePublishing(Project project, PluginPropertiesExtension extension) {
+    private void configurePublishing(Project project, PluginPropertiesExtension extension) {
         if (project.plugins.hasPlugin(MavenPublishPlugin)) {
             project.publishing.publications.nebula(MavenPublication).artifactId(extension.name)
         }
+
     }
 
     private static void configureDependencies(Project project) {
         project.dependencies {
-            if (BuildParams.internal) {
+            if (ClasspathUtils.isElasticsearchProject()) {
                 compileOnly project.project(':server')
                 testCompile project.project(':test:framework')
             } else {
@@ -168,6 +159,10 @@ class PluginBuildPlugin implements Plugin<Project> {
     private static void createIntegTestTask(Project project) {
         RestIntegTestTask integTest = project.tasks.create('integTest', RestIntegTestTask.class)
         integTest.mustRunAfter('precommit', 'test')
+        if (project.plugins.hasPlugin(TestClustersPlugin.class) == false) {
+            // only if not using test clusters
+            project.integTestCluster.distribution = System.getProperty('tests.distribution', 'integ-test-zip')
+        }
         project.check.dependsOn(integTest)
     }
 
@@ -180,7 +175,7 @@ class PluginBuildPlugin implements Plugin<Project> {
         File templateFile = new File(project.buildDir, "templates/plugin-descriptor.properties")
 
         // create tasks to build the properties file for this plugin
-        TaskProvider<Task> copyPluginPropertiesTemplate = project.tasks.register('copyPluginPropertiesTemplate') {
+        Task copyPluginPropertiesTemplate = project.tasks.create('copyPluginPropertiesTemplate') {
             outputs.file(templateFile)
             doLast {
                 InputStream resourceTemplate = PluginBuildPlugin.getResourceAsStream("/${templateFile.name}")
@@ -188,20 +183,50 @@ class PluginBuildPlugin implements Plugin<Project> {
             }
         }
 
-        TaskProvider<Copy> buildProperties = project.tasks.register('pluginProperties', Copy) {
+        Copy buildProperties = project.tasks.create('pluginProperties', Copy) {
             dependsOn(copyPluginPropertiesTemplate)
             from(templateFile)
             into("${project.buildDir}/generated-resources")
         }
 
+        project.afterEvaluate {
+            // check require properties are set
+            if (extension.name == null) {
+                throw new InvalidUserDataException('name is a required setting for esplugin')
+            }
+            if (extension.description == null) {
+                throw new InvalidUserDataException('description is a required setting for esplugin')
+            }
+            if (extension.classname == null) {
+                throw new InvalidUserDataException('classname is a required setting for esplugin')
+            }
+
+            Map<String, String> properties = [
+                    'name': extension.name,
+                    'description': extension.description,
+                    'version': extension.version,
+                    'elasticsearchVersion': Version.fromString(VersionProperties.elasticsearch).toString(),
+                    'javaVersion': project.targetCompatibility as String,
+                    'classname': extension.classname,
+                    'extendedPlugins': extension.extendedPlugins.join(','),
+                    'hasNativeController': extension.hasNativeController,
+                    'requiresKeystore': extension.requiresKeystore
+            ]
+
+            buildProperties.configure {
+                expand(properties)
+                inputs.properties(properties)
+            }
+        }
+
         // add the plugin properties and metadata to test resources, so unit tests can
         // know about the plugin (used by test security code to statically initialize the plugin in unit tests)
         SourceSet testSourceSet = project.sourceSets.test
-        testSourceSet.output.dir("${project.buildDir}/generated-resources", builtBy: buildProperties)
+        testSourceSet.output.dir(buildProperties.destinationDir, builtBy: buildProperties)
         testSourceSet.resources.srcDir(pluginMetadata)
 
         // create the actual bundle task, which zips up all the files for the plugin
-        TaskProvider<Zip> bundle = project.tasks.register('bundlePlugin', Zip) {
+        Zip bundle = project.tasks.create(name: 'bundlePlugin', type: Zip) {
             from buildProperties
             from pluginMetadata // metadata (eg custom security policy)
             /*
@@ -209,7 +234,7 @@ class PluginBuildPlugin implements Plugin<Project> {
              * that shadow jar.
              */
             from { project.plugins.hasPlugin(ShadowPlugin) ? project.shadowJar : project.jar }
-            from project.configurations.runtimeClasspath - project.configurations.compileOnly
+            from project.configurations.runtime - project.configurations.compileOnly
             // extra files for the plugin to go into the zip
             from('src/main/packaging') // TODO: move all config/bin/_size/etc into packaging
             from('src/main') {
@@ -246,24 +271,19 @@ class PluginBuildPlugin implements Plugin<Project> {
 
     /** Configure the pom for the main jar of this plugin */
 
-    protected static void addNoticeGeneration(Project project, PluginPropertiesExtension extension) {
+    protected void addNoticeGeneration(Project project, PluginPropertiesExtension extension) {
         File licenseFile = extension.licenseFile
         if (licenseFile != null) {
-            project.tasks.named('bundlePlugin').configure {
-                from(licenseFile.parentFile) {
-                    include(licenseFile.name)
-                    rename { 'LICENSE.txt' }
-                }
+            project.tasks.bundlePlugin.from(licenseFile.parentFile) {
+                include(licenseFile.name)
+                rename { 'LICENSE.txt' }
             }
         }
         File noticeFile = extension.noticeFile
         if (noticeFile != null) {
-            TaskProvider<NoticeTask> generateNotice = project.tasks.register('generateNotice', NoticeTask) {
-                inputFile = noticeFile
-            }
-            project.tasks.named('bundlePlugin').configure {
-                from(generateNotice)
-            }
+            NoticeTask generateNotice = project.tasks.create('generateNotice', NoticeTask.class)
+            generateNotice.inputFile = noticeFile
+            project.tasks.bundlePlugin.from(generateNotice)
         }
     }
 }

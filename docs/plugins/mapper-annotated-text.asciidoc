@@ -22,7 +22,7 @@ The `annotated-text` tokenizes text content as per the more common `text` field 
 "limitations" below) but also injects any marked-up annotation tokens directly into
 the search index:
 
-[source,console]
+[source,js]
 --------------------------
 PUT my_index
 {
@@ -35,6 +35,7 @@ PUT my_index
   }
 }
 --------------------------
+// CONSOLE
 
 Such a mapping would allow marked-up text eg wikipedia articles to be indexed as both text
 and structured tokens. The annotations use a markdown-like syntax using URL encoding of
@@ -109,17 +110,17 @@ We can now perform searches for annotations using regular `term` queries that do
 the provided search values. Annotations are a more precise way of matching as can be seen 
 in this example where a search for `Beck` will not match `Jeff Beck` :
 
-[source,console]
+[source,js]
 --------------------------
 # Example documents
 PUT my_index/_doc/1
 {
-  "my_field": "[Beck](Beck) announced a new tour"<1>
+  "my_field": "[Beck](Beck) announced a new tour"<2>
 }
 
 PUT my_index/_doc/2
 {
-  "my_field": "[Jeff Beck](Jeff+Beck&Guitarist) plays a strat"<2>
+  "my_field": "[Jeff Beck](Jeff+Beck&Guitarist) plays a strat"<1>
 }
 
 # Example search
@@ -132,12 +133,13 @@ GET my_index/_search
   }
 }
 --------------------------
+// CONSOLE
 
 <1> As well as tokenising the plain text into single words e.g. `beck`, here we 
 inject the single token value `Beck` at the same position as `beck` in the token stream.
 <2> Note annotations can inject multiple tokens at the same position - here we inject both
 the very specific value `Jeff Beck` and the broader term `Guitarist`. This enables
-broader positional queries e.g. finding mentions of a `Guitarist` near to `start`.
+broader positional queries e.g. finding mentions of a `Guitarist` near to `strat`.
 <3> A benefit of searching with these carefully defined annotation tokens is that a query for 
 `Beck` will not match document 2 that contains the tokens `jeff`, `beck` and `Jeff Beck`
 
@@ -162,7 +164,7 @@ entity IDs woven into text.
 These IDs can be embedded as annotations in an annotated_text field but it often makes 
 sense to include them in dedicated structured fields to support discovery via aggregations:
 
-[source,console]
+[source,js]
 --------------------------
 PUT my_index
 {
@@ -183,10 +185,11 @@ PUT my_index
   }
 }
 --------------------------
+// CONSOLE
 
 Applications would then typically provide content and discover it as follows:
 
-[source,console]
+[source,js]
 --------------------------
 # Example documents
 PUT my_index/_doc/1
@@ -212,6 +215,7 @@ GET my_index/_search
   }
 }
 --------------------------
+// CONSOLE
 
 <1> Note the `my_twitter_handles` contains a list of the annotation values
 also used in the unstructured text. (Note the annotated_text syntax requires escaping). 
@@ -245,7 +249,7 @@ However, a problem arises if your named entity happens to be a single term and l
 company `elastic`. In this case, a search on the annotated text field for the token `elastic`
 may match a text document such as this:
 
-    they fired an elastic band
+    he fired an elastic band
 
 To avoid such false matches users should consider prefixing annotation values to ensure 
 they don't name clash with text tokens e.g.
@@ -261,7 +265,7 @@ they don't name clash with text tokens e.g.
 The `annotated-text` plugin includes a custom highlighter designed to mark up search hits
 in a way which is respectful of the original markup:
 
-[source,console]
+[source,js]
 --------------------------
 # Example documents
 PUT my_index/_doc/1
@@ -286,7 +290,7 @@ GET my_index/_search
   }
 }
 --------------------------
-
+// CONSOLE
 <1> The `annotated` highlighter type is designed for use with annotated_text fields
 
 The annotated highlighter is based on the `unified` highlighter and supports the same

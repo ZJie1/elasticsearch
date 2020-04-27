@@ -7,17 +7,11 @@ package org.elasticsearch.xpack.sql.querydsl.agg;
 
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeValuesSourceBuilder;
 import org.elasticsearch.search.aggregations.support.ValueType;
-import org.elasticsearch.xpack.ql.expression.gen.script.ScriptTemplate;
-import org.elasticsearch.xpack.ql.querydsl.container.Sort.Direction;
-import org.elasticsearch.xpack.ql.type.DataTypes;
+import org.elasticsearch.xpack.sql.expression.gen.script.ScriptTemplate;
+import org.elasticsearch.xpack.sql.querydsl.container.Sort.Direction;
+import org.elasticsearch.xpack.sql.type.DataType;
 
 import java.util.Objects;
-
-import static org.elasticsearch.xpack.ql.type.DataTypes.BOOLEAN;
-import static org.elasticsearch.xpack.ql.type.DataTypes.DATETIME;
-import static org.elasticsearch.xpack.ql.type.DataTypes.IP;
-import static org.elasticsearch.xpack.sql.type.SqlDataTypes.DATE;
-import static org.elasticsearch.xpack.sql.type.SqlDataTypes.TIME;
 
 /**
  * A key for a SQL GroupBy which maps to value source for composite aggregation.
@@ -25,43 +19,41 @@ import static org.elasticsearch.xpack.sql.type.SqlDataTypes.TIME;
 public abstract class GroupByKey extends Agg {
 
     protected final Direction direction;
+    private final ScriptTemplate script;
 
-    protected GroupByKey(String id, AggSource source, Direction direction) {
-        super(id, source);
+    protected GroupByKey(String id, String fieldName, ScriptTemplate script, Direction direction) {
+        super(id, fieldName);
         // ASC is the default order of CompositeValueSource
         this.direction = direction == null ? Direction.ASC : direction;
-    }
-
-    public ScriptTemplate script() {
-        return source().script();
+        this.script = script;
     }
 
     public final CompositeValuesSourceBuilder<?> asValueSource() {
         CompositeValuesSourceBuilder<?> builder = createSourceBuilder();
-        ScriptTemplate script = source().script();
+        
         if (script != null) {
             builder.script(script.toPainless());
             if (script.outputType().isInteger()) {
                 builder.valueType(ValueType.LONG);
             } else if (script.outputType().isRational()) {
                 builder.valueType(ValueType.DOUBLE);
-            } else if (DataTypes.isString(script.outputType())) {
+            } else if (script.outputType().isString()) {
                 builder.valueType(ValueType.STRING);
-            } else if (script.outputType() == DATE) {
+            } else if (script.outputType() == DataType.DATE) {
                 builder.valueType(ValueType.LONG);
-            } else if (script.outputType() == TIME) {
+            } else if (script.outputType() == DataType.TIME) {
                 builder.valueType(ValueType.LONG);
-            } else if (script.outputType() == DATETIME) {
+            } else if (script.outputType() == DataType.DATETIME) {
                 builder.valueType(ValueType.LONG);
-            } else if (script.outputType() == BOOLEAN) {
+            } else if (script.outputType() == DataType.BOOLEAN) {
                 builder.valueType(ValueType.BOOLEAN);
-            } else if (script.outputType() == IP) {
+            } else if (script.outputType() == DataType.IP) {
                 builder.valueType(ValueType.IP);
             }
         }
         // field based
         else {
-            builder.field(source().fieldName());
+            builder.field(fieldName());
         }
         return builder.order(direction.asOrder())
                .missingBucket(true);
@@ -69,29 +61,25 @@ public abstract class GroupByKey extends Agg {
 
     protected abstract CompositeValuesSourceBuilder<?> createSourceBuilder();
 
-    protected abstract GroupByKey copy(String id, AggSource source, Direction direction);
+    protected abstract GroupByKey copy(String id, String fieldName, ScriptTemplate script, Direction direction);
 
     public GroupByKey with(Direction direction) {
-        return this.direction == direction ? this : copy(id(), source(), direction);
+        return this.direction == direction ? this : copy(id(), fieldName(), script, direction);
+    }
+
+    public ScriptTemplate script() {
+        return script;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), direction);
+        return Objects.hash(id(), fieldName(), script, direction);
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (super.equals(o) == false) {
-            return false;
-        }
-        GroupByKey that = (GroupByKey) o;
-        return direction == that.direction;
+    public boolean equals(Object obj) {
+        return super.equals(obj)
+                && Objects.equals(script, ((GroupByKey) obj).script)
+                && Objects.equals(direction, ((GroupByKey) obj).direction);
     }
 }

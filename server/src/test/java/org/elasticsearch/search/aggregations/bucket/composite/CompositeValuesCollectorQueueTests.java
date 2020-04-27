@@ -29,16 +29,10 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.RandomIndexWriter;
-import org.apache.lucene.search.CollectionTerminatedException;
 import org.apache.lucene.search.DocIdSet;
 import org.apache.lucene.search.MatchAllDocsQuery;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.SortedNumericSortField;
-import org.apache.lucene.search.SortedSetSortField;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
@@ -62,7 +56,6 @@ import java.util.Set;
 import static org.elasticsearch.index.mapper.NumberFieldMapper.NumberType.DOUBLE;
 import static org.elasticsearch.index.mapper.NumberFieldMapper.NumberType.LONG;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThan;
 
 public class CompositeValuesCollectorQueueTests extends AggregatorTestCase {
     static class ClassAndName {
@@ -140,47 +133,31 @@ public class CompositeValuesCollectorQueueTests extends AggregatorTestCase {
     }
 
     private void testRandomCase(ClassAndName... types) throws IOException {
-        for (int i = 0; i < types.length; i++) {
-            testRandomCase(true, true, i, types);
-            testRandomCase(true, false, i, types);
-            testRandomCase(false, true, i, types);
-            testRandomCase(false, false, i, types);
-        }
+        testRandomCase(true, true, types);
+        testRandomCase(true, false, types);
+        testRandomCase(false, true, types);
+        testRandomCase(false, false, types);
     }
 
-    private void testRandomCase(boolean forceMerge,
-                                boolean missingBucket,
-                                int indexSortSourcePrefix,
-                                ClassAndName... types) throws IOException {
+    private void testRandomCase(boolean forceMerge, boolean missingBucket, ClassAndName... types) throws IOException {
         final BigArrays bigArrays = BigArrays.NON_RECYCLING_INSTANCE;
         int numDocs = randomIntBetween(50, 100);
         List<Comparable<?>[]> possibleValues = new ArrayList<>();
-        SortField[] indexSortFields = indexSortSourcePrefix == 0 ? null : new SortField[indexSortSourcePrefix];
-        for (int i = 0; i < types.length; i++) {
-            ClassAndName type = types[i];
+        for (ClassAndName type : types) {
             final Comparable<?>[] values;
             int numValues = randomIntBetween(1, numDocs * 2);
             values = new Comparable[numValues];
             if (type.clazz == Long.class) {
-                if (i < indexSortSourcePrefix) {
-                    indexSortFields[i] = new SortedNumericSortField(type.fieldType.name(), SortField.Type.LONG);
-                }
-                for (int j = 0; j < numValues; j++) {
-                    values[j] = randomLong();
+                for (int i = 0; i < numValues; i++) {
+                    values[i] = randomLong();
                 }
             } else if (type.clazz == Double.class) {
-                if (i < indexSortSourcePrefix) {
-                    indexSortFields[i] = new SortedNumericSortField(type.fieldType.name(), SortField.Type.DOUBLE);
-                }
-                for (int j = 0; j < numValues; j++) {
-                    values[j] = randomDouble();
+                for (int i = 0; i < numValues; i++) {
+                    values[i] = randomDouble();
                 }
             } else if (type.clazz == BytesRef.class) {
-                if (i < indexSortSourcePrefix) {
-                    indexSortFields[i] = new SortedSetSortField(type.fieldType.name(), false);
-                }
-                for (int j = 0; j < numValues; j++) {
-                    values[j] = new BytesRef(randomAlphaOfLengthBetween(5, 50));
+                for (int i = 0; i < numValues; i++) {
+                    values[i] = new BytesRef(randomAlphaOfLengthBetween(5, 50));
                 }
             } else {
                 assert (false);
@@ -190,17 +167,13 @@ public class CompositeValuesCollectorQueueTests extends AggregatorTestCase {
 
         Set<CompositeKey> keys = new HashSet<>();
         try (Directory directory = newDirectory()) {
-            final IndexWriterConfig writerConfig = newIndexWriterConfig();
-            if (indexSortFields != null) {
-                writerConfig.setIndexSort(new Sort(indexSortFields));
-            }
             try (RandomIndexWriter indexWriter = new RandomIndexWriter(random(), directory, new KeywordAnalyzer())) {
                 for (int i = 0; i < numDocs; i++) {
                     Document document = new Document();
                     List<List<Comparable<?>>> docValues = new ArrayList<>();
                     boolean hasAllField = true;
                     for (int j = 0; j < types.length; j++) {
-                        int numValues = indexSortSourcePrefix-1 >= j ? 1 : randomIntBetween(0, 5);
+                        int numValues = randomIntBetween(0, 5);
                         List<Comparable<?>> values = new ArrayList<>();
                         if (numValues == 0) {
                             hasAllField = false;
@@ -239,7 +212,7 @@ public class CompositeValuesCollectorQueueTests extends AggregatorTestCase {
                 }
             }
             IndexReader reader = DirectoryReader.open(directory);
-            int size = keys.size() > 1 ? randomIntBetween(1, keys.size()) : 1;
+            int size = randomIntBetween(1, keys.size());
             SingleDimensionValuesSource<?>[] sources = new SingleDimensionValuesSource[types.length];
             for (int i = 0; i < types.length; i++) {
                 final MappedFieldType fieldType = types[i].fieldType;
@@ -303,25 +276,21 @@ public class CompositeValuesCollectorQueueTests extends AggregatorTestCase {
                         new CompositeValuesCollectorQueue(BigArrays.NON_RECYCLING_INSTANCE, sources, size, last);
                     final SortedDocsProducer docsProducer = sources[0].createSortedDocsProducerOrNull(reader, new MatchAllDocsQuery());
                     for (LeafReaderContext leafReaderContext : reader.leaves()) {
+                        final LeafBucketCollector leafCollector = new LeafBucketCollector() {
+                            @Override
+                            public void collect(int doc, long bucket) throws IOException {
+                                queue.addIfCompetitive();
+                            }
+                        };
                         if (docsProducer != null && withProducer) {
                             assertEquals(DocIdSet.EMPTY,
                                 docsProducer.processLeaf(new MatchAllDocsQuery(), queue, leafReaderContext, false));
                         } else {
-                            final LeafBucketCollector leafCollector = new LeafBucketCollector() {
-                                @Override
-                                public void collect(int doc, long bucket) throws IOException {
-                                    queue.addIfCompetitive(indexSortSourcePrefix);
-                                }
-                            };
                             final LeafBucketCollector queueCollector = queue.getLeafCollector(leafReaderContext, leafCollector);
                             final Bits liveDocs = leafReaderContext.reader().getLiveDocs();
                             for (int i = 0; i < leafReaderContext.reader().maxDoc(); i++) {
                                 if (liveDocs == null || liveDocs.get(i)) {
-                                    try {
-                                        queueCollector.collect(i);
-                                    } catch (CollectionTerminatedException exc) {
-                                        assertThat(indexSortSourcePrefix, greaterThan(0));
-                                    }
+                                    queueCollector.collect(i);
                                 }
                             }
                         }

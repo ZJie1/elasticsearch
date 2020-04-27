@@ -22,36 +22,38 @@ Deletes an existing {dfeed}.
 can delete it.
 * If the {es} {security-features} are enabled, you must have `manage_ml` or
 `manage` cluster privileges to use this API. See
-<<security-privileges>>.
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ml-delete-datafeed-path-parms]]
 ==== {api-path-parms-title}
 
 `<feed_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=datafeed-id]
+  (Required, string) Identifier for the {dfeed}.
 
 [[ml-delete-datafeed-query-parms]]
 ==== {api-query-parms-title}
 
 `force`::
-(Optional, boolean) Use to forcefully delete a started {dfeed}; this method is
-quicker than stopping and deleting the {dfeed}.
+  (Optional, boolean) Use to forcefully delete a started {dfeed}; this method is
+  quicker than stopping and deleting the {dfeed}.
 
 [[ml-delete-datafeed-example]]
 ==== {api-examples-title}
 
-[source,console]
+The following example deletes the `datafeed-total-requests` {dfeed}:
+
+[source,js]
 --------------------------------------------------
 DELETE _ml/datafeeds/datafeed-total-requests
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:setup:server_metrics_datafeed]
 
 When the {dfeed} is deleted, you receive the following results:
-
-[source,console-result]
+[source,js]
 ----
 {
   "acknowledged": true
 }
 ----
+// TESTRESPONSE

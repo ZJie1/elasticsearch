@@ -135,11 +135,6 @@ public final class RestClientBuilder {
      * @throws IllegalArgumentException if {@code pathPrefix} is empty, or ends with more than one '/'.
      */
     public RestClientBuilder setPathPrefix(String pathPrefix) {
-        this.pathPrefix = cleanPathPrefix(pathPrefix);
-        return this;
-    }
-
-    public static String cleanPathPrefix(String pathPrefix) {
         Objects.requireNonNull(pathPrefix, "pathPrefix must not be null");
 
         if (pathPrefix.isEmpty()) {
@@ -159,7 +154,10 @@ public final class RestClientBuilder {
                 throw new IllegalArgumentException("pathPrefix is malformed. too many trailing slashes: [" + pathPrefix + "]");
             }
         }
-        return cleanPathPrefix;
+
+
+        this.pathPrefix = cleanPathPrefix;
+        return this;
     }
 
     /**

@@ -1,13 +1,13 @@
 [[indices-delete-template]]
 === Delete index template API
 ++++
-<titleabbrev>Delete index template</titleabbrev>
+<titleabbrev>Delete template index</titleabbrev>
 ++++
 
 Deletes an existing index.
 
 ////
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _template/template_1
 {
@@ -17,13 +17,15 @@ PUT _template/template_1
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TESTSETUP
 ////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /_template/template_1
 --------------------------------------------------
+// CONSOLE
 
 
 [[delete-template-api-request]]

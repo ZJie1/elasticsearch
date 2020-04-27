@@ -22,7 +22,7 @@ package org.elasticsearch.search.internal;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.Query;
-import org.elasticsearch.action.search.SearchShardTask;
+import org.elasticsearch.action.search.SearchTask;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.BigArrays;
@@ -106,7 +106,7 @@ public abstract class FilteredSearchContext extends SearchContext {
     }
 
     @Override
-    public SearchContextId id() {
+    public long id() {
         return in.id();
     }
 
@@ -535,12 +535,12 @@ public abstract class FilteredSearchContext extends SearchContext {
     }
 
     @Override
-    public void setTask(SearchShardTask task) {
+    public void setTask(SearchTask task) {
         in.setTask(task);
     }
 
     @Override
-    public SearchShardTask getTask() {
+    public SearchTask getTask() {
         return in.getTask();
     }
 

@@ -35,7 +35,7 @@ public class InternalAggregationProfileTree extends AbstractInternalProfileTree<
 
         // Anonymous classes (such as NonCollectingAggregator in TermsAgg) won't have a name,
         // we need to get the super class
-        if (element.getClass().getSimpleName().isEmpty()) {
+        if (element.getClass().getSimpleName().isEmpty() == true) {
             return element.getClass().getSuperclass().getSimpleName();
         }
         if (element instanceof MultiBucketAggregatorWrapper) {

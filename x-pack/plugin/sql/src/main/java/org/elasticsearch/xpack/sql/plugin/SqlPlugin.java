@@ -23,7 +23,6 @@ import org.elasticsearch.license.LicenseUtils;
 import org.elasticsearch.license.XPackLicenseState;
 import org.elasticsearch.plugins.ActionPlugin;
 import org.elasticsearch.plugins.Plugin;
-import org.elasticsearch.repositories.RepositoriesService;
 import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestHandler;
 import org.elasticsearch.script.ScriptService;
@@ -34,14 +33,13 @@ import org.elasticsearch.xpack.core.XPackPlugin;
 import org.elasticsearch.xpack.core.XPackSettings;
 import org.elasticsearch.xpack.core.action.XPackInfoFeatureAction;
 import org.elasticsearch.xpack.core.action.XPackUsageFeatureAction;
-import org.elasticsearch.xpack.ql.index.IndexResolver;
 import org.elasticsearch.xpack.sql.SqlInfoTransportAction;
 import org.elasticsearch.xpack.sql.SqlUsageTransportAction;
 import org.elasticsearch.xpack.sql.action.SqlClearCursorAction;
 import org.elasticsearch.xpack.sql.action.SqlQueryAction;
 import org.elasticsearch.xpack.sql.action.SqlTranslateAction;
+import org.elasticsearch.xpack.sql.analysis.index.IndexResolver;
 import org.elasticsearch.xpack.sql.execution.PlanExecutor;
-import org.elasticsearch.xpack.sql.type.SqlDataTypeRegistry;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -90,9 +88,7 @@ public class SqlPlugin extends Plugin implements ActionPlugin {
     public Collection<Object> createComponents(Client client, ClusterService clusterService, ThreadPool threadPool,
                                                ResourceWatcherService resourceWatcherService, ScriptService scriptService,
                                                NamedXContentRegistry xContentRegistry, Environment environment,
-                                               NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry,
-                                               IndexNameExpressionResolver expressionResolver,
-                                               Supplier<RepositoriesService> repositoriesServiceSupplier) {
+                                               NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry) {
 
         return createComponents(client, clusterService.getClusterName().value(), namedWriteableRegistry);
     }
@@ -104,7 +100,7 @@ public class SqlPlugin extends Plugin implements ActionPlugin {
         if (false == enabled) {
             return emptyList();
         }
-        IndexResolver indexResolver = new IndexResolver(client, clusterName, SqlDataTypeRegistry.INSTANCE);
+        IndexResolver indexResolver = new IndexResolver(client, clusterName);
         return Arrays.asList(sqlLicenseChecker, indexResolver, new PlanExecutor(client, indexResolver, namedWriteableRegistry));
     }
 
@@ -118,10 +114,10 @@ public class SqlPlugin extends Plugin implements ActionPlugin {
             return emptyList();
         }
 
-        return Arrays.asList(new RestSqlQueryAction(),
-                new RestSqlTranslateAction(),
-                new RestSqlClearCursorAction(),
-                new RestSqlStatsAction());
+        return Arrays.asList(new RestSqlQueryAction(restController),
+                new RestSqlTranslateAction(restController),
+                new RestSqlClearCursorAction(restController),
+                new RestSqlStatsAction(restController));
     }
 
     @Override

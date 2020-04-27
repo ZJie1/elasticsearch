@@ -1,8 +1,5 @@
 [[analysis-snowball-tokenfilter]]
-=== Snowball token filter
-++++
-<titleabbrev>Snowball</titleabbrev>
-++++
+=== Snowball Token Filter
 
 A filter that stems words using a Snowball-generated stemmer. The
 `language` parameter controls the stemmer with the following available
@@ -13,7 +10,7 @@ values: `Armenian`, `Basque`, `Catalan`, `Danish`, `Dutch`, `English`,
 
 For example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /my_index
 {
@@ -35,3 +32,4 @@ PUT /my_index
     }
 }
 --------------------------------------------------
+// CONSOLE

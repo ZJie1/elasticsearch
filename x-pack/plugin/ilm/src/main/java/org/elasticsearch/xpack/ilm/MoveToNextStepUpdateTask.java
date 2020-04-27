@@ -10,7 +10,7 @@ import org.apache.logging.log4j.Logger;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.ClusterStateUpdateTask;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.Index;
 import org.elasticsearch.xpack.core.ilm.LifecycleExecutionState;
@@ -28,18 +28,15 @@ public class MoveToNextStepUpdateTask extends ClusterStateUpdateTask {
     private final Step.StepKey currentStepKey;
     private final Step.StepKey nextStepKey;
     private final LongSupplier nowSupplier;
-    private final PolicyStepsRegistry stepRegistry;
     private final Consumer<ClusterState> stateChangeConsumer;
 
     public MoveToNextStepUpdateTask(Index index, String policy, Step.StepKey currentStepKey, Step.StepKey nextStepKey,
-                                    LongSupplier nowSupplier, PolicyStepsRegistry stepRegistry,
-                                    Consumer<ClusterState> stateChangeConsumer) {
+                                    LongSupplier nowSupplier, Consumer<ClusterState> stateChangeConsumer) {
         this.index = index;
         this.policy = policy;
         this.currentStepKey = currentStepKey;
         this.nextStepKey = nextStepKey;
         this.nowSupplier = nowSupplier;
-        this.stepRegistry = stepRegistry;
         this.stateChangeConsumer = stateChangeConsumer;
     }
 
@@ -61,17 +58,17 @@ public class MoveToNextStepUpdateTask extends ClusterStateUpdateTask {
 
     @Override
     public ClusterState execute(ClusterState currentState) {
-        IndexMetadata indexMetadata = currentState.getMetadata().index(index);
-        if (indexMetadata == null) {
+        IndexMetaData indexMetaData = currentState.getMetaData().index(index);
+        if (indexMetaData == null) {
             // Index must have been since deleted, ignore it
             return currentState;
         }
-        Settings indexSettings = indexMetadata.getSettings();
-        LifecycleExecutionState indexILMData = LifecycleExecutionState.fromIndexMetadata(currentState.getMetadata().index(index));
+        Settings indexSettings = indexMetaData.getSettings();
+        LifecycleExecutionState indexILMData = LifecycleExecutionState.fromIndexMetadata(currentState.getMetaData().index(index));
         if (policy.equals(LifecycleSettings.LIFECYCLE_NAME_SETTING.get(indexSettings))
-            && currentStepKey.equals(LifecycleExecutionState.getCurrentStepKey(indexILMData))) {
+            && currentStepKey.equals(IndexLifecycleRunner.getCurrentStepKey(indexILMData))) {
             logger.trace("moving [{}] to next step ({})", index.getName(), nextStepKey);
-            return IndexLifecycleTransition.moveClusterStateToStep(index, currentState, nextStepKey, nowSupplier, stepRegistry, false);
+            return IndexLifecycleRunner.moveClusterStateToNextStep(index, currentState, currentStepKey, nextStepKey, nowSupplier, false);
         } else {
             // either the policy has changed or the step is now
             // not the same as when we submitted the update task. In

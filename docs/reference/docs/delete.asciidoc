@@ -57,20 +57,22 @@ For example:
 ////
 Example to delete with routing
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /twitter/_doc/1?routing=kimchy
 {
     "test": "test"
 }
 --------------------------------------------------
+// CONSOLE
 ////
 
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /twitter/_doc/1?routing=kimchy
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 This request deletes the tweet with id `1`, but it is routed based on the
@@ -123,10 +125,11 @@ and responding with an error. The `timeout` parameter can be used to
 explicitly specify how long it waits. Here is an example of setting it
 to 5 minutes:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /twitter/_doc/1?timeout=5m
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 [[docs-delete-api-path-params]]
@@ -164,15 +167,16 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=wait_for_active_shards]
 
 Delete the JSON document `1` from the `twitter` index:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /twitter/_doc/1
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 The API returns the following result:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
     "_shards" : {
@@ -181,6 +185,7 @@ The API returns the following result:
         "successful" : 2
     },
     "_index" : "twitter",
+    "_type" : "_doc",
     "_id" : "1",
     "_version" : 2,
     "_primary_term": 1,

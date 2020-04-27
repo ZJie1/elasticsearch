@@ -66,7 +66,6 @@ import org.elasticsearch.search.aggregations.metrics.InternalSum;
 import org.elasticsearch.search.aggregations.metrics.MaxAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.MinAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.SumAggregationBuilder;
-import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator.PipelineTree;
 import org.elasticsearch.search.aggregations.support.ValueType;
 import org.elasticsearch.search.internal.InternalSearchResponse;
 import org.elasticsearch.xpack.core.rollup.RollupField;
@@ -97,12 +96,12 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         Exception e = expectThrows(RuntimeException.class,
                 () -> RollupResponseTranslator.combineResponses(failure,
-                        InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                        new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), equalTo("foo"));
 
         e = expectThrows(RuntimeException.class,
                 () -> RollupResponseTranslator.translateResponse(failure,
-                        InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                        new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), equalTo("foo"));
 
         e = expectThrows(RuntimeException.class,
@@ -119,7 +118,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         Exception e = expectThrows(RuntimeException.class,
                 () -> RollupResponseTranslator.translateResponse(failure,
-                        InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                        new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), equalTo("rollup failure"));
     }
 
@@ -133,7 +132,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         ResourceNotFoundException e = expectThrows(ResourceNotFoundException.class,
                 () -> RollupResponseTranslator.combineResponses(failure,
-                        InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                        new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), equalTo("Index [[foo]] was not found, likely because it was deleted while the request was in-flight. " +
             "Rollup does not support partial search results, please try the request again."));
     }
@@ -151,7 +150,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         when(sum.getValue()).thenReturn(10.0);
         when(sum.value()).thenReturn(10.0);
         when(sum.getName()).thenReturn("foo");
-        when(sum.getMetadata()).thenReturn(metadata);
+        when(sum.getMetaData()).thenReturn(metadata);
         when(sum.getType()).thenReturn(SumAggregationBuilder.NAME);
         subaggs.add(sum);
 
@@ -159,7 +158,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         when(count.getValue()).thenReturn(2.0);
         when(count.value()).thenReturn(2.0);
         when(count.getName()).thenReturn("foo." + RollupField.COUNT_FIELD);
-        when(count.getMetadata()).thenReturn(null);
+        when(count.getMetaData()).thenReturn(null);
         when(count.getType()).thenReturn(SumAggregationBuilder.NAME);
         subaggs.add(count);
 
@@ -178,7 +177,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         ScriptService scriptService = mock(ScriptService.class);
 
         ResourceNotFoundException e = expectThrows(ResourceNotFoundException.class, () -> RollupResponseTranslator.combineResponses(msearch,
-                InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), equalTo("Index [[foo]] was not found, likely because it was deleted while the request was in-flight. " +
             "Rollup does not support partial search results, please try the request again."));
     }
@@ -197,7 +196,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         ScriptService scriptService = mock(ScriptService.class);
 
         SearchResponse response = RollupResponseTranslator.translateResponse(msearch,
-                InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY));
+            new InternalAggregation.ReduceContext(bigArrays, scriptService, true));
         assertNotNull(response);
         Aggregations responseAggs = response.getAggregations();
         assertThat(responseAggs.asList().size(), equalTo(0));
@@ -214,7 +213,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         ScriptService scriptService = mock(ScriptService.class);
 
         ResourceNotFoundException e = expectThrows(ResourceNotFoundException.class, () -> RollupResponseTranslator.combineResponses(msearch,
-                InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+            new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), equalTo("Index [[foo]] was not found, likely because it was deleted while the request was in-flight. " +
             "Rollup does not support partial search results, please try the request again."));
     }
@@ -247,7 +246,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         when(sum.getValue()).thenReturn(10.0);
         when(sum.value()).thenReturn(10.0);
         when(sum.getName()).thenReturn("foo");
-        when(sum.getMetadata()).thenReturn(metadata);
+        when(sum.getMetaData()).thenReturn(metadata);
         when(sum.getType()).thenReturn(SumAggregationBuilder.NAME);
         subaggs.add(sum);
 
@@ -255,7 +254,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         when(count.getValue()).thenReturn(2.0);
         when(count.value()).thenReturn(2.0);
         when(count.getName()).thenReturn("foo." + RollupField.COUNT_FIELD);
-        when(count.getMetadata()).thenReturn(null);
+        when(count.getMetaData()).thenReturn(null);
         when(count.getType()).thenReturn(SumAggregationBuilder.NAME);
         subaggs.add(count);
 
@@ -269,8 +268,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         BigArrays bigArrays = new MockBigArrays(new MockPageCacheRecycler(Settings.EMPTY), new NoneCircuitBreakerService());
         ScriptService scriptService = mock(ScriptService.class);
-        InternalAggregation.ReduceContext context = InternalAggregation.ReduceContext.forFinalReduction(
-                bigArrays, scriptService, b -> {}, PipelineTree.EMPTY);
+        InternalAggregation.ReduceContext context = new InternalAggregation.ReduceContext(bigArrays, scriptService, true);
 
         SearchResponse finalResponse = RollupResponseTranslator.translateResponse(new MultiSearchResponse.Item[]{item}, context);
         assertNotNull(finalResponse);
@@ -284,8 +282,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         MultiSearchResponse.Item missing = new MultiSearchResponse.Item(null, new IndexNotFoundException("foo"));
         BigArrays bigArrays = new MockBigArrays(new MockPageCacheRecycler(Settings.EMPTY), new NoneCircuitBreakerService());
         ScriptService scriptService = mock(ScriptService.class);
-        InternalAggregation.ReduceContext context = InternalAggregation.ReduceContext.forFinalReduction(
-                bigArrays, scriptService, b -> {}, PipelineTree.EMPTY);
+        InternalAggregation.ReduceContext context = new InternalAggregation.ReduceContext(bigArrays, scriptService, true);
 
         ResourceNotFoundException e = expectThrows(ResourceNotFoundException.class,
                 () -> RollupResponseTranslator.translateResponse(new MultiSearchResponse.Item[]{missing}, context));
@@ -319,7 +316,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         Exception e = expectThrows(RuntimeException.class,
                 () -> RollupResponseTranslator.combineResponses(msearch,
-                        InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                        new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(), containsString("Expected [bizzbuzz] to be a FilterAggregation"));
     }
 
@@ -335,7 +332,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         SearchResponse responseWithout = mock(SearchResponse.class);
         List<InternalAggregation> aggTreeWithoutFilter = new ArrayList<>(1);
-        InternalMax max = new InternalMax("filter_foo", 0, DocValueFormat.RAW, null);
+        InternalMax max = new InternalMax("filter_foo", 0, DocValueFormat.RAW, Collections.emptyList(), null);
         aggTreeWithoutFilter.add(max);
         Aggregations mockAggsWithout = new InternalAggregations(aggTreeWithoutFilter);
         when(responseWithout.getAggregations()).thenReturn(mockAggsWithout);
@@ -348,7 +345,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         Exception e = expectThrows(RuntimeException.class,
                 () -> RollupResponseTranslator.combineResponses(msearch,
-                        InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY)));
+                        new InternalAggregation.ReduceContext(bigArrays, scriptService, true)));
         assertThat(e.getMessage(),
                 equalTo("Expected [filter_foo] to be a FilterAggregation, but was [InternalMax]"));
     }
@@ -357,7 +354,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         SearchResponse protoResponse = mock(SearchResponse.class);
         when(protoResponse.getTook()).thenReturn(new TimeValue(100));
         List<InternalAggregation> protoAggTree = new ArrayList<>(1);
-        InternalAvg internalAvg = new InternalAvg("foo", 10, 2, DocValueFormat.RAW, null);
+        InternalAvg internalAvg = new InternalAvg("foo", 10, 2, DocValueFormat.RAW, Collections.emptyList(), null);
         protoAggTree.add(internalAvg);
         Aggregations protoMockAggs = new InternalAggregations(protoAggTree);
         when(protoResponse.getAggregations()).thenReturn(protoMockAggs);
@@ -375,7 +372,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         when(sum.getValue()).thenReturn(10.0);
         when(sum.value()).thenReturn(10.0);
         when(sum.getName()).thenReturn("foo");
-        when(sum.getMetadata()).thenReturn(metadata);
+        when(sum.getMetaData()).thenReturn(metadata);
         when(sum.getType()).thenReturn(SumAggregationBuilder.NAME);
         subaggs.add(sum);
 
@@ -383,7 +380,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         when(count.getValue()).thenReturn(2.0);
         when(count.value()).thenReturn(2.0);
         when(count.getName()).thenReturn("foo." + RollupField.COUNT_FIELD);
-        when(count.getMetadata()).thenReturn(null);
+        when(count.getMetaData()).thenReturn(null);
         when(count.getType()).thenReturn(SumAggregationBuilder.NAME);
         subaggs.add(count);
 
@@ -402,7 +399,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
 
         SearchResponse response = RollupResponseTranslator.combineResponses(msearch,
-                InternalAggregation.ReduceContext.forFinalReduction(bigArrays, scriptService, b -> {}, PipelineTree.EMPTY));
+                new InternalAggregation.ReduceContext(bigArrays, scriptService, true));
         assertNotNull(response);
         Aggregations responseAggs = response.getAggregations();
         assertNotNull(responseAggs);
@@ -448,7 +445,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
                 .must(QueryBuilders.termQuery("field", "foo"))
                 .should(QueryBuilders.termQuery("field", "bar"));
         SignificantTermsAggregationBuilder builder = new SignificantTermsAggregationBuilder(
-                "test")
+                "test", ValueType.STRING)
                 .field("field")
                 .backgroundFilter(filter);
 
@@ -510,8 +507,7 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
 
         BigArrays bigArrays = new MockBigArrays(new MockPageCacheRecycler(Settings.EMPTY), new NoneCircuitBreakerService());
         ScriptService scriptService = mock(ScriptService.class);
-        InternalAggregation.ReduceContext reduceContext = InternalAggregation.ReduceContext.forFinalReduction(
-                bigArrays, scriptService, b -> {}, PipelineTree.EMPTY);
+        InternalAggregation.ReduceContext reduceContext = new InternalAggregation.ReduceContext(bigArrays, scriptService, true);
         ClassCastException e = expectThrows(ClassCastException.class,
                 () -> RollupResponseTranslator.combineResponses(msearch, reduceContext));
         assertThat(e.getMessage(),
@@ -612,10 +608,9 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
         // Reduce the InternalDateHistogram response so we can fill buckets
         BigArrays bigArrays = new MockBigArrays(new MockPageCacheRecycler(Settings.EMPTY), new NoneCircuitBreakerService());
         ScriptService scriptService = mock(ScriptService.class);
-        InternalAggregation.ReduceContext context = InternalAggregation.ReduceContext.forFinalReduction(
-                bigArrays, scriptService, b -> {}, PipelineTree.EMPTY);
+        InternalAggregation.ReduceContext context = new InternalAggregation.ReduceContext(bigArrays, scriptService, true);
 
-        InternalAggregation reduced = ((InternalDateHistogram)unrolled).reduce(Collections.singletonList(unrolled), context);
+        InternalAggregation reduced = ((InternalDateHistogram)unrolled).doReduce(Collections.singletonList(unrolled), context);
         assertThat(reduced.toString(), equalTo("{\"histo\":{\"buckets\":[{\"key_as_string\":\"1970-01-01T00:00:00.100Z\",\"key\":100," +
                 "\"doc_count\":1},{\"key_as_string\":\"1970-01-01T00:00:00.200Z\",\"key\":200,\"doc_count\":1}," +
                 "{\"key_as_string\":\"1970-01-01T00:00:00.300Z\",\"key\":300,\"doc_count\":0,\"histo._count\":{\"value\":0.0}}," +
@@ -1015,11 +1010,9 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
     public void testUnsupportedMetric() throws IOException {
 
 
-        AggregationBuilder nonRollup = new CardinalityAggregationBuilder("test_metric").userValueTypeHint(ValueType.LONG)
-            .field("foo");
+        AggregationBuilder nonRollup = new CardinalityAggregationBuilder("test_metric", ValueType.LONG).field("foo");
         String fieldName = "foo.max." + RollupField.VALUE;
-        AggregationBuilder rollup = new CardinalityAggregationBuilder("test_metric").userValueTypeHint(ValueType.LONG)
-            .field(fieldName);
+        AggregationBuilder rollup = new CardinalityAggregationBuilder("test_metric", ValueType.LONG).field(fieldName);
 
         NumberFieldMapper.Builder nrValueMapper = new NumberFieldMapper.Builder("foo",
                 NumberFieldMapper.NumberType.LONG);
@@ -1051,10 +1044,10 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
     }
 
     public void testStringTerms() throws IOException {
-        TermsAggregationBuilder nonRollupTerms = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.STRING)
+        TermsAggregationBuilder nonRollupTerms = new TermsAggregationBuilder("terms", ValueType.STRING)
                 .field("stringField");
 
-        TermsAggregationBuilder rollupTerms = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.STRING)
+        TermsAggregationBuilder rollupTerms = new TermsAggregationBuilder("terms", ValueType.STRING)
                 .field("stringfield.terms." + RollupField.VALUE)
                 .subAggregation(new SumAggregationBuilder("terms." + RollupField.COUNT_FIELD)
                         .field("stringfield.terms." + RollupField.COUNT_FIELD));
@@ -1092,10 +1085,10 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
     }
 
     public void testStringTermsNullValue() throws IOException {
-        TermsAggregationBuilder nonRollupTerms = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.STRING)
+        TermsAggregationBuilder nonRollupTerms = new TermsAggregationBuilder("terms", ValueType.STRING)
             .field("stringField");
 
-        TermsAggregationBuilder rollupTerms = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.STRING)
+        TermsAggregationBuilder rollupTerms = new TermsAggregationBuilder("terms", ValueType.STRING)
             .field("stringfield.terms." + RollupField.VALUE)
             .subAggregation(new SumAggregationBuilder("terms." + RollupField.COUNT_FIELD)
                 .field("stringfield.terms." + RollupField.COUNT_FIELD));
@@ -1140,10 +1133,10 @@ public class RollupResponseTranslationTests extends AggregatorTestCase {
     }
 
     public void testLongTerms() throws IOException {
-        TermsAggregationBuilder nonRollupTerms = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.LONG)
+        TermsAggregationBuilder nonRollupTerms = new TermsAggregationBuilder("terms", ValueType.LONG)
                 .field("longField");
 
-        TermsAggregationBuilder rollupTerms = new TermsAggregationBuilder("terms").userValueTypeHint(ValueType.LONG)
+        TermsAggregationBuilder rollupTerms = new TermsAggregationBuilder("terms", ValueType.LONG)
                 .field("longfield.terms." + RollupField.VALUE)
                 .subAggregation(new SumAggregationBuilder("terms." + RollupField.COUNT_FIELD)
                         .field("longfield.terms." + RollupField.COUNT_FIELD));

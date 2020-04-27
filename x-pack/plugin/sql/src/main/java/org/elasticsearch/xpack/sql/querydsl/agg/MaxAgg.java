@@ -5,19 +5,18 @@
  */
 package org.elasticsearch.xpack.sql.querydsl.agg;
 
-import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 
-import java.util.function.Function;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.max;
 
-public class MaxAgg extends DefaultAggSourceLeafAgg {
+public class MaxAgg extends LeafAgg {
 
-    public MaxAgg(String id, AggSource source) {
-        super(id, source);
+    public MaxAgg(String id, String fieldName) {
+        super(id, fieldName);
     }
 
     @Override
-    Function<String, ValuesSourceAggregationBuilder<?>> builder() {
-        return AggregationBuilders::max;
+    AggregationBuilder toBuilder() {
+        return max(id()).field(fieldName());
     }
 }

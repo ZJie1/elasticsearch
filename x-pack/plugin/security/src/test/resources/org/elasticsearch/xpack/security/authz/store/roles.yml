@@ -65,16 +65,8 @@ role_query_fields:
       privileges:
         - READ
       query:
-        match_all: {}
+        match_all:
       field_security:
         grant:
           - foo
           - boo
-
-role_query_invalid:
-  indices:
-    - names:
-        - 'query_idx'
-      privileges:
-        - READ
-      query: '{ "unknown": {} }'

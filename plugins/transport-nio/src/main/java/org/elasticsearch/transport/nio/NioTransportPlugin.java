@@ -25,7 +25,6 @@ import org.apache.lucene.util.SetOnce;
 import org.elasticsearch.Version;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.network.NetworkService;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.BigArrays;
@@ -57,7 +56,7 @@ public class NioTransportPlugin extends Plugin implements NetworkPlugin {
 
     public static final Setting<Integer> NIO_WORKER_COUNT =
         new Setting<>("transport.nio.worker_count",
-            (s) -> Integer.toString(EsExecutors.allocatedProcessors(s) * 2),
+            (s) -> Integer.toString(EsExecutors.numberOfProcessors(s) * 2),
             (s) -> Setting.parseInt(s, 1, "transport.nio.worker_count"), Setting.Property.NodeScope);
     public static final Setting<Integer> NIO_HTTP_WORKER_COUNT =
         intSetting("http.nio.worker_count", 0, 0, Setting.Property.NodeScope);
@@ -87,11 +86,10 @@ public class NioTransportPlugin extends Plugin implements NetworkPlugin {
                                                                         CircuitBreakerService circuitBreakerService,
                                                                         NamedXContentRegistry xContentRegistry,
                                                                         NetworkService networkService,
-                                                                        HttpServerTransport.Dispatcher dispatcher,
-                                                                        ClusterSettings clusterSettings) {
+                                                                        HttpServerTransport.Dispatcher dispatcher) {
         return Collections.singletonMap(NIO_HTTP_TRANSPORT_NAME,
             () -> new NioHttpServerTransport(settings, networkService, bigArrays, pageCacheRecycler, threadPool, xContentRegistry,
-                dispatcher, getNioGroupFactory(settings), clusterSettings));
+                dispatcher, getNioGroupFactory(settings)));
     }
 
     private synchronized NioGroupFactory getNioGroupFactory(Settings settings) {

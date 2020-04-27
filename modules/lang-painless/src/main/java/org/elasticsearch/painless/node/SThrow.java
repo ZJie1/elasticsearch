@@ -19,20 +19,21 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.ThrowNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a throw statement.
  */
-public class SThrow extends AStatement {
+public final class SThrow extends AStatement {
 
-    protected final AExpression expression;
+    private AExpression expression;
 
     public SThrow(Location location, AExpression expression) {
         super(location);
@@ -41,25 +42,36 @@ public class SThrow extends AStatement {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        expression.storeSettings(settings);
+    }
 
-        AExpression.Input expressionInput = new AExpression.Input();
-        expressionInput.expected = Exception.class;
-        AExpression.Output expressionOutput = expression.analyze(classNode, scriptRoot, scope, expressionInput);
-        expression.cast(expressionInput, expressionOutput);
+    @Override
+    void extractVariables(Set<String> variables) {
+        expression.extractVariables(variables);
+    }
 
-        output.methodEscape = true;
-        output.loopEscape = true;
-        output.allEscape = true;
-        output.statementCount = 1;
+    @Override
+    void analyze(Locals locals) {
+        expression.expected = Exception.class;
+        expression.analyze(locals);
+        expression = expression.cast(locals);
 
-        ThrowNode throwNode = new ThrowNode();
-        throwNode.setExpressionNode(expression.cast(expressionOutput));
-        throwNode.setLocation(location);
+        methodEscape = true;
+        loopEscape = true;
+        allEscape = true;
+        statementCount = 1;
+    }
 
-        output.statementNode = throwNode;
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeStatementOffset(location);
+        expression.write(writer, globals);
+        writer.throwException();
+    }
 
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString(expression);
     }
 }

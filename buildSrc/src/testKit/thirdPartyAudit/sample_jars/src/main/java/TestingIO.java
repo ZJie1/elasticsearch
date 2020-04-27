@@ -5,3 +5,4 @@ public class TestingIO {
         new File("foo");
     }
 }
+

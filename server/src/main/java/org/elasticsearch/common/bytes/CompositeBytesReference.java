@@ -22,6 +22,7 @@ package org.elasticsearch.common.bytes;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.util.BytesRefIterator;
+import org.apache.lucene.util.FutureObjects;
 import org.apache.lucene.util.RamUsageEstimator;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ import java.util.Objects;
  *
  * Note, {@link #toBytesRef()} will materialize all pages in this BytesReference.
  */
-public final class CompositeBytesReference extends AbstractBytesReference {
+public final class CompositeBytesReference extends BytesReference {
 
     private final BytesReference[] references;
     private final int[] offsets;
@@ -71,41 +72,13 @@ public final class CompositeBytesReference extends AbstractBytesReference {
     }
 
     @Override
-    public int indexOf(byte marker, int from) {
-        final int remainingBytes = Math.max(length - from, 0);
-        Objects.checkFromIndexSize(from, remainingBytes, length);
-
-        int result = -1;
-        if (length == 0) {
-            return result;
-        }
-
-        final int firstReferenceIndex = getOffsetIndex(from);
-        for (int i = firstReferenceIndex; i < references.length; ++i) {
-            final BytesReference reference = references[i];
-            final int internalFrom;
-            if (i == firstReferenceIndex) {
-                internalFrom = from - offsets[firstReferenceIndex];
-            } else {
-                internalFrom = 0;
-            }
-            result = reference.indexOf(marker, internalFrom);
-            if (result != -1) {
-                result += offsets[i];
-                break;
-            }
-        }
-        return result;
-    }
-
-    @Override
     public int length() {
         return length;
     }
 
     @Override
     public BytesReference slice(int from, int length) {
-        Objects.checkFromIndexSize(from, length, this.length);
+        FutureObjects.checkFromIndexSize(from, length, this.length);
 
         if (length == 0) {
             return BytesArray.EMPTY;

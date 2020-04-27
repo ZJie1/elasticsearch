@@ -14,10 +14,11 @@ If you get the _Dynamic Mapping is Disabled_ error when you try to add a watch,
 verify that the index mappings for the `.watches` index are available. You can
 do that by submitting the following request:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET .watches/_mapping
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:my_active_watch]
 
 If the index mappings are missing, follow these steps to restore the correct
@@ -29,10 +30,11 @@ mappings:
 . Delete the `.watches` index:
 +
 --
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE .watches
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:index deletion]
 --
 . Disable direct access to the `.watches` index:

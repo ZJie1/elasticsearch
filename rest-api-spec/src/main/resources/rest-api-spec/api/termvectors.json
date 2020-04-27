@@ -43,43 +43,52 @@
       "term_statistics":{
         "type":"boolean",
         "description":"Specifies if total term frequency and document frequency should be returned.",
-        "default":false
+        "default":false,
+        "required":false
       },
       "field_statistics":{
         "type":"boolean",
         "description":"Specifies if document count, sum of document frequencies and sum of total term frequencies should be returned.",
-        "default":true
+        "default":true,
+        "required":false
       },
       "fields":{
         "type":"list",
-        "description":"A comma-separated list of fields to return."
+        "description":"A comma-separated list of fields to return.",
+        "required":false
       },
       "offsets":{
         "type":"boolean",
         "description":"Specifies if term offsets should be returned.",
-        "default":true
+        "default":true,
+        "required":false
       },
       "positions":{
         "type":"boolean",
         "description":"Specifies if term positions should be returned.",
-        "default":true
+        "default":true,
+        "required":false
       },
       "payloads":{
         "type":"boolean",
         "description":"Specifies if term payloads should be returned.",
-        "default":true
+        "default":true,
+        "required":false
       },
       "preference":{
         "type":"string",
-        "description":"Specify the node or shard the operation should be performed on (default: random)."
+        "description":"Specify the node or shard the operation should be performed on (default: random).",
+        "required":false
       },
       "routing":{
         "type":"string",
-        "description":"Specific routing value."
+        "description":"Specific routing value.",
+        "required":false
       },
       "realtime":{
         "type":"boolean",
-        "description":"Specifies if request is real-time as opposed to near-real-time (default: true)."
+        "description":"Specifies if request is real-time as opposed to near-real-time (default: true).",
+        "required":false
       },
       "version":{
         "type":"number",
@@ -90,7 +99,8 @@
         "options":[
           "internal",
           "external",
-          "external_gte"
+          "external_gte",
+          "force"
         ],
         "description":"Specific version type"
       }

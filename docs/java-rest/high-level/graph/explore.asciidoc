@@ -1,6 +1,5 @@
-[role="xpack"]
 [[java-rest-high-x-pack-graph-explore]]
-=== Graph explore API
+=== X-Pack Graph explore API
 
 [[java-rest-high-x-pack-graph-explore-execution]]
 ==== Initial request

@@ -5,9 +5,8 @@
  */
 package org.elasticsearch.xpack.sql.querydsl.container;
 
-import org.elasticsearch.xpack.ql.execution.search.QlSourceBuilder;
-import org.elasticsearch.xpack.ql.type.DataType;
-import org.elasticsearch.xpack.sql.type.SqlDataTypes;
+import org.elasticsearch.xpack.sql.execution.search.SqlSourceBuilder;
+import org.elasticsearch.xpack.sql.type.DataType;
 
 public class SearchHitFieldRef extends FieldReference {
     private final String name;
@@ -27,8 +26,7 @@ public class SearchHitFieldRef extends FieldReference {
         this.dataType = dataType;
         // these field types can only be extracted from docvalue_fields (ie, values already computed by Elasticsearch)
         // because, for us to be able to extract them from _source, we would need the mapping of those fields (which we don't have)
-        this.docValue = isAlias ? useDocValueInsteadOfSource : 
-            (SqlDataTypes.isFromDocValuesOnly(dataType) ? useDocValueInsteadOfSource : false);
+        this.docValue = isAlias ? useDocValueInsteadOfSource : (dataType.isFromDocValuesOnly() ? useDocValueInsteadOfSource : false);
         this.hitName = hitName;
     }
 
@@ -54,13 +52,13 @@ public class SearchHitFieldRef extends FieldReference {
     }
 
     @Override
-    public void collectFields(QlSourceBuilder sourceBuilder) {
+    public void collectFields(SqlSourceBuilder sourceBuilder) {
         // nested fields are handled by inner hits
         if (hitName != null) {
             return;
         }
         if (docValue) {
-            sourceBuilder.addDocField(name, SqlDataTypes.format(dataType));
+            sourceBuilder.addDocField(name, dataType.format());
         } else {
             sourceBuilder.addSourceField(name);
         }

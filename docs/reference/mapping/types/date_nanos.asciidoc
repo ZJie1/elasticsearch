@@ -28,14 +28,16 @@ nano second part).
 
 For instance:
 
-[source,console]
+[source,js]
 --------------------------------------------------
-PUT my_index
+PUT my_index?include_type_name=true
 {
   "mappings": {
-    "properties": {
-      "date": {
-        "type": "date_nanos" <1>
+    "_doc": {
+      "properties": {
+        "date": {
+          "type": "date_nanos" <1>
+        }
       }
     }
   }
@@ -61,7 +63,7 @@ GET my_index/_search
     "my_field" : {
       "script" : {
         "lang" : "painless",
-        "source" : "doc['date'].value.nano" <6>
+        "source" : "doc['date'].date.nanos" <6>
       }
     }
   }
@@ -71,12 +73,13 @@ GET my_index/_search
 {
   "docvalue_fields" : [
     {
-      "field" : "date",
+      "field" : "my_ip_field",
       "format": "strict_date_time" <7>
     }
   ]
 }
 --------------------------------------------------
+// CONSOLE
 
 <1> The `date` field uses the default `format`.
 <2> This document uses a plain date.
@@ -94,6 +97,6 @@ same mapping parameters than with the `date` field can be used.
 [[date-nanos-limitations]]
 ==== Limitations
 
-Aggregations are still on millisecond resolution, even when using a `date_nanos`
-field. This limitation also affects <<transforms,{transforms}>>.
+Aggregations are still on millisecond resolution, even when using a
+`date_nanos` field.
 

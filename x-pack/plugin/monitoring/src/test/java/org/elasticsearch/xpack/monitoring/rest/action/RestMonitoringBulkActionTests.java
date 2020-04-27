@@ -16,6 +16,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
 import org.elasticsearch.rest.RestChannel;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.RestStatus;
@@ -37,7 +38,9 @@ import static org.mockito.Mockito.when;
 
 public class RestMonitoringBulkActionTests extends ESTestCase {
 
-    private final RestMonitoringBulkAction action = new RestMonitoringBulkAction();
+    private final RestController controller = mock(RestController.class);
+
+    private final RestMonitoringBulkAction action = new RestMonitoringBulkAction(controller);
 
     public void testGetName() {
         // Are you sure that you want to change the name?
@@ -143,6 +146,13 @@ public class RestMonitoringBulkActionTests extends ESTestCase {
      */
     private static MonitoredSystem randomSystem() {
         return randomFrom(MonitoredSystem.LOGSTASH, MonitoredSystem.KIBANA, MonitoredSystem.BEATS);
+    }
+
+    /**
+     * Returns a {@link String} representing a {@link MonitoredSystem} supported by the Monitoring Bulk API
+     */
+    private static String randomSystemId() {
+        return randomSystem().getSystem();
     }
 
     private void prepareRequest(final RestRequest restRequest) throws Exception {

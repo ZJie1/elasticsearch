@@ -32,6 +32,7 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.lucene.search.TopDocsAndMaxScore;
+import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.search.internal.SubSearchContext;
@@ -79,7 +80,8 @@ public final class InnerHitsContext {
         protected final SearchContext context;
         private InnerHitsContext childInnerHits;
 
-        private String id;
+        // TODO: when types are complete removed just use String instead for the id:
+        private Uid uid;
 
         protected InnerHitSubContext(String name, SearchContext context) {
             super(context);
@@ -112,12 +114,12 @@ public final class InnerHitsContext {
             return context;
         }
 
-        public String getId() {
-            return id;
+        public Uid getUid() {
+            return uid;
         }
 
-        public void setId(String id) {
-            this.id = id;
+        public void setUid(Uid uid) {
+            this.uid = uid;
         }
     }
 

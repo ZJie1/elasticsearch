@@ -22,7 +22,7 @@ Read more about http://www.regular-expressions.info/catastrophic.html[pathologic
 [float]
 === Example output
 
-[source,console]
+[source,js]
 ---------------------------
 POST _analyze
 {
@@ -30,10 +30,11 @@ POST _analyze
   "text": "The 2 QUICK Brown-Foxes jumped over the lazy dog's bone."
 }
 ---------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -124,6 +125,7 @@ POST _analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 
@@ -173,7 +175,7 @@ about stop word configuration.
 In this example, we configure the `pattern` analyzer to split email addresses
 on non-word characters or on underscores (`\W|_`), and to lower-case the result:
 
-[source,console]
+[source,js]
 ----------------------------
 PUT my_index
 {
@@ -196,13 +198,14 @@ POST my_index/_analyze
   "text": "John_Smith@foo-bar.com"
 }
 ----------------------------
+// CONSOLE
 
 <1> The backslashes in the pattern need to be escaped when specifying the
     pattern as a JSON string.
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -244,6 +247,7 @@ POST my_index/_analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 
@@ -260,7 +264,7 @@ The above example produces the following terms:
 
 The following more complicated example splits CamelCase text into tokens:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT my_index
 {
@@ -282,10 +286,11 @@ GET my_index/_analyze
   "text": "MooseX::FTPClass2_beta"
 }
 --------------------------------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -334,6 +339,7 @@ GET my_index/_analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 
@@ -378,7 +384,7 @@ it, usually by adding token filters. This would recreate the built-in
 `pattern` analyzer and you can use it as a starting point for further
 customization:
 
-[source,console]
+[source,js]
 ----------------------------------------------------
 PUT /pattern_example
 {
@@ -402,6 +408,7 @@ PUT /pattern_example
   }
 }
 ----------------------------------------------------
+// CONSOLE
 // TEST[s/\n$/\nstartyaml\n  - compare_analyzers: {index: pattern_example, first: pattern, second: rebuilt_pattern}\nendyaml\n/]
 <1> The default pattern is `\W+` which splits on non-word characters
 and this is where you'd change it.

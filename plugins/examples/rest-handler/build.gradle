@@ -1,5 +1,3 @@
-import org.elasticsearch.gradle.info.BuildParams
-
 /*
  * Licensed to Elasticsearch under one or more contributor
  * license agreements. See the NOTICE file distributed with
@@ -34,15 +32,15 @@ test.enabled = false
 
 task exampleFixture(type: org.elasticsearch.gradle.test.AntFixture) {
   dependsOn testClasses
-  env 'CLASSPATH', "${-> project.sourceSets.test.runtimeClasspath.asPath}"
-  executable = "${BuildParams.runtimeJavaHome}/bin/java"
+  env 'CLASSPATH', "${ -> project.sourceSets.test.runtimeClasspath.asPath }"
+  executable = new File(project.runtimeJavaHome, 'bin/java')
   args 'org.elasticsearch.example.resthandler.ExampleFixture', baseDir, 'TEST'
 }
 
 integTest {
   dependsOn exampleFixture
   runner {
-    nonInputProperties.systemProperty 'external.address', "${-> exampleFixture.addressAndPort}"
+    nonInputProperties.systemProperty 'external.address', "${ -> exampleFixture.addressAndPort }"  
   }
 }
 

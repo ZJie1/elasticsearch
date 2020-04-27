@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.job.config.Job;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.xcontent.ConstructingObjectParser;
@@ -31,7 +32,7 @@ import java.util.Objects;
 /**
  * Request object to flush a given Machine Learning job.
  */
-public class FlushJobRequest implements Validatable, ToXContentObject {
+public class FlushJobRequest extends ActionRequest implements ToXContentObject {
 
     public static final ParseField CALC_INTERIM = new ParseField("calc_interim");
     public static final ParseField START = new ParseField("start");
@@ -187,4 +188,8 @@ public class FlushJobRequest implements Validatable, ToXContentObject {
         return builder;
     }
 
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
+    }
 }

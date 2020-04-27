@@ -26,6 +26,7 @@ import org.elasticsearch.action.search.ShardSearchFailure;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.geo.GeoUtils;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.fielddata.ScriptDocValues;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.script.MockScriptPlugin;
@@ -118,9 +119,9 @@ public class SimpleSortIT extends ESIntegTestCase {
     public void testSimpleSorts() throws Exception {
         Random random = random();
         assertAcked(prepareCreate("test")
-                .setMapping(jsonBuilder()
+                .addMapping("type1", jsonBuilder()
                         .startObject()
-                            .startObject("_doc")
+                            .startObject("type1")
                                 .startObject("properties")
                                     .startObject("str_value")
                                         .field("type", "keyword")
@@ -152,7 +153,7 @@ public class SimpleSortIT extends ESIntegTestCase {
         ensureGreen();
         List<IndexRequestBuilder> builders = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            builders.add(client().prepareIndex("test").setId(Integer.toString(i))
+            builders.add(client().prepareIndex("test", "type1", Integer.toString(i))
                     .setSource(jsonBuilder()
                             .startObject()
                                 .field("str_value", new String(new char[]{(char) (97 + i), (char) (97 + i)}))
@@ -224,6 +225,7 @@ public class SimpleSortIT extends ESIntegTestCase {
     public void testSortMinValueScript() throws IOException {
         String mapping = Strings.toString(jsonBuilder()
                 .startObject()
+                    .startObject("type1")
                         .startObject("properties")
                             .startObject("lvalue")
                                 .field("type", "long")
@@ -238,13 +240,14 @@ public class SimpleSortIT extends ESIntegTestCase {
                                 .field("type", "geo_point")
                             .endObject()
                         .endObject()
+                    .endObject()
                 .endObject());
 
-        assertAcked(prepareCreate("test").setMapping(mapping));
+        assertAcked(prepareCreate("test").addMapping("type1", mapping, XContentType.JSON));
         ensureGreen();
 
         for (int i = 0; i < 10; i++) {
-            client().prepareIndex("test").setId("" + i)
+            client().prepareIndex("test", "type1", "" + i)
                     .setSource(jsonBuilder()
                             .startObject()
                                 .field("ord", i)
@@ -260,7 +263,7 @@ public class SimpleSortIT extends ESIntegTestCase {
         }
 
         for (int i = 10; i < 20; i++) { // add some docs that don't have values in those fields
-            client().prepareIndex("test").setId("" + i)
+            client().prepareIndex("test", "type1", "" + i)
                     .setSource(jsonBuilder()
                             .startObject()
                                 .field("ord", i)
@@ -341,6 +344,7 @@ public class SimpleSortIT extends ESIntegTestCase {
         // be propagated to all nodes yet and sort operation fail when the sort field is not defined
         String mapping = Strings.toString(jsonBuilder()
                 .startObject()
+                    .startObject("type1")
                         .startObject("properties")
                             .startObject("id")
                                 .field("type", "keyword")
@@ -349,25 +353,26 @@ public class SimpleSortIT extends ESIntegTestCase {
                                 .field("type", "keyword")
                             .endObject()
                         .endObject()
+                    .endObject()
                 .endObject());
-        assertAcked(prepareCreate("test").setMapping(mapping));
+        assertAcked(prepareCreate("test").addMapping("type1", mapping, XContentType.JSON));
         ensureGreen();
 
-        client().prepareIndex("test")
+        client().prepareIndex("test", "type1")
                 .setSource(jsonBuilder().startObject()
                                             .field("id", "1")
                                             .field("svalue", "aaa")
                                         .endObject())
                 .get();
 
-        client().prepareIndex("test")
+        client().prepareIndex("test", "type1")
                 .setSource(jsonBuilder().startObject()
                                             .field("id", "2")
                                             .nullField("svalue")
                                         .endObject())
                 .get();
 
-        client().prepareIndex("test")
+        client().prepareIndex("test", "type1")
                 .setSource(jsonBuilder().startObject()
                                             .field("id", "3")
                                             .field("svalue", "bbb")
@@ -445,9 +450,9 @@ public class SimpleSortIT extends ESIntegTestCase {
 
     public void test2920() throws IOException {
         assertAcked(prepareCreate("test")
-                .setMapping(jsonBuilder()
+                .addMapping("test", jsonBuilder()
                         .startObject()
-                            .startObject("_doc")
+                            .startObject("test")
                                 .startObject("properties")
                                     .startObject("value")
                                         .field("type", "keyword")
@@ -457,7 +462,7 @@ public class SimpleSortIT extends ESIntegTestCase {
                         .endObject()));
         ensureGreen();
         for (int i = 0; i < 10; i++) {
-            client().prepareIndex("test").setId(Integer.toString(i))
+            client().prepareIndex("test", "test", Integer.toString(i))
                     .setSource(jsonBuilder().startObject().field("value", "" + i).endObject()).get();
         }
         refresh();

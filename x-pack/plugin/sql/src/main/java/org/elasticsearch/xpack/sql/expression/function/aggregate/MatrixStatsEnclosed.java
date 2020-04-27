@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.sql.expression.function.aggregate;
 
-import org.elasticsearch.xpack.ql.expression.function.aggregate.EnclosedAgg;
-
 public interface MatrixStatsEnclosed extends EnclosedAgg {
 
 }

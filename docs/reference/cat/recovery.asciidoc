@@ -4,9 +4,8 @@
 <titleabbrev>cat recovery</titleabbrev>
 ++++
 
-
-Returns information about ongoing and completed shard recoveries,
-similar to the <<indices-recovery, index recovery>> API.
+Returns information about ongoing and completed index shard recoveries, similar
+to the <<indices-recovery, indices recovery>> API.
 
 
 [[cat-recovery-api-request]]
@@ -14,17 +13,19 @@ similar to the <<indices-recovery, index recovery>> API.
 
 `GET /_cat/recovery/<index>`
 
-`GET /_cat/recovery`
-
 
 [[cat-recovery-api-desc]]
 ==== {api-description-title}
 
-The cat recovery API returns information about shard recoveries, both
+The cat recovery API returns information about index shard recoveries, both
 ongoing and completed. It is a more compact view of the JSON
-<<indices-recovery,index recovery>> API.
+<<indices-recovery,indices recovery>> API.
 
-include::{docdir}/indices/recovery.asciidoc[tag=shard-recovery-desc]
+A recovery event occurs anytime an index shard moves to a different node in the
+cluster. This can happen during a snapshot recovery, a change in replication
+level, node failure, or on node startup. This last type is called a local store
+recovery and is the normal way for shards to be loaded from disk when a node
+starts up.
 
 
 [[cat-recovery-path-params]]
@@ -36,11 +37,7 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=index]
 [[cat-recovery-query-params]]
 ==== {api-query-parms-title}
 
-include::{docdir}/rest-api/common-parms.asciidoc[tag=active-only]
-
 include::{docdir}/rest-api/common-parms.asciidoc[tag=bytes]
-
-include::{docdir}/rest-api/common-parms.asciidoc[tag=detailed]
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=http-format]
 
@@ -48,11 +45,11 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=cat-h]
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=help]
 
-include::{docdir}/rest-api/common-parms.asciidoc[tag=index-query-parm]
+include::{docdir}/rest-api/common-parms.asciidoc[tag=local]
+
+include::{docdir}/rest-api/common-parms.asciidoc[tag=master-timeout]
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=cat-s]
-
-include::{docdir}/rest-api/common-parms.asciidoc[tag=time]
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=cat-v]
 
@@ -63,10 +60,11 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=cat-v]
 [[cat-recovery-api-ex-dead]]
 ===== Example with no ongoing recoveries
 
-[source,console]
+[source,js]
 ----------------------------------------------------------------------------
 GET _cat/recovery?v
 ----------------------------------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 The API returns the following response:
@@ -92,10 +90,11 @@ start.
 By increasing the replica count of an index and bringing another node online to
 host the replicas, you can retrieve information about an ongoing recovery.
 
-[source,console]
+[source,js]
 ----------------------------------------------------------------------------
 GET _cat/recovery?v&h=i,s,t,ty,st,shost,thost,f,fp,b,bp
 ----------------------------------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 The API returns the following response:
@@ -122,10 +121,11 @@ You can restore backups of an index using the <<modules-snapshots,snapshot and
 restore>> API. You can use the cat recovery API retrieve information about a
 snapshot recovery.
 
-[source,console]
+[source,js]
 --------------------------------------------------------------------------------
 GET _cat/recovery?v&h=i,s,t,ty,st,rep,snap,f,fp,b,bp
 --------------------------------------------------------------------------------
+// CONSOLE
 // TEST[skip:no need to execute snapshot/restore here]
 
 The API returns the following response with a recovery type of `snapshot`:

@@ -17,7 +17,8 @@ Deletes an existing model snapshot.
 ==== {api-prereq-title}
 
 * If the {es} {security-features} are enabled, you must have `manage_ml` or
-`manage` cluster privileges to use this API. See <<security-privileges>>.
+`manage` cluster privileges to use this API. See
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ml-delete-snapshot-desc]]
 ==== {api-description-title}
@@ -30,27 +31,28 @@ the `model_snapshot_id` in the results from the get jobs API.
 ==== {api-path-parms-title}
 
 `<job_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=job-id-anomaly-detection]
+  (Required, string) Identifier for the job.
 
 `<snapshot_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=snapshot-id]
+  (Required, string) Identifier for the model snapshot.
 
 [[ml-delete-snapshot-example]]
 ==== {api-examples-title}
 
-[source,console]
+The following example deletes the `1491948163` snapshot:
+
+[source,js]
 --------------------------------------------------
 DELETE _ml/anomaly_detectors/farequote/model_snapshots/1491948163
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:todo]
 
 When the snapshot is deleted, you receive the following results:
-
-[source,console-result]
+[source,js]
 ----
 {
   "acknowledged": true
 }
 ----
+// TESTRESPONSE

@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -71,13 +70,6 @@ public class SchedulerEngine {
 
         public long getScheduledTime() {
             return scheduledTime;
-        }
-
-        @Override
-        public String toString() {
-            return "Event[jobName=" + jobName + "," +
-                "triggeredTime=" + triggeredTime + "," +
-                "scheduledTime=" + scheduledTime + "]";
         }
     }
 
@@ -227,14 +219,7 @@ public class SchedulerEngine {
             this.scheduledTime = schedule.nextScheduledTimeAfter(startTime, currentTime);
             if (scheduledTime != -1) {
                 long delay = Math.max(0, scheduledTime - currentTime);
-                try {
-                    future = scheduler.schedule(this, delay, TimeUnit.MILLISECONDS);
-                } catch (RejectedExecutionException e) {
-                    // ignoring rejections if the scheduler has been shut down already
-                    if (scheduler.isShutdown() == false) {
-                        throw e;
-                    }
-                }
+                future = scheduler.schedule(this, delay, TimeUnit.MILLISECONDS);
             }
         }
 

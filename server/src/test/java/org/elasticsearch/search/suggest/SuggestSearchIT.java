@@ -55,20 +55,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_REPLICAS;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_SHARDS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_REPLICAS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_SHARDS;
 import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
 import static org.elasticsearch.search.suggest.SuggestBuilders.phraseSuggestion;
 import static org.elasticsearch.search.suggest.SuggestBuilders.termSuggestion;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertNoFailures;
-import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertRequestBuilderThrows;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertSuggestion;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertSuggestionPhraseCollateMatchExists;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertSuggestionSize;
+import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertThrows;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
@@ -84,13 +83,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
     // see #3196
     public void testSuggestAcrossMultipleIndices() throws IOException {
-        assertAcked(prepareCreate("test").setMapping("text", "type=text"));
+        assertAcked(prepareCreate("test").addMapping("type1", "text", "type=text"));
         ensureGreen();
 
-        indexDoc("test", "1", "text", "abcd");
-        indexDoc("test", "2", "text", "aacd");
-        indexDoc("test", "3", "text", "abbd");
-        indexDoc("test", "4", "text", "abcc");
+        index("test", "type1", "1", "text", "abcd");
+        index("test", "type1", "2", "text", "aacd");
+        index("test", "type1", "3", "text", "abbd");
+        index("test", "type1", "4", "text", "abcc");
         refresh();
 
         TermSuggestionBuilder termSuggest = termSuggestion("text")
@@ -98,13 +97,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .text("abcd");
         logger.info("--> run suggestions with one index");
         searchSuggest("test", termSuggest);
-        assertAcked(prepareCreate("test_1").setMapping("text", "type=text"));
+        assertAcked(prepareCreate("test_1").addMapping("type1", "text", "type=text"));
         ensureGreen();
 
-        indexDoc("test_1", "1", "text", "ab cd");
-        indexDoc("test_1", "2", "text", "aa cd");
-        indexDoc("test_1", "3", "text", "ab bd");
-        indexDoc("test_1", "4", "text", "ab cc");
+        index("test_1", "type1", "1", "text", "ab cd");
+        index("test_1", "type1", "2", "text", "aa cd");
+        index("test_1", "type1", "3", "text", "ab bd");
+        index("test_1", "type1", "4", "text", "ab cc");
         refresh();
         termSuggest = termSuggestion("text")
                 .suggestMode(SuggestMode.ALWAYS) // Always, otherwise the results can vary between requests.
@@ -114,22 +113,22 @@ public class SuggestSearchIT extends ESIntegTestCase {
         searchSuggest("test", termSuggest);
 
 
-        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("_doc")
+        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("type1")
                 .startObject("properties")
                 .startObject("text").field("type", "text").field("analyzer", "keyword").endObject()
                 .endObject()
                 .endObject().endObject();
-        assertAcked(prepareCreate("test_2").setMapping(mapping));
+        assertAcked(prepareCreate("test_2").addMapping("type1", mapping));
         ensureGreen();
 
-        indexDoc("test_2", "1", "text", "ab cd");
-        indexDoc("test_2", "2", "text", "aa cd");
-        indexDoc("test_2", "3", "text", "ab bd");
-        indexDoc("test_2", "4", "text", "ab cc");
-        indexDoc("test_2", "1", "text", "abcd");
-        indexDoc("test_2", "2", "text", "aacd");
-        indexDoc("test_2", "3", "text", "abbd");
-        indexDoc("test_2", "4", "text", "abcc");
+        index("test_2", "type1", "1", "text", "ab cd");
+        index("test_2", "type1", "2", "text", "aa cd");
+        index("test_2", "type1", "3", "text", "ab bd");
+        index("test_2", "type1", "4", "text", "ab cc");
+        index("test_2", "type1", "1", "text", "abcd");
+        index("test_2", "type1", "2", "text", "aacd");
+        index("test_2", "type1", "3", "text", "abbd");
+        index("test_2", "type1", "4", "text", "abcc");
         refresh();
 
         termSuggest = termSuggestion("text")
@@ -180,7 +179,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .put("index.analysis.filter.shingler.min_shingle_size", 2)
                 .put("index.analysis.filter.shingler.max_shingle_size", 3));
 
-        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("_doc")
+        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("type1")
                 .startObject("properties")
                 .startObject("name")
                     .field("type", "text")
@@ -194,13 +193,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .endObject()
                 .endObject()
                 .endObject().endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
 
-        indexDoc("test", "1", "name", "I like iced tea");
-        indexDoc("test", "2", "name", "I like tea.");
-        indexDoc("test", "3", "name", "I like ice cream.");
+        index("test", "type1", "1", "name", "I like iced tea");
+        index("test", "type1", "2", "name", "I like tea.");
+        index("test", "type1", "3", "name", "I like ice cream.");
         refresh();
 
         DirectCandidateGeneratorBuilder generator = candidateGenerator("name").prefixLength(0).minWordLength(0).suggestMode("always")
@@ -232,7 +231,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
         ensureGreen();
 
         for (int i = 0; i < 15; i++) {
-            indexDoc("test", Integer.toString(i), "text", "abc" + i);
+            index("test", "type1", Integer.toString(i), "text", "abc" + i);
         }
         refresh();
 
@@ -259,7 +258,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .put("index.analysis.filter.shingler.type", "shingle")
                 .put("index.analysis.filter.shingler.min_shingle_size", 2)
                 .put("index.analysis.filter.shingler.max_shingle_size", 3));
-        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("_doc")
+        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("type1")
                 .startObject("properties")
                 .startObject("name")
                     .field("type", "text")
@@ -273,12 +272,12 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .endObject()
                 .endObject()
                 .endObject().endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
-        indexRandom(true, client().prepareIndex("test").setSource("name", "I like iced tea"),
-        client().prepareIndex("test").setSource("name", "I like tea."),
-        client().prepareIndex("test").setSource("name", "I like ice cream."));
+        indexRandom(true, client().prepareIndex("test", "type1").setSource("name", "I like iced tea"),
+        client().prepareIndex("test", "type1").setSource("name", "I like tea."),
+        client().prepareIndex("test", "type1").setSource("name", "I like ice cream."));
         refresh();
 
         PhraseSuggestionBuilder phraseSuggestion = phraseSuggestion("name.shingled")
@@ -293,23 +292,23 @@ public class SuggestSearchIT extends ESIntegTestCase {
         {
             SearchRequestBuilder searchBuilder = client().prepareSearch().setSize(0);
             searchBuilder.suggest(new SuggestBuilder().setGlobalText("tetsting sugestion").addSuggestion("did_you_mean", phraseSuggestion));
-            assertRequestBuilderThrows(searchBuilder, SearchPhaseExecutionException.class);
+            assertThrows(searchBuilder, SearchPhaseExecutionException.class);
         }
         {
             SearchRequestBuilder searchBuilder = client().prepareSearch().setSize(0);
             searchBuilder.suggest(new SuggestBuilder().setGlobalText("tetsting sugestion").addSuggestion("did_you_mean", phraseSuggestion));
-            assertRequestBuilderThrows(searchBuilder, SearchPhaseExecutionException.class);
+            assertThrows(searchBuilder, SearchPhaseExecutionException.class);
         }
     }
 
     public void testSimple() throws Exception {
-        assertAcked(prepareCreate("test").setMapping("text", "type=text"));
+        assertAcked(prepareCreate("test").addMapping("type1", "text", "type=text"));
         ensureGreen();
 
-        indexDoc("test", "1", "text", "abcd");
-        indexDoc("test", "2", "text", "aacd");
-        indexDoc("test", "3", "text", "abbd");
-        indexDoc("test", "4", "text", "abcc");
+        index("test", "type1", "1", "text", "abcd");
+        index("test", "type1", "2", "text", "aacd");
+        index("test", "type1", "3", "text", "abbd");
+        index("test", "type1", "4", "text", "abcc");
         refresh();
 
         SearchResponse search = client().prepareSearch().setQuery(matchQuery("text", "spellcecker")).get();
@@ -328,10 +327,10 @@ public class SuggestSearchIT extends ESIntegTestCase {
     }
 
     public void testEmpty() throws Exception {
-        assertAcked(prepareCreate("test").setMapping("text", "type=text"));
+        assertAcked(prepareCreate("test").addMapping("type1", "text", "type=text"));
         ensureGreen();
 
-        indexDoc("test", "1", "text", "bar");
+        index("test", "type1", "1", "text", "bar");
         refresh();
 
         TermSuggestionBuilder termSuggest = termSuggestion("text")
@@ -347,7 +346,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
     }
 
     public void testEmptyIndex() throws Exception {
-        assertAcked(prepareCreate("test").setMapping("text", "type=text"));
+        assertAcked(prepareCreate("test").addMapping("type1", "text", "type=text"));
         ensureGreen();
 
         // use SuggestMode.ALWAYS, otherwise the results can vary between requests.
@@ -362,7 +361,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
         assertSuggestionSize(suggest, 0, 0, "test");
         assertThat(suggest.getSuggestion("test").getEntries().get(0).getText().string(), equalTo("abcd"));
 
-        indexDoc("test", "1", "text", "bar");
+        index("test", "type1", "1", "text", "bar");
         refresh();
 
         suggest = searchSuggest("test", termSuggest);
@@ -375,13 +374,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
     }
 
     public void testWithMultipleCommands() throws Exception {
-        assertAcked(prepareCreate("test").setMapping("field1", "type=text", "field2", "type=text"));
+        assertAcked(prepareCreate("test").addMapping("typ1", "field1", "type=text", "field2", "type=text"));
         ensureGreen();
 
-        indexDoc("test", "1", "field1", "prefix_abcd", "field2", "prefix_efgh");
-        indexDoc("test", "2", "field1", "prefix_aacd", "field2", "prefix_eeeh");
-        indexDoc("test", "3", "field1", "prefix_abbd", "field2", "prefix_efff");
-        indexDoc("test", "4", "field1", "prefix_abcc", "field2", "prefix_eggg");
+        index("test", "typ1", "1", "field1", "prefix_abcd", "field2", "prefix_efgh");
+        index("test", "typ1", "2", "field1", "prefix_aacd", "field2", "prefix_eeeh");
+        index("test", "typ1", "3", "field1", "prefix_abbd", "field2", "prefix_efff");
+        index("test", "typ1", "4", "field1", "prefix_abcc", "field2", "prefix_eggg");
         refresh();
 
         Map<String, SuggestionBuilder<?>> suggestions = new HashMap<>();
@@ -423,7 +422,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         for (Entry<String, Integer> entry : termsAndDocCount.entrySet()) {
             for (int i = 0; i < entry.getValue(); i++) {
-                indexDoc("test", entry.getKey() + i, "field1", entry.getKey());
+                index("test", "type1", entry.getKey() + i, "field1", entry.getKey());
             }
         }
         refresh();
@@ -454,13 +453,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
     // see #2817
     public void testStopwordsOnlyPhraseSuggest() throws IOException {
-        assertAcked(prepareCreate("test").setMapping("body", "type=text,analyzer=stopwd").setSettings(
+        assertAcked(prepareCreate("test").addMapping("typ1", "body", "type=text,analyzer=stopwd").setSettings(
                 Settings.builder()
                         .put("index.analysis.analyzer.stopwd.tokenizer", "standard")
                         .putList("index.analysis.analyzer.stopwd.filter", "stop")
         ));
         ensureGreen();
-        indexDoc("test", "1", "body", "this is a test");
+        index("test", "typ1", "1", "body", "this is a test");
         refresh();
 
         Suggest searchSuggest = searchSuggest( "a an the", "simple_phrase",
@@ -481,18 +480,18 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .put("index.analysis.filter.my_shingle.output_unigrams", false)
                 .put("index.analysis.filter.my_shingle.min_shingle_size", 2)
                 .put("index.analysis.filter.my_shingle.max_shingle_size", 2));
-        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("_doc")
+        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("type1")
                 .startObject("properties")
                 .startObject("body").field("type", "text").field("analyzer", "body").endObject()
                 .startObject("bigram").field("type", "text").field("analyzer", "bigram").endObject()
                 .endObject()
                 .endObject().endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
-        indexDoc("test", "1", "body", "hello world");
-        indexDoc("test", "2", "body", "hello world");
-        indexDoc("test", "3", "body", "hello words");
+        index("test", "type1", "1", "body", "hello world");
+        index("test", "type1", "2", "body", "hello world");
+        index("test", "type1", "3", "body", "hello words");
         refresh();
 
         Suggest searchSuggest = searchSuggest( "hello word", "simple_phrase",
@@ -520,7 +519,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .put("index.analysis.filter.my_shingle.min_shingle_size", 2)
                 .put("index.analysis.filter.my_shingle.max_shingle_size", 2)
                 .put("index.number_of_shards", 1));
-        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("_doc")
+        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("type1")
                     .startObject("properties")
                         .startObject("body").
                             field("type", "text").
@@ -532,7 +531,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                          .endObject()
                      .endObject()
                 .endObject().endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
         String[] strings = new String[]{
@@ -555,7 +554,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
             "Police sergeant who stops the film",
         };
         for (String line : strings) {
-            indexDoc("test", line, "body", line, "bigram", line);
+            index("test", "type1", line, "body", line, "bigram", line);
         }
         refresh();
 
@@ -655,7 +654,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         XContentBuilder mapping = XContentFactory.jsonBuilder()
                 .startObject()
-                    .startObject("_doc")
+                    .startObject("type1")
                         .startObject("properties")
                             .startObject("body")
                                 .field("type", "text")
@@ -668,13 +667,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
                      .endObject()
                  .endObject()
              .endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
         String line = "xorr the god jewel";
-        indexDoc("test", "1", "body", line, "bigram", line);
+        index("test", "type1", "1", "body", line, "bigram", line);
         line = "I got it this time";
-        indexDoc("test", "2", "body", line, "bigram", line);
+        index("test", "type1", "2", "body", line, "bigram", line);
         refresh();
 
         PhraseSuggestionBuilder phraseSuggestion = phraseSuggestion("bigram")
@@ -700,9 +699,9 @@ public class SuggestSearchIT extends ESIntegTestCase {
     public void testDifferentShardSize() throws Exception {
         createIndex("test");
         ensureGreen();
-        indexRandom(true, client().prepareIndex("test").setId("1").setSource("field1", "foobar1").setRouting("1"),
-                client().prepareIndex("test").setId("2").setSource("field1", "foobar2").setRouting("2"),
-                client().prepareIndex("test").setId("3").setSource("field1", "foobar3").setRouting("3"));
+        indexRandom(true, client().prepareIndex("test", "type1", "1").setSource("field1", "foobar1").setRouting("1"),
+                client().prepareIndex("test", "type1", "2").setSource("field1", "foobar2").setRouting("2"),
+                client().prepareIndex("test", "type1", "3").setSource("field1", "foobar3").setRouting("3"));
 
         Suggest suggest = searchSuggest( "foobar", "simple",
                 termSuggestion("field1")
@@ -722,7 +721,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .put("index.analysis.filter.shingler.max_shingle_size", 5)
                 .put("index.analysis.filter.shingler.output_unigrams", true));
 
-        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("_doc")
+        XContentBuilder mapping = XContentFactory.jsonBuilder().startObject().startObject("type2")
                 .startObject("properties")
                     .startObject("name")
                         .field("type", "text")
@@ -730,16 +729,16 @@ public class SuggestSearchIT extends ESIntegTestCase {
                     .endObject()
                 .endObject()
                 .endObject().endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type2", mapping));
         ensureGreen();
 
-        indexDoc("test", "1", "foo", "bar");
-        indexDoc("test", "2", "foo", "bar");
-        indexDoc("test", "3", "foo", "bar");
-        indexDoc("test", "4", "foo", "bar");
-        indexDoc("test", "5", "foo", "bar");
-        indexDoc("test", "1", "name", "Just testing the suggestions api");
-        indexDoc("test", "2", "name", "An other title about equal length");
+        index("test", "type2", "1", "foo", "bar");
+        index("test", "type2", "2", "foo", "bar");
+        index("test", "type2", "3", "foo", "bar");
+        index("test", "type2", "4", "foo", "bar");
+        index("test", "type2", "5", "foo", "bar");
+        index("test", "type2", "1", "name", "Just testing the suggestions api");
+        index("test", "type2", "2", "name", "An other title about equal length");
         // Note that the last document has to have about the same length as the other or cutoff rechecking will remove the useful suggestion
         refresh();
 
@@ -748,7 +747,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .suggest(
                         new SuggestBuilder().setGlobalText("tetsting sugestion").addSuggestion("did_you_mean",
                                 phraseSuggestion("fielddoesnotexist").maxErrors(5.0f)));
-        assertRequestBuilderThrows(request, SearchPhaseExecutionException.class);
+        assertThrows(request, SearchPhaseExecutionException.class);
 
         // When searching on a shard which does not hold yet any document of an existing type, we should not fail
         SearchResponse searchResponse = client().prepareSearch().setSize(0)
@@ -764,7 +763,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
     public void testEmptyShards() throws IOException, InterruptedException {
         XContentBuilder mappingBuilder = XContentFactory.jsonBuilder().
                 startObject().
-                    startObject("_doc").
+                    startObject("type1").
                         startObject("properties").
                             startObject("name").
                                 field("type", "text").
@@ -782,7 +781,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .put("index.analysis.filter.shingler.type", "shingle")
                 .put("index.analysis.filter.shingler.min_shingle_size", 2)
                 .put("index.analysis.filter.shingler.max_shingle_size", 5)
-                .put("index.analysis.filter.shingler.output_unigrams", true)).setMapping(mappingBuilder));
+                .put("index.analysis.filter.shingler.output_unigrams", true)).addMapping("type1", mappingBuilder));
         ensureGreen();
 
         // test phrase suggestion on completely empty index
@@ -799,9 +798,9 @@ public class SuggestSearchIT extends ESIntegTestCase {
         assertThat(suggest.getSuggestion("did_you_mean").getEntries().get(0).getText().string(), equalTo("tetsting sugestion"));
 
 
-        indexDoc("test", "11", "foo", "bar");
-        indexDoc("test", "12", "foo", "bar");
-        indexDoc("test", "2", "name", "An other title about equal length");
+        index("test", "type1", "11", "foo", "bar");
+        index("test", "type1", "12", "foo", "bar");
+        index("test", "type1", "2", "name", "An other title about equal length");
         refresh();
 
         // test phrase suggestion but nothing matches
@@ -818,7 +817,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
         assertThat(suggest.getSuggestion("did_you_mean").getEntries().get(0).getText().string(), equalTo("tetsting sugestion"));
 
         // finally indexing a document that will produce some meaningful suggestion
-        indexDoc("test", "1", "name", "Just testing the suggestions api");
+        index("test", "type1", "1", "name", "Just testing the suggestions api");
         refresh();
 
         searchResponse = client().prepareSearch()
@@ -854,7 +853,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         XContentBuilder mapping = XContentFactory.jsonBuilder()
                 .startObject()
-                    .startObject("_doc")
+                    .startObject("type1")
                         .startObject("properties")
                             .startObject("body")
                                 .field("type", "text")
@@ -863,7 +862,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                         .endObject()
                     .endObject()
                 .endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
         NumShards test = getNumShards("test");
@@ -877,7 +876,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
             phrases.add("chaff" + i);
         }
         for (String phrase: phrases) {
-            indexDoc("test", phrase, "body", phrase);
+            index("test", "type1", phrase, "body", phrase);
         }
         refresh();
 
@@ -909,7 +908,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         XContentBuilder mapping = XContentFactory.jsonBuilder()
                 .startObject()
-                    .startObject("_doc")
+                    .startObject("type1")
                         .startObject("properties")
                             .startObject("title")
                                 .field("type", "text")
@@ -918,7 +917,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                         .endObject()
                     .endObject()
                 .endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
         List<String> titles = new ArrayList<>();
@@ -1013,7 +1012,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         List<IndexRequestBuilder> builders = new ArrayList<>();
         for (String title: titles) {
-            builders.add(client().prepareIndex("test").setSource("title", title));
+            builders.add(client().prepareIndex("test", "type1").setSource("title", title));
         }
 
         indexRandom(true, builders);
@@ -1041,7 +1040,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
     public void testSuggestWithFieldAlias() throws Exception {
         XContentBuilder mapping = XContentFactory.jsonBuilder()
             .startObject()
-                .startObject("_doc")
+                .startObject("type")
                     .startObject("properties")
                         .startObject("text")
                             .field("type", "keyword")
@@ -1053,12 +1052,12 @@ public class SuggestSearchIT extends ESIntegTestCase {
                     .endObject()
                 .endObject()
             .endObject();
-        assertAcked(prepareCreate("test").setMapping(mapping));
+        assertAcked(prepareCreate("test").addMapping("type", mapping));
 
         List<IndexRequestBuilder> builders = new ArrayList<>();
-        builders.add(client().prepareIndex("test").setSource("text", "apple"));
-        builders.add(client().prepareIndex("test").setSource("text", "mango"));
-        builders.add(client().prepareIndex("test").setSource("text", "papaya"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "apple"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "mango"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "papaya"));
         indexRandom(true, false, builders);
 
         TermSuggestionBuilder termSuggest = termSuggestion("alias").text("appple");
@@ -1070,7 +1069,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
     public void testPhraseSuggestMinDocFreq() throws Exception {
         XContentBuilder mapping = XContentFactory.jsonBuilder()
             .startObject()
-                .startObject("_doc")
+                .startObject("type")
                     .startObject("properties")
                         .startObject("text")
                             .field("type", "keyword")
@@ -1080,13 +1079,13 @@ public class SuggestSearchIT extends ESIntegTestCase {
             .endObject();
         assertAcked(prepareCreate("test")
             .setSettings(Settings.builder().put("index.number_of_shards", 1).build())
-            .setMapping(mapping));
+            .addMapping("type", mapping));
 
         List<IndexRequestBuilder> builders = new ArrayList<>();
-        builders.add(client().prepareIndex("test").setSource("text", "apple"));
-        builders.add(client().prepareIndex("test").setSource("text", "apple"));
-        builders.add(client().prepareIndex("test").setSource("text", "apple"));
-        builders.add(client().prepareIndex("test").setSource("text", "appfle"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "apple"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "apple"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "apple"));
+        builders.add(client().prepareIndex("test", "type").setSource("text", "appfle"));
         indexRandom(true, false, builders);
 
         PhraseSuggestionBuilder phraseSuggest = phraseSuggestion("text").text("appple")
@@ -1137,12 +1136,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
         }
 
         @Override
-        public <T> T compile(
-            String scriptName,
-            String scriptSource,
-            ScriptContext<T> context,
-            Map<String, String> params
-        ) {
+        public <T> T compile(String scriptName, String scriptSource, ScriptContext<T> context, Map<String, String> params) {
             if (context.instanceClazz != TemplateScript.class) {
                 throw new UnsupportedOperationException();
             }
@@ -1161,11 +1155,6 @@ public class SuggestSearchIT extends ESIntegTestCase {
             };
             return context.factoryClazz.cast(factory);
         }
-
-        @Override
-        public Set<ScriptContext<?>> getSupportedContexts() {
-            return Set.of(TemplateScript.CONTEXT);
-        }
     }
 
     public void testPhraseSuggesterCollate() throws InterruptedException, ExecutionException, IOException {
@@ -1181,7 +1170,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         XContentBuilder mapping = XContentFactory.jsonBuilder()
                 .startObject()
-                .startObject("_doc")
+                .startObject("type1")
                 .startObject("properties")
                 .startObject("title")
                 .field("type", "text")
@@ -1190,7 +1179,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
                 .endObject()
                 .endObject()
                 .endObject();
-        assertAcked(builder.setMapping(mapping));
+        assertAcked(builder.addMapping("type1", mapping));
         ensureGreen();
 
         List<String> titles = new ArrayList<>();
@@ -1204,7 +1193,7 @@ public class SuggestSearchIT extends ESIntegTestCase {
 
         List<IndexRequestBuilder> builders = new ArrayList<>();
         for (String title: titles) {
-            builders.add(client().prepareIndex("test").setSource("title", title));
+            builders.add(client().prepareIndex("test", "type1").setSource("title", title));
         }
         indexRandom(true, builders);
 

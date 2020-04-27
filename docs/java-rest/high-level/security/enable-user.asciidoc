@@ -1,4 +1,3 @@
-[role="xpack"]
 [[java-rest-high-security-enable-user]]
 === Enable User API
 

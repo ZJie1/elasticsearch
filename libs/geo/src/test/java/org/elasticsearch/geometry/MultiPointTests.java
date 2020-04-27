@@ -45,23 +45,23 @@ public class MultiPointTests extends BaseGeometryTestCase<MultiPoint> {
 
     public void testBasicSerialization() throws IOException, ParseException {
         WellKnownText wkt = new WellKnownText(true, new GeographyValidator(true));
-        assertEquals("MULTIPOINT (2.0 1.0)", wkt.toWKT(
+        assertEquals("multipoint (2.0 1.0)", wkt.toWKT(
             new MultiPoint(Collections.singletonList(new Point(2, 1)))));
         assertEquals(new MultiPoint(Collections.singletonList(new Point(2, 1))),
-            wkt.fromWKT("MULTIPOINT (2 1)"));
+            wkt.fromWKT("multipoint (2 1)"));
 
-        assertEquals("MULTIPOINT (2.0 1.0, 3.0 4.0)",
+        assertEquals("multipoint (2.0 1.0, 3.0 4.0)",
             wkt.toWKT(new MultiPoint(Arrays.asList(new Point(2, 1), new Point(3, 4)))));
         assertEquals(new MultiPoint(Arrays.asList(new Point(2, 1), new Point(3, 4))),
-            wkt.fromWKT("MULTIPOINT (2 1, 3 4)"));
+            wkt.fromWKT("multipoint (2 1, 3 4)"));
 
-        assertEquals("MULTIPOINT (2.0 1.0 10.0, 3.0 4.0 20.0)",
+        assertEquals("multipoint (2.0 1.0 10.0, 3.0 4.0 20.0)",
             wkt.toWKT(new MultiPoint(Arrays.asList(new Point(2, 1, 10), new Point(3, 4, 20)))));
         assertEquals(new MultiPoint(Arrays.asList(new Point(2, 1, 10), new Point(3, 4, 20))),
-            wkt.fromWKT("MULTIPOINT (2 1 10, 3 4 20)"));
+            wkt.fromWKT("multipoint (2 1 10, 3 4 20)"));
 
-        assertEquals("MULTIPOINT EMPTY", wkt.toWKT(MultiPoint.EMPTY));
-        assertEquals(MultiPoint.EMPTY, wkt.fromWKT("MULTIPOINT EMPTY)"));
+        assertEquals("multipoint EMPTY", wkt.toWKT(MultiPoint.EMPTY));
+        assertEquals(MultiPoint.EMPTY, wkt.fromWKT("multipoint EMPTY)"));
     }
 
     public void testValidation() {

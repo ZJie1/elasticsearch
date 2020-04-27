@@ -44,15 +44,15 @@ public class MultiPolygonTests extends BaseGeometryTestCase<MultiPolygon> {
 
     public void testBasicSerialization() throws IOException, ParseException {
         WellKnownText wkt = new WellKnownText(true, new GeographyValidator(true));
-        assertEquals("MULTIPOLYGON (((3.0 1.0, 4.0 2.0, 5.0 3.0, 3.0 1.0)))",
+        assertEquals("multipolygon (((3.0 1.0, 4.0 2.0, 5.0 3.0, 3.0 1.0)))",
             wkt.toWKT(new MultiPolygon(Collections.singletonList(
                 new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1}))))));
         assertEquals(new MultiPolygon(Collections.singletonList(
             new Polygon(new LinearRing(new double[]{3, 4, 5, 3}, new double[]{1, 2, 3, 1})))),
-            wkt.fromWKT("MULTIPOLYGON (((3.0 1.0, 4.0 2.0, 5.0 3.0, 3.0 1.0)))"));
+            wkt.fromWKT("multipolygon (((3.0 1.0, 4.0 2.0, 5.0 3.0, 3.0 1.0)))"));
 
-        assertEquals("MULTIPOLYGON EMPTY", wkt.toWKT(MultiPolygon.EMPTY));
-        assertEquals(MultiPolygon.EMPTY, wkt.fromWKT("MULTIPOLYGON EMPTY)"));
+        assertEquals("multipolygon EMPTY", wkt.toWKT(MultiPolygon.EMPTY));
+        assertEquals(MultiPolygon.EMPTY, wkt.fromWKT("multipolygon EMPTY)"));
     }
 
     public void testValidation() {

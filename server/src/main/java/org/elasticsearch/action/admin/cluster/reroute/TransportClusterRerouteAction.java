@@ -19,7 +19,6 @@
 
 package org.elasticsearch.action.admin.cluster.reroute;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.ExceptionsHelper;
@@ -59,8 +58,6 @@ import java.util.List;
 import java.util.Map;
 
 public class TransportClusterRerouteAction extends TransportMasterNodeAction<ClusterRerouteRequest, ClusterRerouteResponse> {
-
-    private static final Logger logger = LogManager.getLogger(TransportClusterRerouteAction.class);
 
     private final AllocationService allocationService;
 

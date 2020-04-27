@@ -13,7 +13,7 @@ Resumes a follower index.
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /follower_index/_ccr/follow?wait_for_active_shards=1
 {
@@ -23,23 +23,26 @@ PUT /follower_index/_ccr/follow?wait_for_active_shards=1
 
 POST /follower_index/_ccr/pause_follow
 --------------------------------------------------
+// CONSOLE
 // TESTSETUP
 // TEST[setup:remote_cluster_and_leader_index]
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /follower_index/_ccr/pause_follow
 --------------------------------------------------
+// CONSOLE
 // TEARDOWN
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /<follower_index>/_ccr/resume_follow
 {
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[s/<follower_index>/follower_index/]
 // TEST[s/<remote_cluster>/remote_cluster/]
 // TEST[s/<leader_index>/leader_index/]
@@ -51,7 +54,7 @@ POST /<follower_index>/_ccr/resume_follow
 index privileges for the follower index. You must have `read` and `monitor`
 index privileges for the leader index. You must also have `manage_ccr` cluster
 privileges on the cluster that contains the follower index. For more information,
-see <<security-privileges>>.
+see {stack-ov}/security-privileges.html[Security privileges].
 
 [[ccr-post-resume-follow-desc]]
 ==== {api-description-title}
@@ -76,7 +79,7 @@ include::../follow-request-body.asciidoc[]
 
 This example resumes a follower index named `follower_index`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /follower_index/_ccr/resume_follow
 {
@@ -92,12 +95,14 @@ POST /follower_index/_ccr/resume_follow
   "read_poll_timeout" : "30s"
 }
 --------------------------------------------------
+// CONSOLE
 
 The API returns the following result:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "acknowledged" : true
 }
 --------------------------------------------------
+// TESTRESPONSE

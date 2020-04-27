@@ -21,7 +21,7 @@ package org.elasticsearch.bootstrap;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.cli.Terminal;
+import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.common.SuppressForbidden;
 
 import java.io.IOError;
@@ -32,29 +32,29 @@ class ElasticsearchUncaughtExceptionHandler implements Thread.UncaughtExceptionH
     private static final Logger logger = LogManager.getLogger(ElasticsearchUncaughtExceptionHandler.class);
 
     @Override
-    public void uncaughtException(Thread thread, Throwable t) {
-        if (isFatalUncaught(t)) {
+    public void uncaughtException(Thread t, Throwable e) {
+        if (isFatalUncaught(e)) {
             try {
-                onFatalUncaught(thread.getName(), t);
+                onFatalUncaught(t.getName(), e);
             } finally {
                 // we use specific error codes in case the above notification failed, at least we
                 // will have some indication of the error bringing us down
-                if (t instanceof InternalError) {
+                if (e instanceof InternalError) {
                     halt(128);
-                } else if (t instanceof OutOfMemoryError) {
+                } else if (e instanceof OutOfMemoryError) {
                     halt(127);
-                } else if (t instanceof StackOverflowError) {
+                } else if (e instanceof StackOverflowError) {
                     halt(126);
-                } else if (t instanceof UnknownError) {
+                } else if (e instanceof UnknownError) {
                     halt(125);
-                } else if (t instanceof IOError) {
+                } else if (e instanceof IOError) {
                     halt(124);
                 } else {
                     halt(1);
                 }
             }
         } else {
-            onNonFatalUncaught(thread.getName(), t);
+            onNonFatalUncaught(t.getName(), e);
         }
     }
 
@@ -63,21 +63,11 @@ class ElasticsearchUncaughtExceptionHandler implements Thread.UncaughtExceptionH
     }
 
     void onFatalUncaught(final String threadName, final Throwable t) {
-        final String message = "fatal error in thread [" + threadName + "], exiting";
-        logger.error(message, t);
-        Terminal.DEFAULT.errorPrintln(message);
-        t.printStackTrace(Terminal.DEFAULT.getErrorWriter());
-        // Without a final flush, the stacktrace may not be shown before ES exits
-        Terminal.DEFAULT.flush();
+        logger.error(() -> new ParameterizedMessage("fatal error in thread [{}], exiting", threadName), t);
     }
 
     void onNonFatalUncaught(final String threadName, final Throwable t) {
-        final String message = "uncaught exception in thread [" + threadName + "]";
-        logger.error(message, t);
-        Terminal.DEFAULT.errorPrintln(message);
-        t.printStackTrace(Terminal.DEFAULT.getErrorWriter());
-        // Without a final flush, the stacktrace may not be shown if ES goes on to exit
-        Terminal.DEFAULT.flush();
+        logger.warn(() -> new ParameterizedMessage("uncaught exception in thread [{}]", threadName), t);
     }
 
     void halt(int status) {

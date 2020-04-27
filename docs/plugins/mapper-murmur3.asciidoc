@@ -14,7 +14,7 @@ include::install_remove.asciidoc[]
 The `murmur3` is typically used within a multi-field, so that both the original
 value and its hash are stored in the index:
 
-[source,console]
+[source,js]
 --------------------------
 PUT my_index
 {
@@ -32,12 +32,13 @@ PUT my_index
   }
 }
 --------------------------
+// CONSOLE
 
 Such a mapping would allow to refer to `my_field.hash` in order to get hashes
 of the values of the `my_field` field. This is only useful in order to run
 `cardinality` aggregations:
 
-[source,console]
+[source,js]
 --------------------------
 # Example documents
 PUT my_index/_doc/1
@@ -61,6 +62,7 @@ GET my_index/_search
   }
 }
 --------------------------
+// CONSOLE
 
 <1> Counting unique values on the `my_field.hash` field
 

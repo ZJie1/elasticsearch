@@ -32,23 +32,20 @@ import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.Table;
 import org.elasticsearch.common.unit.ByteSizeValue;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.action.RestActionListener;
 import org.elasticsearch.rest.action.RestResponseListener;
-
-import java.util.List;
 
 import static org.elasticsearch.rest.RestRequest.Method.GET;
 
 
 public class RestAllocationAction extends AbstractCatAction {
 
-    @Override
-    public List<Route> routes() {
-        return List.of(
-            new Route(GET, "/_cat/allocation"),
-            new Route(GET, "/_cat/allocation/{nodes}"));
+    public RestAllocationAction(RestController controller) {
+        controller.registerHandler(GET, "/_cat/allocation", this);
+        controller.registerHandler(GET, "/_cat/allocation/{nodes}", this);
     }
 
     @Override
@@ -73,8 +70,7 @@ public class RestAllocationAction extends AbstractCatAction {
             @Override
             public void processResponse(final ClusterStateResponse state) {
                 NodesStatsRequest statsRequest = new NodesStatsRequest(nodes);
-                statsRequest.clear().addMetric(NodesStatsRequest.Metric.FS.metricName())
-                    .indices(new CommonStatsFlags(CommonStatsFlags.Flag.Store));
+                statsRequest.clear().fs(true).indices(new CommonStatsFlags(CommonStatsFlags.Flag.Store));
 
                 client.admin().cluster().nodesStats(statsRequest, new RestResponseListener<NodesStatsResponse>(channel) {
                     @Override

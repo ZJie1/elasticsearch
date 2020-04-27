@@ -5,12 +5,11 @@
  */
 package org.elasticsearch.xpack.sql.expression.function.scalar.math;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.tree.NodeInfo;
-import org.elasticsearch.xpack.ql.tree.Source;
-import org.elasticsearch.xpack.ql.type.DataType;
-import org.elasticsearch.xpack.ql.type.DataTypes;
+import org.elasticsearch.xpack.sql.expression.Expression;
 import org.elasticsearch.xpack.sql.expression.function.scalar.math.MathProcessor.MathOperation;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.tree.NodeInfo;
+import org.elasticsearch.xpack.sql.type.DataType;
 
 /**
  * Returns the sign of the given expression:
@@ -42,6 +41,6 @@ public class Sign extends MathFunction {
 
     @Override
     public DataType dataType() {
-        return DataTypes.INTEGER;
+        return DataType.INTEGER;
     }
 }

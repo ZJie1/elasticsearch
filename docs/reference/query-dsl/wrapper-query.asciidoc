@@ -6,7 +6,7 @@
 
 A query that accepts any other query as base64 encoded string.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -17,6 +17,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 <1> Base64 encoded string:  `{"term" : { "user" : "Kimchy" }}`
 

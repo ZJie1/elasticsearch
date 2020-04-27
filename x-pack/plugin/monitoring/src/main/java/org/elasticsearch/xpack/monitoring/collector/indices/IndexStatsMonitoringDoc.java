@@ -8,7 +8,7 @@ package org.elasticsearch.xpack.monitoring.collector.indices;
 import org.elasticsearch.action.admin.indices.stats.CommonStats;
 import org.elasticsearch.action.admin.indices.stats.IndexStats;
 import org.elasticsearch.cluster.health.ClusterIndexHealth;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.routing.IndexRoutingTable;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.util.set.Sets;
@@ -30,7 +30,7 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
     public static final String TYPE = "index_stats";
 
     private final IndexStats indexStats;
-    private final IndexMetadata metadata;
+    private final IndexMetaData metaData;
     private final IndexRoutingTable routingTable;
 
     IndexStatsMonitoringDoc(final String cluster,
@@ -38,11 +38,11 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
                             final long intervalMillis,
                             final MonitoringDoc.Node node,
                             @Nullable final IndexStats indexStats,
-                            final IndexMetadata metadata,
+                            final IndexMetaData metaData,
                             final IndexRoutingTable routingTable) {
         super(cluster, timestamp, intervalMillis, node, MonitoredSystem.ES, TYPE, null, XCONTENT_FILTERS);
         this.indexStats = indexStats;
-        this.metadata = Objects.requireNonNull(metadata);
+        this.metaData = Objects.requireNonNull(metaData);
         this.routingTable = Objects.requireNonNull(routingTable);
     }
 
@@ -50,8 +50,8 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
         return indexStats;
     }
 
-    IndexMetadata getIndexMetadata() {
-        return metadata;
+    IndexMetaData getIndexMetaData() {
+        return metaData;
     }
 
     IndexRoutingTable getIndexRoutingTable() {
@@ -60,19 +60,19 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
 
     @Override
     protected void innerToXContent(XContentBuilder builder, Params params) throws IOException {
-        final ClusterIndexHealth health = new ClusterIndexHealth(metadata, routingTable);
+        final ClusterIndexHealth health = new ClusterIndexHealth(metaData, routingTable);
 
         builder.startObject(TYPE);
         {
-            builder.field("index", metadata.getIndex().getName());
-            builder.field("uuid", metadata.getIndexUUID());
-            builder.field("created", metadata.getCreationDate());
+            builder.field("index", metaData.getIndex().getName());
+            builder.field("uuid", metaData.getIndexUUID());
+            builder.field("created", metaData.getCreationDate());
             builder.field("status", health.getStatus().name().toLowerCase(Locale.ROOT));
 
             builder.startObject("shards");
             {
-                final int total = metadata.getTotalNumberOfShards();
-                final int primaries = metadata.getNumberOfShards();
+                final int total = metaData.getTotalNumberOfShards();
+                final int primaries = metaData.getNumberOfShards();
                 final int activeTotal = health.getActiveShards();
                 final int activePrimaries = health.getActivePrimaryShards();
                 final int unassignedTotal = health.getUnassignedShards() + health.getInitializingShards();
@@ -80,7 +80,7 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
 
                 builder.field("total", total);
                 builder.field("primaries", primaries);
-                builder.field("replicas", metadata.getNumberOfReplicas());
+                builder.field("replicas", metaData.getNumberOfReplicas());
                 builder.field("active_total", activeTotal);
                 builder.field("active_primaries", activePrimaries);
                 builder.field("active_replicas", activeTotal - activePrimaries);
@@ -163,11 +163,6 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
                         "index_stats.primaries.store.size_in_bytes",
                         "index_stats.primaries.refresh.total_time_in_millis",
                         "index_stats.primaries.refresh.external_total_time_in_millis",
-                        "index_stats.primaries.bulk.total_operations",
-                        "index_stats.primaries.bulk.total_time_in_millis",
-                        "index_stats.primaries.bulk.total_size_in_bytes",
-                        "index_stats.primaries.bulk.avg_time_in_millis",
-                        "index_stats.primaries.bulk.avg_size_in_bytes",
                         "index_stats.total.docs.count",
                         "index_stats.total.fielddata.memory_size_in_bytes",
                         "index_stats.total.fielddata.evictions",
@@ -198,10 +193,5 @@ public class IndexStatsMonitoringDoc extends FilteredMonitoringDoc {
                         "index_stats.total.segments.fixed_bit_set_memory_in_bytes",
                         "index_stats.total.store.size_in_bytes",
                         "index_stats.total.refresh.total_time_in_millis",
-                        "index_stats.total.refresh.external_total_time_in_millis",
-                        "index_stats.total.bulk.total_operations",
-                        "index_stats.total.bulk.total_time_in_millis",
-                        "index_stats.total.bulk.total_size_in_bytes",
-                        "index_stats.total.bulk.avg_time_in_millis",
-                        "index_stats.total.bulk.avg_size_in_bytes");
+                        "index_stats.total.refresh.external_total_time_in_millis");
 }

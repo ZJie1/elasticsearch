@@ -22,10 +22,6 @@ public final class TimeUtils {
         // Do nothing
     }
 
-    /**
-     * @deprecated Please use {@link #parseTimeFieldToInstant(XContentParser, String)} instead.
-     */
-    @Deprecated
     public static Date parseTimeField(XContentParser parser, String fieldName) throws IOException {
         if (parser.currentToken() == XContentParser.Token.VALUE_NUMBER) {
             return new Date(parser.longValue());
@@ -40,7 +36,7 @@ public final class TimeUtils {
         if (parser.currentToken() == XContentParser.Token.VALUE_NUMBER) {
             return Instant.ofEpochMilli(parser.longValue());
         } else if (parser.currentToken() == XContentParser.Token.VALUE_STRING) {
-            return Instant.from(DateFieldMapper.DEFAULT_DATE_TIME_FORMATTER.parse(parser.text()));
+            return Instant.ofEpochMilli(dateStringToEpoch(parser.text()));
         }
         throw new IllegalArgumentException(
             "unexpected token [" + parser.currentToken() + "] for [" + fieldName + "]");
@@ -58,7 +54,6 @@ public final class TimeUtils {
      * @return The epoch time in milliseconds or -1 if the date cannot be
      *         parsed.
      */
-    @Deprecated
     public static long dateStringToEpoch(String date) {
         try {
             long epoch = Long.parseLong(date);

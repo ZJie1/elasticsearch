@@ -24,6 +24,7 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
 import java.io.IOException;
 import java.util.List;
@@ -51,8 +52,13 @@ public class InternalMedianAbsoluteDeviation extends InternalNumericMetricsAggre
     private final TDigestState valuesSketch;
     private final double medianAbsoluteDeviation;
 
-    InternalMedianAbsoluteDeviation(String name, Map<String, Object> metadata, DocValueFormat format, TDigestState valuesSketch) {
-        super(name, metadata);
+    InternalMedianAbsoluteDeviation(String name,
+                                           List<PipelineAggregator> pipelineAggregators,
+                                           Map<String, Object> metaData,
+                                           DocValueFormat format,
+                                           TDigestState valuesSketch) {
+
+        super(name, pipelineAggregators, metaData);
         this.format = Objects.requireNonNull(format);
         this.valuesSketch = Objects.requireNonNull(valuesSketch);
 
@@ -74,14 +80,14 @@ public class InternalMedianAbsoluteDeviation extends InternalNumericMetricsAggre
     }
 
     @Override
-    public InternalAggregation reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+    public InternalAggregation doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
         final TDigestState valueMerged = new TDigestState(valuesSketch.compression());
         for (InternalAggregation aggregation : aggregations) {
             final InternalMedianAbsoluteDeviation madAggregation = (InternalMedianAbsoluteDeviation) aggregation;
             valueMerged.add(madAggregation.valuesSketch);
         }
 
-        return new InternalMedianAbsoluteDeviation(name, metadata, format, valueMerged);
+        return new InternalMedianAbsoluteDeviation(name, pipelineAggregators(), metaData, format, valueMerged);
     }
 
     @Override

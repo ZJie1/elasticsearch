@@ -47,31 +47,26 @@ public class LicenseOperationModeTests extends ESTestCase {
         assertResolve(OperationMode.PLATINUM, "PlAtINum", "platinum");
     }
 
-    public void testResolveEnterprise() {
-        assertResolve(OperationMode.ENTERPRISE, License.LicenseType.ENTERPRISE.getTypeName());
-        assertResolve(OperationMode.ENTERPRISE, License.LicenseType.ENTERPRISE.name());
-    }
-
     public void testResolveUnknown() {
-        String[] types = { "unknown", "fake", "commercial" };
+        // 'enterprise' is a type that exists in cloud but should be rejected under normal operation
+        // See https://github.com/elastic/x-plugins/issues/3371
+        String[] types = { "unknown", "fake", "enterprise" };
 
         for (String type : types) {
             try {
-                final License.LicenseType licenseType = License.LicenseType.resolve(type);
-                OperationMode.resolve(licenseType);
+                OperationMode.resolve(type);
 
                 fail(String.format(Locale.ROOT, "[%s] should not be recognized as an operation mode", type));
             }
             catch (IllegalArgumentException e) {
-                assertThat(e.getMessage(), equalTo("unknown license type [" + type + "]"));
+                assertThat(e.getMessage(), equalTo("unknown type [" + type + "]"));
             }
         }
     }
 
     private static void assertResolve(OperationMode expected, String... types) {
         for (String type : types) {
-            License.LicenseType licenseType = License.LicenseType.resolve(type);
-            assertThat(OperationMode.resolve(licenseType), equalTo(expected));
+            assertThat(OperationMode.resolve(type), equalTo(expected));
         }
     }
 }

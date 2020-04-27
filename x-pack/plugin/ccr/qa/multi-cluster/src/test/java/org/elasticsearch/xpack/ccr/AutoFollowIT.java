@@ -8,6 +8,8 @@ package org.elasticsearch.xpack.ccr;
 
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RestClient;
+import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.settings.Settings;
 
 import java.io.IOException;
 import java.util.Map;
@@ -31,8 +33,12 @@ public class AutoFollowIT extends ESCCRRestTestCase {
         putPatternRequest.setJsonEntity("{\"leader_index_patterns\": [\"logs-*\"], \"remote_cluster\": \"middle_cluster\"}");
         assertOK(client().performRequest(putPatternRequest));
         try (RestClient leaderClient = buildLeaderClient()) {
+            Settings settings = Settings.builder()
+                .put("index.soft_deletes.enabled", true)
+                .build();
             Request request = new Request("PUT", "/logs-20190101");
-            request.setJsonEntity("{\"mappings\": {\"properties\": {\"field\": {\"type\": \"keyword\"}}}}");
+            request.setJsonEntity("{\"settings\": " + Strings.toString(settings) +
+                ", \"mappings\": {\"properties\": {\"field\": {\"type\": \"keyword\"}}}}");
             assertOK(leaderClient.performRequest(request));
             for (int i = 0; i < 5; i++) {
                 String id = Integer.toString(i);
@@ -40,8 +46,12 @@ public class AutoFollowIT extends ESCCRRestTestCase {
             }
         }
         try (RestClient middleClient = buildMiddleClient()) {
+            Settings settings = Settings.builder()
+                .put("index.soft_deletes.enabled", true)
+                .build();
             Request request = new Request("PUT", "/logs-20200101");
-            request.setJsonEntity("{\"mappings\": {\"properties\": {\"field\": {\"type\": \"keyword\"}}}}");
+            request.setJsonEntity("{\"settings\": " + Strings.toString(settings) +
+                ", \"mappings\": {\"properties\": {\"field\": {\"type\": \"keyword\"}}}}");
             assertOK(middleClient.performRequest(request));
             for (int i = 0; i < 5; i++) {
                 String id = Integer.toString(i);
@@ -70,8 +80,12 @@ public class AutoFollowIT extends ESCCRRestTestCase {
         assertOK(client().performRequest(request));
 
         try (RestClient leaderClient = buildLeaderClient()) {
+            Settings settings = Settings.builder()
+                .put("index.soft_deletes.enabled", true)
+                .build();
             request = new Request("PUT", "/metrics-20210101");
-            request.setJsonEntity("{\"mappings\": {\"properties\": {\"field\": {\"type\": \"keyword\"}}}}");
+            request.setJsonEntity("{\"settings\": " + Strings.toString(settings) +
+                ", \"mappings\": {\"properties\": {\"field\": {\"type\": \"keyword\"}}}}");
             assertOK(leaderClient.performRequest(request));
 
             for (int i = 0; i < 5; i++) {

@@ -27,7 +27,6 @@ import org.elasticsearch.test.rest.yaml.Features;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -99,30 +98,33 @@ public class SkipSection {
 
     public static final SkipSection EMPTY = new SkipSection();
 
-    private final List<VersionRange> versionRanges;
+    private final Version lowerVersion;
+    private final Version upperVersion;
     private final List<String> features;
     private final String reason;
 
     private SkipSection() {
-        this.versionRanges = new ArrayList<>();
+        this.lowerVersion = null;
+        this.upperVersion = null;
         this.features = new ArrayList<>();
         this.reason = null;
     }
 
     public SkipSection(String versionRange, List<String> features, String reason) {
         assert features != null;
-        this.versionRanges = parseVersionRanges(versionRange);
-        assert versionRanges.isEmpty() == false;
+        Version[] versions = parseVersionRange(versionRange);
+        this.lowerVersion = versions[0];
+        this.upperVersion = versions[1];
         this.features = features;
         this.reason = reason;
     }
 
     public Version getLowerVersion() {
-        return versionRanges.get(0).getLower();
+        return lowerVersion;
     }
 
     public Version getUpperVersion() {
-        return versionRanges.get(versionRanges.size() - 1).getUpper();
+        return upperVersion;
     }
 
     public List<String> getFeatures() {
@@ -137,8 +139,10 @@ public class SkipSection {
         if (isEmpty()) {
             return false;
         }
-        boolean skip = versionRanges.stream().anyMatch(range -> range.contains(currentVersion));
-        return skip || Features.areAllSupported(features) == false;
+        boolean skip = lowerVersion != null && upperVersion != null && currentVersion.onOrAfter(lowerVersion)
+            && currentVersion.onOrBefore(upperVersion);
+        skip |= Features.areAllSupported(features) == false;
+        return skip;
     }
 
     public boolean isVersionCheck() {
@@ -149,30 +153,24 @@ public class SkipSection {
         return EMPTY.equals(this);
     }
 
-    static List<VersionRange> parseVersionRanges(String rawRanges) {
-        if (rawRanges == null) {
-            return Collections.singletonList(new VersionRange(null, null));
+    static Version[] parseVersionRange(String versionRange) {
+        if (versionRange == null) {
+            return new Version[] { null, null };
         }
-        if (rawRanges.trim().equals("all")) {
-            return Collections.singletonList(new VersionRange(VersionUtils.getFirstVersion(), Version.CURRENT));
+        if (versionRange.trim().equals("all")) {
+            return new Version[]{VersionUtils.getFirstVersion(), Version.CURRENT};
         }
-        String[] ranges = rawRanges.split(",");
-        List<VersionRange> versionRanges = new ArrayList<>();
-        for (String rawRange : ranges) {
-            String[] skipVersions = rawRange.split("-", -1);
-            if (skipVersions.length > 2) {
-                throw new IllegalArgumentException("version range malformed: " + rawRanges);
-            }
+        String[] skipVersions = versionRange.split("-");
+        if (skipVersions.length > 2) {
+            throw new IllegalArgumentException("version range malformed: " + versionRange);
+        }
 
-            String lower = skipVersions[0].trim();
-            String upper = skipVersions[1].trim();
-            VersionRange versionRange = new VersionRange(
-                lower.isEmpty() ? VersionUtils.getFirstVersion() : Version.fromString(lower),
-                upper.isEmpty() ? Version.CURRENT : Version.fromString(upper)
-            );
-            versionRanges.add(versionRange);
-        }
-        return versionRanges;
+        String lower = skipVersions[0].trim();
+        String upper = skipVersions[1].trim();
+        return new Version[] {
+            lower.isEmpty() ? VersionUtils.getFirstVersion() : Version.fromString(lower),
+            upper.isEmpty() ? Version.CURRENT : Version.fromString(upper)
+        };
     }
 
     public String getSkipMessage(String description) {

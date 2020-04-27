@@ -18,7 +18,7 @@ Sends data to an anomaly detection job for analysis.
 
 * If the {es} {security-features} are enabled, you must have `manage_ml` or
 `manage` cluster privileges to use this API. See
-<<security-privileges>>.
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ml-post-data-desc]]
 ==== {api-description-title}
@@ -37,10 +37,10 @@ and upload each one separately in sequential time order. When running in
 real time, it is generally recommended that you perform many small uploads,
 rather than queueing data to upload larger files.
 
-When uploading data, check the job data counts for progress.
-The following documents will not be processed:
+When uploading data, check the <<ml-datacounts,job data counts>> for progress.
+The following records will not be processed:
 
-* Documents not in chronological order and outside the latency window
+* Records not in chronological order and outside the latency window
 * Records with an invalid timestamp
 
 //TBD link to Working with Out of Order timeseries concept doc
@@ -53,8 +53,7 @@ or a comma-separated list.
 ==== {api-path-parms-title}
 
 `<job_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=job-id-anomaly-detection]
+		(Required, string) Identifier for the job.
 
 [[ml-post-data-query-parms]]
 ==== {api-query-parms-title}
@@ -109,4 +108,4 @@ the job. For example:
 }
 ----
 
-For more information about these properties, see <<ml-get-job-stats-results>>.
+For more information about these properties, see <<ml-jobstats,Job Stats>>.

@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
@@ -45,10 +44,9 @@ class NativeAutodetectProcess extends AbstractNativeProcess implements Autodetec
 
     NativeAutodetectProcess(String jobId, NativeController nativeController, InputStream logStream, OutputStream processInStream,
                             InputStream processOutStream, OutputStream processRestoreStream, int numberOfFields, List<Path> filesToDelete,
-                            ProcessResultsParser<AutodetectResult> resultsParser, Consumer<String> onProcessCrash,
-                            Duration processConnectTimeout) {
+                            ProcessResultsParser<AutodetectResult> resultsParser, Consumer<String> onProcessCrash) {
         super(jobId, nativeController, logStream, processInStream, processOutStream, processRestoreStream, numberOfFields, filesToDelete,
-            onProcessCrash, processConnectTimeout);
+            onProcessCrash);
         this.resultsParser = resultsParser;
     }
 

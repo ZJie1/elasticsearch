@@ -43,8 +43,6 @@ import org.elasticsearch.index.analysis.NamedAnalyzer;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.plain.DocValuesIndexFieldData;
 import org.elasticsearch.index.query.QueryShardContext;
-import org.elasticsearch.search.aggregations.support.CoreValuesSourceType;
-import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -204,7 +202,6 @@ public final class KeywordFieldMapper extends FieldMapper {
             this.splitQueriesOnWhitespace = ref.splitQueriesOnWhitespace;
         }
 
-        @Override
         public KeywordFieldType clone() {
             return new KeywordFieldType(this);
         }
@@ -275,11 +272,6 @@ public final class KeywordFieldMapper extends FieldMapper {
         }
 
         @Override
-        public ValuesSourceType getValuesSourceType() {
-            return CoreValuesSourceType.BYTES;
-        }
-
-        @Override
         public Object valueForDisplay(Object value) {
             if (value == null) {
                 return null;
@@ -322,7 +314,8 @@ public final class KeywordFieldMapper extends FieldMapper {
 
     /** Values that have more chars than the return value of this method will
      *  be skipped at parsing time. */
-    public int ignoreAbove() {
+    // pkg-private for testing
+    int ignoreAbove() {
         return ignoreAbove;
     }
 

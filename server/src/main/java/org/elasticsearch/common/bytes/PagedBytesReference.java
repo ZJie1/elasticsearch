@@ -25,13 +25,12 @@ import org.elasticsearch.common.util.ByteArray;
 import org.elasticsearch.common.util.PageCacheRecycler;
 
 import java.io.IOException;
-import java.util.Objects;
 
 /**
  * A page based bytes reference, internally holding the bytes in a paged
  * data structure.
  */
-public class PagedBytesReference extends AbstractBytesReference {
+public class PagedBytesReference extends BytesReference {
 
     private static final int PAGE_SIZE = PageCacheRecycler.BYTE_PAGE_SIZE;
 
@@ -61,7 +60,10 @@ public class PagedBytesReference extends AbstractBytesReference {
 
     @Override
     public BytesReference slice(int from, int length) {
-        Objects.checkFromIndexSize(from, length, this.length);
+        if (from < 0 || (from + length) > length()) {
+            throw new IllegalArgumentException("can't slice a buffer with length [" + length() +
+                "], with slice parameters from [" + from + "], length [" + length + "]");
+        }
         return new PagedBytesReference(byteArray, offset + from, length);
     }
 

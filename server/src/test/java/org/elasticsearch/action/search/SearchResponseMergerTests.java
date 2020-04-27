@@ -32,6 +32,7 @@ import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.SearchShardTarget;
+import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.range.InternalDateRange;
 import org.elasticsearch.search.aggregations.bucket.range.Range;
@@ -63,9 +64,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonList;
-import static org.elasticsearch.test.InternalAggregationTestCase.emptyReduceContextBuilder;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
@@ -96,12 +94,12 @@ public class SearchResponseMergerTests extends ESTestCase {
     }
 
     public void testMergeTookInMillis() throws InterruptedException {
-        long currentRelativeTime = randomNonNegativeLong();
+        long currentRelativeTime = randomLong();
         SearchTimeProvider timeProvider = new SearchTimeProvider(randomLong(), 0, () -> currentRelativeTime);
         SearchResponseMerger merger = new SearchResponseMerger(randomIntBetween(0, 1000), randomIntBetween(0, 10000),
-            SearchContext.TRACK_TOTAL_HITS_ACCURATE, timeProvider, emptyReduceContextBuilder());
+            SearchContext.TRACK_TOTAL_HITS_ACCURATE, timeProvider, flag -> null);
         for (int i = 0; i < numResponses; i++) {
-            SearchResponse searchResponse = new SearchResponse(InternalSearchResponse.empty(), null, 1, 1, 0, randomNonNegativeLong(),
+            SearchResponse searchResponse = new SearchResponse(InternalSearchResponse.empty(), null, 1, 1, 0, randomLong(),
                 ShardSearchFailure.EMPTY_ARRAY, SearchResponseTests.randomClusters());
             addResponse(merger, searchResponse);
         }
@@ -113,7 +111,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeShardFailures() throws InterruptedException {
         SearchTimeProvider searchTimeProvider = new SearchTimeProvider(0, 0, () -> 0);
         SearchResponseMerger merger = new SearchResponseMerger(0, 0, SearchContext.TRACK_TOTAL_HITS_ACCURATE,
-            searchTimeProvider, emptyReduceContextBuilder());
+            searchTimeProvider, flag -> null);
         PriorityQueue<Tuple<SearchShardTarget, ShardSearchFailure>> priorityQueue = new PriorityQueue<>(Comparator.comparing(Tuple::v1,
             (o1, o2) -> {
                 int compareTo = o1.getShardId().compareTo(o2.getShardId());
@@ -161,7 +159,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeShardFailuresNullShardTarget() throws InterruptedException {
         SearchTimeProvider searchTimeProvider = new SearchTimeProvider(0, 0, () -> 0);
         SearchResponseMerger merger = new SearchResponseMerger(0, 0, SearchContext.TRACK_TOTAL_HITS_ACCURATE,
-            searchTimeProvider, emptyReduceContextBuilder());
+            searchTimeProvider, flag -> null);
         PriorityQueue<Tuple<ShardId, ShardSearchFailure>> priorityQueue = new PriorityQueue<>(Comparator.comparing(Tuple::v1));
         for (int i = 0; i < numResponses; i++) {
             int numFailures = randomIntBetween(1, 10);
@@ -199,7 +197,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeShardFailuresNullShardId() throws InterruptedException {
         SearchTimeProvider searchTimeProvider = new SearchTimeProvider(0, 0, () -> 0);
         SearchResponseMerger merger = new SearchResponseMerger(0, 0, SearchContext.TRACK_TOTAL_HITS_ACCURATE,
-            searchTimeProvider, emptyReduceContextBuilder());
+            searchTimeProvider, flag -> null);
         List<ShardSearchFailure> expectedFailures = new ArrayList<>();
         for (int i = 0; i < numResponses; i++) {
             int numFailures = randomIntBetween(1, 50);
@@ -222,7 +220,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeProfileResults() throws InterruptedException {
         SearchTimeProvider searchTimeProvider = new SearchTimeProvider(0, 0, () -> 0);
         SearchResponseMerger merger = new SearchResponseMerger(0, 0, SearchContext.TRACK_TOTAL_HITS_ACCURATE,
-            searchTimeProvider, emptyReduceContextBuilder());
+            searchTimeProvider, flag -> null);
         Map<String, ProfileShardResult> expectedProfile = new HashMap<>();
         for (int i = 0; i < numResponses; i++) {
             SearchProfileShardResults profile = SearchProfileShardResultsTests.createTestItem();
@@ -249,8 +247,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeCompletionSuggestions()  throws InterruptedException {
         String suggestionName = randomAlphaOfLengthBetween(4, 8);
         int size = randomIntBetween(1, 100);
-        SearchResponseMerger searchResponseMerger = new SearchResponseMerger(0, 0, 0, new SearchTimeProvider(0, 0, () -> 0),
-                emptyReduceContextBuilder());
+        SearchResponseMerger searchResponseMerger = new SearchResponseMerger(0, 0, 0, new SearchTimeProvider(0, 0, () -> 0), flag -> null);
         for (int i = 0; i < numResponses; i++) {
             List<Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>>> suggestions =
                 new ArrayList<>();
@@ -299,8 +296,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeCompletionSuggestionsTieBreak()  throws InterruptedException {
         String suggestionName = randomAlphaOfLengthBetween(4, 8);
         int size = randomIntBetween(1, 100);
-        SearchResponseMerger searchResponseMerger = new SearchResponseMerger(0, 0, 0, new SearchTimeProvider(0, 0, () -> 0),
-                emptyReduceContextBuilder());
+        SearchResponseMerger searchResponseMerger = new SearchResponseMerger(0, 0, 0, new SearchTimeProvider(0, 0, () -> 0), flag -> null);
         for (int i = 0; i < numResponses; i++) {
             List<Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>>> suggestions =
                 new ArrayList<>();
@@ -355,7 +351,7 @@ public class SearchResponseMergerTests extends ESTestCase {
 
     public void testMergeAggs() throws InterruptedException {
         SearchResponseMerger searchResponseMerger = new SearchResponseMerger(0, 0, 0, new SearchTimeProvider(0, 0, () -> 0),
-                emptyReduceContextBuilder());
+            flag -> new InternalAggregation.ReduceContext(null, null, flag));
         String maxAggName = randomAlphaOfLengthBetween(5, 8);
         String rangeAggName = randomAlphaOfLengthBetween(5, 8);
         int totalCount = 0;
@@ -363,13 +359,14 @@ public class SearchResponseMergerTests extends ESTestCase {
         for (int i = 0; i < numResponses; i++) {
             double value = randomDouble();
             maxValue = Math.max(value, maxValue);
-            InternalMax max = new InternalMax(maxAggName, value, DocValueFormat.RAW, Collections.emptyMap());
+            InternalMax max = new InternalMax(maxAggName, value, DocValueFormat.RAW, Collections.emptyList(), Collections.emptyMap());
             InternalDateRange.Factory factory = new InternalDateRange.Factory();
             int count = randomIntBetween(1, 1000);
             totalCount += count;
             InternalDateRange.Bucket bucket = factory.createBucket("bucket", 0, 10000, count, InternalAggregations.EMPTY,
                 false, DocValueFormat.RAW);
-            InternalDateRange range = factory.create(rangeAggName, singletonList(bucket), DocValueFormat.RAW, false, emptyMap());
+            InternalDateRange range = factory.create(rangeAggName, Collections.singletonList(bucket), DocValueFormat.RAW, false,
+                Collections.emptyList(), Collections.emptyMap());
             InternalAggregations aggs = new InternalAggregations(Arrays.asList(range, max));
             SearchHits searchHits = new SearchHits(new SearchHit[0], null, Float.NaN);
             InternalSearchResponse internalSearchResponse = new InternalSearchResponse(searchHits, aggs, null, null, false, null, 1);
@@ -400,7 +397,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     }
 
     public void testMergeSearchHits() throws InterruptedException {
-        final long currentRelativeTime = randomNonNegativeLong();
+        final long currentRelativeTime = randomLong();
         final SearchTimeProvider timeProvider = new SearchTimeProvider(randomLong(), 0, () -> currentRelativeTime);
         final int size = randomIntBetween(0, 100);
         final int from = size > 0 ? randomIntBetween(0, 100) : 0;
@@ -432,8 +429,7 @@ public class SearchResponseMergerTests extends ESTestCase {
         TotalHits.Relation totalHitsRelation = randomTrackTotalHits.v2();
 
         PriorityQueue<SearchHit> priorityQueue = new PriorityQueue<>(new SearchHitComparator(sortFields));
-        SearchResponseMerger searchResponseMerger = new SearchResponseMerger(
-                from, size, trackTotalHitsUpTo, timeProvider, emptyReduceContextBuilder());
+        SearchResponseMerger searchResponseMerger = new SearchResponseMerger(from, size, trackTotalHitsUpTo, timeProvider, flag -> null);
 
         TotalHits expectedTotalHits = null;
         int expectedTotal = 0;
@@ -558,9 +554,9 @@ public class SearchResponseMergerTests extends ESTestCase {
     }
 
     public void testMergeNoResponsesAdded() {
-        long currentRelativeTime = randomNonNegativeLong();
+        long currentRelativeTime = randomLong();
         final SearchTimeProvider timeProvider = new SearchTimeProvider(randomLong(), 0, () -> currentRelativeTime);
-        SearchResponseMerger merger = new SearchResponseMerger(0, 10, Integer.MAX_VALUE, timeProvider, emptyReduceContextBuilder());
+        SearchResponseMerger merger = new SearchResponseMerger(0, 10, Integer.MAX_VALUE, timeProvider, flag -> null);
         SearchResponse.Clusters clusters = SearchResponseTests.randomClusters();
         assertEquals(0, merger.numResponses());
         SearchResponse response = merger.getMergedResponse(clusters);
@@ -587,7 +583,7 @@ public class SearchResponseMergerTests extends ESTestCase {
     public void testMergeEmptySearchHitsWithNonEmpty() {
         long currentRelativeTime = randomLong();
         final SearchTimeProvider timeProvider = new SearchTimeProvider(randomLong(), 0, () -> currentRelativeTime);
-        SearchResponseMerger merger = new SearchResponseMerger(0, 10, Integer.MAX_VALUE, timeProvider, emptyReduceContextBuilder());
+        SearchResponseMerger merger = new SearchResponseMerger(0, 10, Integer.MAX_VALUE, timeProvider, flag -> null);
         SearchResponse.Clusters clusters = SearchResponseTests.randomClusters();
         int numFields = randomIntBetween(1, 3);
         SortField[] sortFields = new SortField[numFields];
@@ -630,7 +626,7 @@ public class SearchResponseMergerTests extends ESTestCase {
         Tuple<Integer, TotalHits.Relation> randomTrackTotalHits = randomTrackTotalHits();
         int trackTotalHitsUpTo = randomTrackTotalHits.v1();
         TotalHits.Relation totalHitsRelation = randomTrackTotalHits.v2();
-        SearchResponseMerger merger = new SearchResponseMerger(0, 10, trackTotalHitsUpTo, timeProvider, emptyReduceContextBuilder());
+        SearchResponseMerger merger = new SearchResponseMerger(0, 10, trackTotalHitsUpTo, timeProvider, flag -> null);
         int numResponses = randomIntBetween(1, 5);
         TotalHits expectedTotalHits = null;
         for (int i = 0; i < numResponses; i++) {

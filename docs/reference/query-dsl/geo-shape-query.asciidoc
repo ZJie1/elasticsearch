@@ -4,9 +4,9 @@
 <titleabbrev>Geo-shape</titleabbrev>
 ++++
 
-Filter documents indexed using the `geo_shape` or `geo_point` type.
+Filter documents indexed using the `geo_shape` type.
 
-Requires the <<geo-shape,`geo_shape` Mapping>> or the <<geo-point,`geo_point` Mapping>>.
+Requires the <<geo-shape,`geo_shape` Mapping>>.
 
 The `geo_shape` query uses the same grid square representation as the
 `geo_shape` mapping to find documents that have a shape that intersects
@@ -25,7 +25,7 @@ http://www.geojson.org[GeoJSON] to represent shapes.
 
 Given the following index:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /example
 {
@@ -47,12 +47,13 @@ POST /example/_doc?refresh
     }
 }
 --------------------------------------------------
+// CONSOLE
 // TESTSETUP
 
 The following query will find the point using the Elasticsearch's
 `envelope` GeoJSON extension:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /example/_search
 {
@@ -76,6 +77,7 @@ GET /example/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 ==== Pre-Indexed Shape
 
@@ -96,7 +98,7 @@ Defaults to 'shape'.
 The following is an example of using the Filter with a pre-indexed
 shape:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /shapes
 {
@@ -136,13 +138,14 @@ GET /example/_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 ==== Spatial Relations
 
 The <<spatial-strategy, geo_shape strategy>> mapping parameter determines
 which spatial relation operators may be used at search time.
 
-The following is a complete list of spatial relation operators available when searching a field of type `geo_shape`:
+The following is a complete list of spatial relation operators available:
 
 * `INTERSECTS` - (default) Return all documents whose `geo_shape` field
 intersects the query geometry.
@@ -151,12 +154,8 @@ has nothing in common with the query geometry.
 * `WITHIN` - Return all documents whose `geo_shape` field
 is within the query geometry.
 * `CONTAINS` - Return all documents whose `geo_shape` field
-contains the query geometry.
-
-When searching a field of type `geo_point` there is a single supported spatial relation operator:
-
-* `INTERSECTS` - (default) Return all documents whose `geo_point` field
-intersects the query geometry.
+contains the query geometry. Note: this is only supported using the
+`recursive` Prefix Tree Strategy deprecated[6.6]
 
 [float]
 ==== Ignore Unmapped
@@ -166,16 +165,3 @@ and will not match any documents for this query. This can be useful when
 querying multiple indexes which might have different mappings. When set to
 `false` (the default value) the query will throw an exception if the field
 is not mapped.
-
-==== Shape Types supported for Geo-Point
-
-When searching a field of type `geo_point` the following shape types are not supported:
-
-* `POINT`
-* `LINE`
-* `MULTIPOINT`
-* `MULTILINE`
-
-==== Notes
-Geo-shape queries on geo-shapes implemented with <<prefix-trees, `PrefixTrees`>> will not be executed if
-<<query-dsl-allow-expensive-queries, `search.allow_expensive_queries`>> is set to false.

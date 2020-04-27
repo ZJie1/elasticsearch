@@ -25,7 +25,6 @@ import java.util.function.Supplier;
 
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
 import org.elasticsearch.common.network.NetworkService;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.PageCacheRecycler;
@@ -74,8 +73,7 @@ public interface NetworkPlugin {
                                                                          CircuitBreakerService circuitBreakerService,
                                                                          NamedXContentRegistry xContentRegistry,
                                                                          NetworkService networkService,
-                                                                         HttpServerTransport.Dispatcher dispatcher,
-                                                                         ClusterSettings clusterSettings) {
+                                                                         HttpServerTransport.Dispatcher dispatcher) {
         return Collections.emptyMap();
     }
 }

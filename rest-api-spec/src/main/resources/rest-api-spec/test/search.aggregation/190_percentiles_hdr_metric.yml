@@ -309,7 +309,7 @@ setup:
                   number_of_significant_value_digits: null
 
   - do:
-      catch: bad_request
+      catch: /\[percents\] must not be empty/
       search:
         rest_total_hits_as_int: true
         body:

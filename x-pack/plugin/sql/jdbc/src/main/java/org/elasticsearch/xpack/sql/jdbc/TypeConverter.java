@@ -210,7 +210,6 @@ final class TypeConverter {
             case BOOLEAN:
             case TEXT:
             case KEYWORD:
-            case CONSTANT_KEYWORD:
                 return v; // These types are already represented correctly in JSON
             case BYTE:
                 return ((Number) v).byteValue(); // Parser might return it as integer or long - need to update to the correct type
@@ -249,7 +248,6 @@ final class TypeConverter {
                 return Duration.parse(v.toString());
             case GEO_POINT:
             case GEO_SHAPE:
-            case SHAPE:
                 try {
                     return WKT.fromWKT(v.toString());
                 } catch (IOException | ParseException ex) {
@@ -324,7 +322,6 @@ final class TypeConverter {
                 return Boolean.valueOf(Integer.signum(((Number) val).intValue()) != 0);
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 return Boolean.valueOf((String) val);
             default:
                 return failConversion(val, columnType, typeString, Boolean.class);
@@ -347,7 +344,6 @@ final class TypeConverter {
                 return safeToByte(safeToLong(((Number) val).doubleValue()));
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 try {
                     return Byte.valueOf((String) val);
                 } catch (NumberFormatException e) {
@@ -375,7 +371,6 @@ final class TypeConverter {
                 return safeToShort(safeToLong(((Number) val).doubleValue()));
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 try {
                     return Short.valueOf((String) val);
                 } catch (NumberFormatException e) {
@@ -402,7 +397,6 @@ final class TypeConverter {
                 return safeToInt(safeToLong(((Number) val).doubleValue()));
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 try {
                     return Integer.valueOf((String) val);
                 } catch (NumberFormatException e) {
@@ -434,7 +428,6 @@ final class TypeConverter {
             //    return ((Number) val).longValue();
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 try {
                     return Long.valueOf((String) val);
                 } catch (NumberFormatException e) {
@@ -462,7 +455,6 @@ final class TypeConverter {
                 return Float.valueOf(((Number) val).floatValue());
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 try {
                     return Float.valueOf((String) val);
                 } catch (NumberFormatException e) {
@@ -489,7 +481,6 @@ final class TypeConverter {
                 return Double.valueOf(((Number) val).doubleValue());
             case KEYWORD:
             case TEXT:
-            case CONSTANT_KEYWORD:
                 try {
                     return Double.valueOf((String) val);
                 } catch (NumberFormatException e) {

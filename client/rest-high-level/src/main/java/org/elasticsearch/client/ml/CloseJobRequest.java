@@ -18,7 +18,8 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
@@ -37,7 +38,7 @@ import java.util.Objects;
 /**
  * Request to close Machine Learning Jobs
  */
-public class CloseJobRequest implements ToXContentObject, Validatable {
+public class CloseJobRequest extends ActionRequest implements ToXContentObject {
 
     public static final ParseField JOB_ID = new ParseField("job_id");
     public static final ParseField TIMEOUT = new ParseField("timeout");
@@ -141,6 +142,11 @@ public class CloseJobRequest implements ToXContentObject, Validatable {
      */
     public void setAllowNoJobs(boolean allowNoJobs) {
         this.allowNoJobs = allowNoJobs;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

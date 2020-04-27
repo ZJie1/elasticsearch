@@ -23,6 +23,7 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
 import java.io.IOException;
 import java.util.List;
@@ -33,8 +34,9 @@ public class InternalWeightedAvg extends InternalNumericMetricsAggregation.Singl
     private final double sum;
     private final double weight;
 
-    InternalWeightedAvg(String name, double sum, double weight, DocValueFormat format, Map<String, Object> metadata) {
-        super(name, metadata);
+    InternalWeightedAvg(String name, double sum, double weight, DocValueFormat format, List<PipelineAggregator> pipelineAggregators,
+                            Map<String, Object> metaData) {
+        super(name, pipelineAggregators, metaData);
         this.sum = sum;
         this.weight = weight;
         this.format = format;
@@ -85,21 +87,38 @@ public class InternalWeightedAvg extends InternalNumericMetricsAggregation.Singl
     }
 
     @Override
-    public InternalWeightedAvg reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
-        CompensatedSum sumCompensation = new CompensatedSum(0, 0);
-        CompensatedSum weightCompensation = new CompensatedSum(0, 0);
-
+    public InternalWeightedAvg doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+        double weight = 0;
+        double sum = 0;
+        double sumCompensation = 0;
+        double weightCompensation = 0;
         // Compute the sum of double values with Kahan summation algorithm which is more
         // accurate than naive summation.
         for (InternalAggregation aggregation : aggregations) {
             InternalWeightedAvg avg = (InternalWeightedAvg) aggregation;
-            weightCompensation.add(avg.weight);
-            sumCompensation.add(avg.sum);
+            // If the weight is Inf or NaN, just add it to the running tally to "convert" to
+            // Inf/NaN.  This keeps the behavior bwc from before kahan summing
+            if (Double.isFinite(avg.weight) == false) {
+                weight += avg.weight;
+            } else if (Double.isFinite(weight)) {
+                double corrected = avg.weight - weightCompensation;
+                double newWeight = weight + corrected;
+                weightCompensation = (newWeight - weight) - corrected;
+                weight = newWeight;
+            }
+            // If the avg is Inf or NaN, just add it to the running tally to "convert" to
+            // Inf/NaN.  This keeps the behavior bwc from before kahan summing
+            if (Double.isFinite(avg.sum) == false) {
+                sum += avg.sum;
+            } else if (Double.isFinite(sum)) {
+                double corrected = avg.sum - sumCompensation;
+                double newSum = sum + corrected;
+                sumCompensation = (newSum - sum) - corrected;
+                sum = newSum;
+            }
         }
-
-        return new InternalWeightedAvg(getName(), sumCompensation.value(), weightCompensation.value(), format, getMetadata());
+        return new InternalWeightedAvg(getName(), sum, weight, format, pipelineAggregators(), getMetaData());
     }
-
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
         builder.field(CommonFields.VALUE.getPreferredName(), weight != 0 ? getValue() : null);

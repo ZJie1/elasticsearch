@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.ml.action;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.master.TransportMasterNodeReadAction;
@@ -26,8 +24,6 @@ import org.elasticsearch.xpack.ml.job.JobManager;
 import java.io.IOException;
 
 public class TransportGetJobsAction extends TransportMasterNodeReadAction<GetJobsAction.Request, GetJobsAction.Response> {
-
-    private static final Logger logger = LogManager.getLogger(TransportGetJobsAction.class);
 
     private final JobManager jobManager;
 

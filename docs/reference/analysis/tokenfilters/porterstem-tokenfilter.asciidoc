@@ -1,8 +1,5 @@
 [[analysis-porterstem-tokenfilter]]
-=== Porter stem token filter
-++++
-<titleabbrev>Porter stem</titleabbrev>
-++++
+=== Porter Stem Token Filter
 
 A token filter of type `porter_stem` that transforms the token stream as
 per the Porter stemming algorithm.

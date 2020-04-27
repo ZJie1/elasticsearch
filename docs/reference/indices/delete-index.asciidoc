@@ -6,10 +6,11 @@
 
 Deletes an existing index.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /twitter
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:twitter]
 
 
@@ -43,8 +44,6 @@ this setting in the `elasticsearch.yml` file or using the
 ==== {api-query-parms-title}
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=allow-no-indices]
-+
-Defaults to `true`.
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=expand-wildcards]
 +

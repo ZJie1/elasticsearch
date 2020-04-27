@@ -13,15 +13,16 @@ Creates a follower index.
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST /follower_index/_ccr/pause_follow
 --------------------------------------------------
+// CONSOLE
 // TEARDOWN
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /<follower_index>/_ccr/follow?wait_for_active_shards=1
 {
@@ -29,6 +30,7 @@ PUT /<follower_index>/_ccr/follow?wait_for_active_shards=1
   "leader_index" : "<leader_index>"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:remote_cluster_and_leader_index]
 // TEST[s/<follower_index>/follower_index/]
 // TEST[s/<remote_cluster>/remote_cluster/]
@@ -41,7 +43,8 @@ PUT /<follower_index>/_ccr/follow?wait_for_active_shards=1
 and `manage_follow_index` index privileges for the follower index. You must have
 `read` and `monitor` index privileges for the leader index. You must also have
 `manage_ccr` cluster privileges on the cluster that contains the follower index.
-For more information, see <<security-privileges>>.
+For more information, see
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ccr-put-follow-desc]]
 ==== {api-description-title}
@@ -84,7 +87,7 @@ include::../follow-request-body.asciidoc[]
 
 This example creates a follower index named `follower_index`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /follower_index/_ccr/follow?wait_for_active_shards=1
 {
@@ -102,11 +105,12 @@ PUT /follower_index/_ccr/follow?wait_for_active_shards=1
   "read_poll_timeout" : "30s"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:remote_cluster_and_leader_index]
 
 The API returns the following result:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "follow_index_created" : true,
@@ -114,3 +118,4 @@ The API returns the following result:
   "index_following_started" : true
 }
 --------------------------------------------------
+// TESTRESPONSE

@@ -73,7 +73,7 @@ public class SimpleMockNioTransportTests extends AbstractSimpleTransportTestCase
 
     public void testConnectException() throws UnknownHostException {
         try {
-            connectToNode(serviceA, new DiscoveryNode("C", new TransportAddress(InetAddress.getByName("localhost"), 9876),
+            serviceA.connectToNode(new DiscoveryNode("C", new TransportAddress(InetAddress.getByName("localhost"), 9876),
                 emptyMap(), emptySet(),Version.CURRENT));
             fail("Expected ConnectTransportException");
         } catch (ConnectTransportException e) {

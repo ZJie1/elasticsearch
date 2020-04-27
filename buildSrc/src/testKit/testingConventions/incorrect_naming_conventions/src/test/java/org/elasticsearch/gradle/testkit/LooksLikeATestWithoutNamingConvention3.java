@@ -18,6 +18,9 @@
  */
 package org.elasticsearch.gradle.testkit;
 
+import org.junit.Assert;
+import org.junit.Test;
+
 public class LooksLikeATestWithoutNamingConvention3 {
 
     public void testMethod() {

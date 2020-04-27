@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.elasticsearch.client.tasks;
 
 import org.elasticsearch.common.ParseField;
@@ -30,16 +31,16 @@ public class GetTaskResponse {
     private final TaskInfo taskInfo;
     public static final ParseField COMPLETED = new ParseField("completed");
     public static final ParseField TASK = new ParseField("task");
-
+    
     public GetTaskResponse(boolean completed, TaskInfo taskInfo) {
         this.completed = completed;
         this.taskInfo = taskInfo;
     }
-
+    
     public boolean isCompleted() {
         return completed;
     }
-
+    
     public TaskInfo getTaskInfo() {
         return taskInfo;
     }
@@ -49,9 +50,9 @@ public class GetTaskResponse {
     static {
         PARSER.declareBoolean(constructorArg(), COMPLETED);
         PARSER.declareObject(constructorArg(), (p, c) -> TaskInfo.fromXContent(p), TASK);
-    }
+    }    
 
     public static GetTaskResponse fromXContent(XContentParser parser) {
         return PARSER.apply(parser, null);
-    }
+    }    
 }

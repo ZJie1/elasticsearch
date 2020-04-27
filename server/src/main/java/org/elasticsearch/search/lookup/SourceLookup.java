@@ -36,7 +36,7 @@ import java.util.Set;
 
 import static java.util.Collections.emptyMap;
 
-public class SourceLookup implements Map<String, Object> {
+public class SourceLookup implements Map {
 
     private LeafReader reader;
 
@@ -132,6 +132,10 @@ public class SourceLookup implements Map<String, Object> {
         return context.getFilter().apply(loadSourceIfNeeded());
     }
 
+    public Object extractValue(String path) {
+        return XContentMapValues.extractValue(path, loadSourceIfNeeded());
+    }
+
     @Override
     public Object get(Object key) {
         return loadSourceIfNeeded().get(key);
@@ -158,22 +162,22 @@ public class SourceLookup implements Map<String, Object> {
     }
 
     @Override
-    public Set<String> keySet() {
+    public Set keySet() {
         return loadSourceIfNeeded().keySet();
     }
 
     @Override
-    public Collection<Object> values() {
+    public Collection values() {
         return loadSourceIfNeeded().values();
     }
 
     @Override
-    public Set<Map.Entry<String, Object>> entrySet() {
+    public Set entrySet() {
         return loadSourceIfNeeded().entrySet();
     }
 
     @Override
-    public Object put(String key, Object value) {
+    public Object put(Object key, Object value) {
         throw new UnsupportedOperationException();
     }
 
@@ -183,7 +187,6 @@ public class SourceLookup implements Map<String, Object> {
     }
 
     @Override
-    @SuppressWarnings("rawtypes")
     public void putAll(Map m) {
         throw new UnsupportedOperationException();
     }

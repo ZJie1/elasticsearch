@@ -35,7 +35,6 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.threadpool.ThreadPool.Names;
 import org.elasticsearch.transport.ConnectTransportException;
 import org.elasticsearch.transport.NodeDisconnectedException;
-import org.elasticsearch.transport.Transport;
 import org.elasticsearch.transport.TransportConnectionListener;
 import org.elasticsearch.transport.TransportException;
 import org.elasticsearch.transport.TransportRequest;
@@ -63,7 +62,7 @@ public class LeaderChecker {
 
     private static final Logger logger = LogManager.getLogger(LeaderChecker.class);
 
-    static final String LEADER_CHECK_ACTION_NAME = "internal:coordination/fault_detection/leader_check";
+    public static final String LEADER_CHECK_ACTION_NAME = "internal:coordination/fault_detection/leader_check";
 
     // the time between checks sent to the leader
     public static final Setting<TimeValue> LEADER_CHECK_INTERVAL_SETTING =
@@ -89,7 +88,7 @@ public class LeaderChecker {
 
     private volatile DiscoveryNodes discoveryNodes;
 
-    LeaderChecker(final Settings settings, final TransportService transportService, final Consumer<Exception> onLeaderFailure) {
+    public LeaderChecker(final Settings settings, final TransportService transportService, final Consumer<Exception> onLeaderFailure) {
         leaderCheckInterval = LEADER_CHECK_INTERVAL_SETTING.get(settings);
         leaderCheckTimeout = LEADER_CHECK_TIMEOUT_SETTING.get(settings);
         leaderCheckRetryCount = LEADER_CHECK_RETRY_COUNT_SETTING.get(settings);
@@ -104,7 +103,7 @@ public class LeaderChecker {
 
         transportService.addConnectionListener(new TransportConnectionListener() {
             @Override
-            public void onNodeDisconnected(DiscoveryNode node, Transport.Connection connection) {
+            public void onNodeDisconnected(DiscoveryNode node) {
                 handleDisconnectedNode(node);
             }
         });
@@ -120,7 +119,7 @@ public class LeaderChecker {
      *
      * @param leader the node to be checked as leader, or null if checks should be disabled
      */
-    void updateLeader(@Nullable final DiscoveryNode leader) {
+    public void updateLeader(@Nullable final DiscoveryNode leader) {
         assert transportService.getLocalNode().equals(leader) == false;
         final CheckScheduler checkScheduler;
         if (leader != null) {
@@ -140,8 +139,12 @@ public class LeaderChecker {
     /**
      * Update the "known" discovery nodes. Should be called on the leader before a new cluster state is published to reflect the new
      * publication targets, and also called if a leader becomes a non-leader.
+     * TODO if heartbeats can make nodes become followers then this needs to be called before a heartbeat is sent to a new node too.
+     * <p>
+     * isLocalNodeElectedMaster() should reflect whether this node is a leader, and nodeExists()
+     * should indicate whether nodes are known publication targets or not.
      */
-    void setCurrentNodes(DiscoveryNodes discoveryNodes) {
+    public void setCurrentNodes(DiscoveryNodes discoveryNodes) {
         logger.trace("setCurrentNodes: {}", discoveryNodes);
         this.discoveryNodes = discoveryNodes;
     }
@@ -156,13 +159,11 @@ public class LeaderChecker {
         assert discoveryNodes != null;
 
         if (discoveryNodes.isLocalNodeElectedMaster() == false) {
-            logger.debug("rejecting leader check on non-master {}", request);
-            throw new CoordinationStateRejectedException(
-                "rejecting leader check from [" + request.getSender() + "] sent to a node that is no longer the master");
+            logger.debug("non-master handling {}", request);
+            throw new CoordinationStateRejectedException("non-leader rejecting leader check");
         } else if (discoveryNodes.nodeExists(request.getSender()) == false) {
-            logger.debug("rejecting leader check from removed node: {}", request);
-            throw new CoordinationStateRejectedException(
-                "rejecting leader check since [" + request.getSender() + "] has been removed from the cluster");
+            logger.debug("leader check from unknown node: {}", request);
+            throw new CoordinationStateRejectedException("leader check from unknown node");
         } else {
             logger.trace("handling {}", request);
         }
@@ -302,15 +303,15 @@ public class LeaderChecker {
         }
     }
 
-    static class LeaderCheckRequest extends TransportRequest {
+    public static class LeaderCheckRequest extends TransportRequest {
 
         private final DiscoveryNode sender;
 
-        LeaderCheckRequest(final DiscoveryNode sender) {
+        public LeaderCheckRequest(final DiscoveryNode sender) {
             this.sender = sender;
         }
 
-        LeaderCheckRequest(final StreamInput in) throws IOException {
+        public LeaderCheckRequest(final StreamInput in) throws IOException {
             super(in);
             sender = new DiscoveryNode(in);
         }

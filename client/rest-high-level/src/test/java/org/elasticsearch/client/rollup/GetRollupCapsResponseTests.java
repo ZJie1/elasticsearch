@@ -43,12 +43,11 @@ public class GetRollupCapsResponseTests extends RollupCapsResponseTestCase<GetRo
 
     @Override
     protected Predicate<String> randomFieldsExcludeFilter() {
-        return (field) -> {
+        return (field) ->
             // base cannot have extra things in it
-            return "".equals(field)
-                // the field list expects to be a nested object of a certain type
-                || field.contains("fields");
-        };
+            "".equals(field)
+            // the field list expects to be a nested object of a certain type
+            || field.contains("fields");
     }
 
     @Override

@@ -26,8 +26,6 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.geometry.Geometry;
 import org.elasticsearch.index.query.VectorGeoShapeQueryProcessor;
 
-import java.util.Map;
-
 /**
  * FieldMapper for indexing {@link LatLonShape}s.
  * <p>
@@ -48,11 +46,10 @@ import java.util.Map;
  * <p>
  * "field" : "POLYGON ((100.0 0.0, 101.0 0.0, 101.0 1.0, 100.0 1.0, 100.0 0.0))
  */
-public class GeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<Geometry, Geometry> {
+public class GeoShapeFieldMapper extends AbstractGeometryFieldMapper<Geometry, Geometry> {
     public static final String CONTENT_TYPE = "geo_shape";
 
-    public static class Builder extends AbstractShapeGeometryFieldMapper.Builder<AbstractShapeGeometryFieldMapper.Builder,
-            GeoShapeFieldMapper> {
+    public static class Builder extends AbstractGeometryFieldMapper.Builder<AbstractGeometryFieldMapper.Builder, GeoShapeFieldMapper> {
         public Builder(String name) {
             super (name, new GeoShapeFieldType(), new GeoShapeFieldType());
         }
@@ -61,7 +58,7 @@ public class GeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<Geomet
         public GeoShapeFieldMapper build(BuilderContext context) {
             setupFieldType(context);
             return new GeoShapeFieldMapper(name, fieldType, defaultFieldType, ignoreMalformed(context), coerce(context),
-                ignoreZValue(), orientation(), context.indexSettings(), multiFieldsBuilder.build(this, context), copyTo);
+                ignoreZValue(), context.indexSettings(), multiFieldsBuilder.build(this, context), copyTo);
         }
 
         @Override
@@ -79,10 +76,9 @@ public class GeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<Geomet
         }
     }
 
-    public static class GeoShapeFieldType extends AbstractShapeGeometryFieldType<Geometry, Geometry> {
+    public static final class GeoShapeFieldType extends AbstractGeometryFieldType<Geometry, Geometry> {
         public GeoShapeFieldType() {
             super();
-            setDimensions(7, 4, Integer.BYTES);
         }
 
         protected GeoShapeFieldType(GeoShapeFieldType ref) {
@@ -100,35 +96,12 @@ public class GeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<Geomet
         }
     }
 
-    public static final class TypeParser extends AbstractShapeGeometryFieldMapper.TypeParser {
-
-        @Override
-        protected AbstractShapeGeometryFieldMapper.Builder newBuilder(String name, Map<String, Object> params) {
-            if (params.containsKey(DEPRECATED_PARAMETERS_KEY)) {
-                return new LegacyGeoShapeFieldMapper.Builder(name,
-                    (LegacyGeoShapeFieldMapper.DeprecatedParameters)params.get(DEPRECATED_PARAMETERS_KEY));
-            }
-            return new GeoShapeFieldMapper.Builder(name);
-        }
-    }
-
     public GeoShapeFieldMapper(String simpleName, MappedFieldType fieldType, MappedFieldType defaultFieldType,
                                Explicit<Boolean> ignoreMalformed, Explicit<Boolean> coerce,
-                               Explicit<Boolean> ignoreZValue, Explicit<ShapeBuilder.Orientation> orientation, Settings indexSettings,
+                               Explicit<Boolean> ignoreZValue, Settings indexSettings,
                                MultiFields multiFields, CopyTo copyTo) {
-        super(simpleName, fieldType, defaultFieldType, ignoreMalformed, coerce, ignoreZValue, orientation, indexSettings,
+        super(simpleName, fieldType, defaultFieldType, ignoreMalformed, coerce, ignoreZValue, indexSettings,
             multiFields, copyTo);
-    }
-
-    @Override
-    protected void doMerge(Mapper mergeWith) {
-        if (mergeWith instanceof LegacyGeoShapeFieldMapper) {
-            LegacyGeoShapeFieldMapper legacy = (LegacyGeoShapeFieldMapper) mergeWith;
-            throw new IllegalArgumentException("[" + fieldType().name() + "] with field mapper [" + fieldType().typeName() + "] " +
-                "using [BKD] strategy cannot be merged with " + "[" + legacy.fieldType().typeName() + "] with [" +
-                legacy.fieldType().strategy() + "] strategy");
-        }
-        super.doMerge(mergeWith);
     }
 
     @Override

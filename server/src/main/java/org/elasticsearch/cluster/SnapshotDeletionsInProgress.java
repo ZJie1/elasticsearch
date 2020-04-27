@@ -26,16 +26,11 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.repositories.RepositoryData;
-import org.elasticsearch.repositories.RepositoryOperation;
 import org.elasticsearch.snapshots.Snapshot;
-import org.elasticsearch.snapshots.SnapshotId;
-import org.elasticsearch.snapshots.SnapshotsService;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -49,7 +44,7 @@ public class SnapshotDeletionsInProgress extends AbstractNamedDiffable<Custom> i
     // the list of snapshot deletion request entries
     private final List<Entry> entries;
 
-    public SnapshotDeletionsInProgress(List<Entry> entries) {
+    private SnapshotDeletionsInProgress(List<Entry> entries) {
         this.entries = Collections.unmodifiableList(entries);
     }
 
@@ -143,12 +138,8 @@ public class SnapshotDeletionsInProgress extends AbstractNamedDiffable<Custom> i
         for (Entry entry : entries) {
             builder.startObject();
             {
-                builder.field("repository", entry.repository());
-                builder.startArray("snapshots");
-                for (SnapshotId snapshot : entry.snapshots) {
-                    builder.value(snapshot.getName());
-                }
-                builder.endArray();
+                builder.field("repository", entry.snapshot.getRepository());
+                builder.field("snapshot", entry.snapshot.getSnapshotId().getName());
                 builder.humanReadableField("start_time_millis", "start_time", new TimeValue(entry.startTime));
                 builder.field("repository_state_id", entry.repositoryStateId);
             }
@@ -162,7 +153,7 @@ public class SnapshotDeletionsInProgress extends AbstractNamedDiffable<Custom> i
     public String toString() {
         StringBuilder builder = new StringBuilder("SnapshotDeletionsInProgress[");
         for (int i = 0; i < entries.size(); i++) {
-            builder.append(entries.get(i).getSnapshots());
+            builder.append(entries.get(i).getSnapshot().getSnapshotId().getName());
             if (i + 1 < entries.size()) {
                 builder.append(",");
             }
@@ -173,37 +164,28 @@ public class SnapshotDeletionsInProgress extends AbstractNamedDiffable<Custom> i
     /**
      * A class representing a snapshot deletion request entry in the cluster state.
      */
-    public static final class Entry implements Writeable, RepositoryOperation {
-        private final List<SnapshotId> snapshots;
-        private final String repoName;
+    public static final class Entry implements Writeable {
+        private final Snapshot snapshot;
         private final long startTime;
         private final long repositoryStateId;
 
-        public Entry(List<SnapshotId> snapshots, String repoName, long startTime, long repositoryStateId) {
-            this.snapshots = snapshots;
-            assert snapshots.size() == new HashSet<>(snapshots).size() : "Duplicate snapshot ids in " + snapshots;
-            this.repoName = repoName;
+        public Entry(Snapshot snapshot, long startTime, long repositoryStateId) {
+            this.snapshot = snapshot;
             this.startTime = startTime;
             this.repositoryStateId = repositoryStateId;
-            assert repositoryStateId > RepositoryData.EMPTY_REPO_GEN :
-                "Can't delete based on an empty or unknown repository generation but saw [" + repositoryStateId + "]";
         }
 
         public Entry(StreamInput in) throws IOException {
-            if (in.getVersion().onOrAfter(SnapshotsService.MULTI_DELETE_VERSION)) {
-                this.repoName = in.readString();
-                this.snapshots = in.readList(SnapshotId::new);
-            } else {
-                final Snapshot snapshot = new Snapshot(in);
-                this.snapshots = Collections.singletonList(snapshot.getSnapshotId());
-                this.repoName = snapshot.getRepository();
-            }
+            this.snapshot = new Snapshot(in);
             this.startTime = in.readVLong();
             this.repositoryStateId = in.readLong();
         }
 
-        public List<SnapshotId> getSnapshots() {
-            return snapshots;
+        /**
+         * The snapshot to delete.
+         */
+        public Snapshot getSnapshot() {
+            return snapshot;
         }
 
         /**
@@ -211,6 +193,13 @@ public class SnapshotDeletionsInProgress extends AbstractNamedDiffable<Custom> i
          */
         public long getStartTime() {
             return startTime;
+        }
+
+        /**
+         * The repository state id at the time the snapshot deletion began.
+         */
+        public long getRepositoryStateId() {
+            return repositoryStateId;
         }
 
         @Override
@@ -222,39 +211,21 @@ public class SnapshotDeletionsInProgress extends AbstractNamedDiffable<Custom> i
                 return false;
             }
             Entry that = (Entry) o;
-            return repoName.equals(that.repoName)
-                       && snapshots.equals(that.snapshots)
+            return snapshot.equals(that.snapshot)
                        && startTime == that.startTime
                        && repositoryStateId == that.repositoryStateId;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(snapshots, repoName, startTime, repositoryStateId);
+            return Objects.hash(snapshot, startTime, repositoryStateId);
         }
 
         @Override
         public void writeTo(StreamOutput out) throws IOException {
-            if (out.getVersion().onOrAfter(SnapshotsService.MULTI_DELETE_VERSION)) {
-                out.writeString(repoName);
-                out.writeCollection(snapshots);
-            } else {
-                assert snapshots.size() == 1 : "Only single deletion allowed in mixed version cluster containing [" + out.getVersion() +
-                        "] but saw " + snapshots;
-                new Snapshot(repoName, snapshots.get(0)).writeTo(out);
-            }
+            snapshot.writeTo(out);
             out.writeVLong(startTime);
             out.writeLong(repositoryStateId);
-        }
-
-        @Override
-        public String repository() {
-            return repoName;
-        }
-
-        @Override
-        public long repositoryStateId() {
-            return repositoryStateId;
         }
     }
 }

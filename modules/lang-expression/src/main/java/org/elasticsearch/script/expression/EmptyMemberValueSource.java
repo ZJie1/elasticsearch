@@ -20,39 +20,44 @@
 package org.elasticsearch.script.expression;
 
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.DoubleValues;
-import org.elasticsearch.index.fielddata.LeafNumericFieldData;
+import org.apache.lucene.queries.function.FunctionValues;
+import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.queries.function.docvalues.DoubleDocValues;
+import org.elasticsearch.index.fielddata.AtomicNumericFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * ValueSource to return non-zero if a field is missing.
  * <p>
  * This is essentially sugar over !count()
  */
-final class EmptyMemberValueSource extends FieldDataBasedDoubleValuesSource {
+final class EmptyMemberValueSource extends ValueSource {
+    final IndexFieldData<?> fieldData;
 
     EmptyMemberValueSource(IndexFieldData<?> fieldData) {
-        super(fieldData);
+        this.fieldData = Objects.requireNonNull(fieldData);
     }
 
     @Override
-    public DoubleValues getValues(LeafReaderContext leaf, DoubleValues scores) {
-        LeafNumericFieldData leafData = (LeafNumericFieldData) fieldData.load(leaf);
+    @SuppressWarnings("rawtypes") // ValueSource uses a rawtype
+    public FunctionValues getValues(Map context, LeafReaderContext leaf) throws IOException {
+        AtomicNumericFieldData leafData = (AtomicNumericFieldData) fieldData.load(leaf);
         final SortedNumericDoubleValues values = leafData.getDoubleValues();
-        return DoubleValues.withDefault(new DoubleValues() {
+        return new DoubleDocValues(this) {
             @Override
-            public double doubleValue() {
-                return 0;
+            public double doubleVal(int doc) throws IOException {
+                if (values.advanceExact(doc)) {
+                    return 0;
+                } else {
+                    return 1;
+                }
             }
-
-            @Override
-            public boolean advanceExact(int doc) throws IOException {
-                return values.advanceExact(doc);
-            }
-        }, 1);
+        };
     }
 
     @Override
@@ -66,12 +71,12 @@ final class EmptyMemberValueSource extends FieldDataBasedDoubleValuesSource {
         if (obj == null) return false;
         if (getClass() != obj.getClass()) return false;
         EmptyMemberValueSource other = (EmptyMemberValueSource) obj;
-        return fieldData.equals(other.fieldData);
+        if (!fieldData.equals(other.fieldData)) return false;
+        return true;
     }
 
     @Override
-    public String toString() {
+    public String description() {
         return "empty: field(" + fieldData.getFieldName() + ")";
     }
-
 }

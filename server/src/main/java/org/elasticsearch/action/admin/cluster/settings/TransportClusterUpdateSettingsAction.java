@@ -19,8 +19,6 @@
 
 package org.elasticsearch.action.admin.cluster.settings;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.ActionListener;
@@ -31,7 +29,7 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.routing.allocation.AllocationService;
 import org.elasticsearch.cluster.service.ClusterService;
@@ -48,8 +46,6 @@ import java.io.IOException;
 
 public class TransportClusterUpdateSettingsAction extends
     TransportMasterNodeAction<ClusterUpdateSettingsRequest, ClusterUpdateSettingsResponse> {
-
-    private static final Logger logger = LogManager.getLogger(TransportClusterUpdateSettingsAction.class);
 
     private final AllocationService allocationService;
 
@@ -75,10 +71,10 @@ public class TransportClusterUpdateSettingsAction extends
         // allow for dedicated changes to the metadata blocks, so we don't block those to allow to "re-enable" it
         if (request.transientSettings().size() + request.persistentSettings().size() == 1) {
             // only one setting
-            if (Metadata.SETTING_READ_ONLY_SETTING.exists(request.persistentSettings())
-                || Metadata.SETTING_READ_ONLY_SETTING.exists(request.transientSettings())
-                || Metadata.SETTING_READ_ONLY_ALLOW_DELETE_SETTING.exists(request.transientSettings())
-                || Metadata.SETTING_READ_ONLY_ALLOW_DELETE_SETTING.exists(request.persistentSettings())) {
+            if (MetaData.SETTING_READ_ONLY_SETTING.exists(request.persistentSettings())
+                || MetaData.SETTING_READ_ONLY_SETTING.exists(request.transientSettings())
+                || MetaData.SETTING_READ_ONLY_ALLOW_DELETE_SETTING.exists(request.transientSettings())
+                || MetaData.SETTING_READ_ONLY_ALLOW_DELETE_SETTING.exists(request.persistentSettings())) {
                 // one of the settings above as the only setting in the request means - resetting the block!
                 return null;
             }

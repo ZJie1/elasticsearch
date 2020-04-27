@@ -126,16 +126,11 @@ public class SpanMultiTermQueryBuilder extends AbstractQueryBuilder<SpanMultiTer
 
     @Override
     protected Query doToQuery(QueryShardContext context) throws IOException {
-        // We do the rewrite in toQuery to not have to deal with the case when a multi-term builder rewrites to a non-multi-term
-        // builder.
-        QueryBuilder multiTermQueryBuilder = Rewriteable.rewrite(this.multiTermQueryBuilder, context);
-        if (multiTermQueryBuilder instanceof MatchNoneQueryBuilder) {
-            return new SpanMatchNoDocsQuery(this.multiTermQueryBuilder.fieldName(), "Inner query rewrote to match_none");
-        } else if (multiTermQueryBuilder instanceof PrefixQueryBuilder) {
+        if (multiTermQueryBuilder instanceof PrefixQueryBuilder) {
             PrefixQueryBuilder prefixBuilder = (PrefixQueryBuilder) multiTermQueryBuilder;
-            MappedFieldType fieldType = context.fieldMapper(prefixBuilder.fieldName());
+            MappedFieldType fieldType = context.fieldMapper(multiTermQueryBuilder.fieldName());
             if (fieldType == null) {
-                throw new IllegalStateException("Rewrite first");
+                return new SpanMatchNoDocsQuery(multiTermQueryBuilder.fieldName(), "unknown field");
             }
             final SpanMultiTermQueryWrapper.SpanRewriteMethod spanRewriteMethod;
             if (prefixBuilder.rewrite() != null) {
@@ -164,7 +159,7 @@ public class SpanMultiTermQueryBuilder extends AbstractQueryBuilder<SpanMultiTer
                 }
             }
             if (subQuery instanceof MatchNoDocsQuery) {
-                return new SpanMatchNoDocsQuery(this.multiTermQueryBuilder.fieldName(), subQuery.toString());
+                return new SpanMatchNoDocsQuery(multiTermQueryBuilder.fieldName(), subQuery.toString());
             } else if (subQuery instanceof MultiTermQuery == false) {
                 throw new UnsupportedOperationException("unsupported inner query, should be "
                     + MultiTermQuery.class.getName() + " but was " + subQuery.getClass().getName());

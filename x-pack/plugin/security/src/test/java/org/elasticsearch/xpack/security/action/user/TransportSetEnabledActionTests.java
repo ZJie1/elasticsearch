@@ -16,11 +16,10 @@ import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.Transport;
 import org.elasticsearch.transport.TransportService;
-import org.elasticsearch.xpack.core.security.SecurityContext;
 import org.elasticsearch.xpack.core.security.action.user.SetEnabledRequest;
 import org.elasticsearch.xpack.core.security.action.user.SetEnabledResponse;
 import org.elasticsearch.xpack.core.security.authc.Authentication;
-import org.elasticsearch.xpack.core.security.authc.support.AuthenticationContextSerializer;
+import org.elasticsearch.xpack.core.security.authc.AuthenticationField;
 import org.elasticsearch.xpack.core.security.user.AnonymousUser;
 import org.elasticsearch.xpack.core.security.user.ElasticUser;
 import org.elasticsearch.xpack.core.security.user.KibanaUser;
@@ -54,23 +53,20 @@ import static org.mockito.Mockito.when;
  */
 public class TransportSetEnabledActionTests extends ESTestCase {
 
-    public void testAnonymousUser() throws Exception {
+    public void testAnonymousUser() {
         Settings settings = Settings.builder().put(AnonymousUser.ROLES_SETTING.getKey(), "superuser").build();
         final User user = randomFrom(new ElasticUser(true), new KibanaUser(true), new User("joe"));
         ThreadPool threadPool = mock(ThreadPool.class);
         ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
         Authentication authentication = mock(Authentication.class);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        threadContext.putTransient(AuthenticationField.AUTHENTICATION_KEY, authentication);
         when(authentication.getUser()).thenReturn(user);
-        when(authentication.encode()).thenReturn(randomAlphaOfLength(24)); // just can't be null
-        new AuthenticationContextSerializer().writeToContext(authentication, threadContext);
-
         NativeUsersStore usersStore = mock(NativeUsersStore.class);
         TransportService transportService = new TransportService(Settings.EMPTY, mock(Transport.class), null,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR, x -> null, null, Collections.emptySet());
-        final SecurityContext securityContext = new SecurityContext(Settings.EMPTY, threadContext);
         TransportSetEnabledAction action = new TransportSetEnabledAction(settings, threadPool, transportService, mock(ActionFilters.class),
-                securityContext, usersStore);
+                usersStore);
 
         SetEnabledRequest request = new SetEnabledRequest();
         request.username(new AnonymousUser(settings).principal());
@@ -96,23 +92,19 @@ public class TransportSetEnabledActionTests extends ESTestCase {
         verifyZeroInteractions(usersStore);
     }
 
-    public void testInternalUser() throws Exception {
+    public void testInternalUser() {
         final User user = randomFrom(new ElasticUser(true), new KibanaUser(true), new User("joe"));
         ThreadPool threadPool = mock(ThreadPool.class);
         ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
-
         Authentication authentication = mock(Authentication.class);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        threadContext.putTransient(AuthenticationField.AUTHENTICATION_KEY, authentication);
         when(authentication.getUser()).thenReturn(user);
-        when(authentication.encode()).thenReturn(randomAlphaOfLength(24)); // just can't be null
-        new AuthenticationContextSerializer().writeToContext(authentication, threadContext);
-
         NativeUsersStore usersStore = mock(NativeUsersStore.class);
         TransportService transportService = new TransportService(Settings.EMPTY, mock(Transport.class), null,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR, x -> null, null, Collections.emptySet());
-        final SecurityContext securityContext = new SecurityContext(Settings.EMPTY, threadContext);
         TransportSetEnabledAction action = new TransportSetEnabledAction(Settings.EMPTY, threadPool, transportService,
-                mock(ActionFilters.class), securityContext, usersStore);
+                mock(ActionFilters.class), usersStore);
 
         SetEnabledRequest request = new SetEnabledRequest();
         request.username(randomFrom(SystemUser.INSTANCE.principal(), XPackUser.INSTANCE.principal()));
@@ -138,15 +130,13 @@ public class TransportSetEnabledActionTests extends ESTestCase {
         verifyZeroInteractions(usersStore);
     }
 
-    public void testValidUser() throws Exception {
+    public void testValidUser() {
         ThreadPool threadPool = mock(ThreadPool.class);
         ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
-
         Authentication authentication = mock(Authentication.class);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        threadContext.putTransient(AuthenticationField.AUTHENTICATION_KEY, authentication);
         when(authentication.getUser()).thenReturn(new User("the runner"));
-        when(authentication.encode()).thenReturn(randomAlphaOfLength(24)); // just can't be null
-        new AuthenticationContextSerializer().writeToContext(authentication, threadContext);
 
         final User user = randomFrom(new ElasticUser(true), new KibanaUser(true), new User("joe"));
         NativeUsersStore usersStore = mock(NativeUsersStore.class);
@@ -167,9 +157,8 @@ public class TransportSetEnabledActionTests extends ESTestCase {
                 .setEnabled(eq(user.principal()), eq(request.enabled()), eq(request.getRefreshPolicy()), any(ActionListener.class));
         TransportService transportService = new TransportService(Settings.EMPTY, mock(Transport.class), null,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR, x -> null, null, Collections.emptySet());
-        final SecurityContext securityContext = new SecurityContext(Settings.EMPTY, threadContext);
         TransportSetEnabledAction action = new TransportSetEnabledAction(Settings.EMPTY, threadPool, transportService,
-                mock(ActionFilters.class), securityContext, usersStore);
+                mock(ActionFilters.class), usersStore);
 
         final AtomicReference<Throwable> throwableRef = new AtomicReference<>();
         final AtomicReference<SetEnabledResponse> responseRef = new AtomicReference<>();
@@ -192,15 +181,13 @@ public class TransportSetEnabledActionTests extends ESTestCase {
                 .setEnabled(eq(user.principal()), eq(request.enabled()), eq(request.getRefreshPolicy()), any(ActionListener.class));
     }
 
-    public void testException() throws Exception {
+    public void testException() {
         ThreadPool threadPool = mock(ThreadPool.class);
         ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
-
         Authentication authentication = mock(Authentication.class);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        threadContext.putTransient(AuthenticationField.AUTHENTICATION_KEY, authentication);
         when(authentication.getUser()).thenReturn(new User("the runner"));
-        when(authentication.encode()).thenReturn(randomAlphaOfLength(24)); // just can't be null
-        new AuthenticationContextSerializer().writeToContext(authentication, threadContext);
 
         final User user = randomFrom(new ElasticUser(true), new KibanaUser(true), new User("joe"));
         NativeUsersStore usersStore = mock(NativeUsersStore.class);
@@ -222,9 +209,8 @@ public class TransportSetEnabledActionTests extends ESTestCase {
                 .setEnabled(eq(user.principal()), eq(request.enabled()), eq(request.getRefreshPolicy()), any(ActionListener.class));
         TransportService transportService = new TransportService(Settings.EMPTY, mock(Transport.class), null,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR, x -> null, null, Collections.emptySet());
-        final SecurityContext securityContext = new SecurityContext(Settings.EMPTY, threadContext);
         TransportSetEnabledAction action = new TransportSetEnabledAction(Settings.EMPTY, threadPool, transportService,
-            mock(ActionFilters.class), securityContext, usersStore);
+                mock(ActionFilters.class), usersStore);
 
         final AtomicReference<Throwable> throwableRef = new AtomicReference<>();
         final AtomicReference<SetEnabledResponse> responseRef = new AtomicReference<>();
@@ -247,16 +233,14 @@ public class TransportSetEnabledActionTests extends ESTestCase {
                 .setEnabled(eq(user.principal()), eq(request.enabled()), eq(request.getRefreshPolicy()), any(ActionListener.class));
     }
 
-    public void testUserModifyingThemselves() throws Exception {
+    public void testUserModifyingThemselves() {
         final User user = randomFrom(new ElasticUser(true), new KibanaUser(true), new User("joe"));
         ThreadPool threadPool = mock(ThreadPool.class);
         ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
-
         Authentication authentication = mock(Authentication.class);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        threadContext.putTransient(AuthenticationField.AUTHENTICATION_KEY, authentication);
         when(authentication.getUser()).thenReturn(user);
-        when(authentication.encode()).thenReturn(randomAlphaOfLength(24)); // just can't be null
-        new AuthenticationContextSerializer().writeToContext(authentication, threadContext);
 
         NativeUsersStore usersStore = mock(NativeUsersStore.class);
         SetEnabledRequest request = new SetEnabledRequest();
@@ -265,9 +249,8 @@ public class TransportSetEnabledActionTests extends ESTestCase {
         request.setRefreshPolicy(randomFrom(RefreshPolicy.values()));
         TransportService transportService = new TransportService(Settings.EMPTY, mock(Transport.class), null,
             TransportService.NOOP_TRANSPORT_INTERCEPTOR, x -> null, null, Collections.emptySet());
-        final SecurityContext securityContext = new SecurityContext(Settings.EMPTY, threadContext);
         TransportSetEnabledAction action = new TransportSetEnabledAction(Settings.EMPTY, threadPool, transportService,
-                mock(ActionFilters.class), securityContext, usersStore);
+                mock(ActionFilters.class), usersStore);
 
         final AtomicReference<Throwable> throwableRef = new AtomicReference<>();
         final AtomicReference<SetEnabledResponse> responseRef = new AtomicReference<>();

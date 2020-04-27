@@ -49,11 +49,14 @@ final class TransportHandshaker {
     private final Version version;
     private final ThreadPool threadPool;
     private final HandshakeRequestSender handshakeRequestSender;
+    private final HandshakeResponseSender handshakeResponseSender;
 
-    TransportHandshaker(Version version, ThreadPool threadPool, HandshakeRequestSender handshakeRequestSender) {
+    TransportHandshaker(Version version, ThreadPool threadPool, HandshakeRequestSender handshakeRequestSender,
+                        HandshakeResponseSender handshakeResponseSender) {
         this.version = version;
         this.threadPool = threadPool;
         this.handshakeRequestSender = handshakeRequestSender;
+        this.handshakeResponseSender = handshakeResponseSender;
     }
 
     void sendHandshake(long requestId, DiscoveryNode node, TcpChannel channel, TimeValue timeout, ActionListener<Version> listener) {
@@ -85,7 +88,7 @@ final class TransportHandshaker {
         }
     }
 
-    void handleHandshake(TransportChannel channel, long requestId, StreamInput stream) throws IOException {
+    void handleHandshake(Version version, TcpChannel channel, long requestId, StreamInput stream) throws IOException {
         // Must read the handshake request to exhaust the stream
         HandshakeRequest handshakeRequest = new HandshakeRequest(stream);
         final int nextByte = stream.read();
@@ -93,7 +96,8 @@ final class TransportHandshaker {
             throw new IllegalStateException("Handshake request not fully read for requestId [" + requestId + "], action ["
                 + TransportHandshaker.HANDSHAKE_ACTION_NAME + "], available [" + stream.available() + "]; resetting");
         }
-        channel.sendResponse(new HandshakeResponse(this.version));
+        HandshakeResponse response = new HandshakeResponse(this.version);
+        handshakeResponseSender.sendResponse(version, channel, response, requestId);
     }
 
     TransportResponseHandler<HandshakeResponse> removeHandlerForHandshake(long requestId) {
@@ -224,4 +228,12 @@ final class TransportHandshaker {
 
         void sendRequest(DiscoveryNode node, TcpChannel channel, long requestId, Version version) throws IOException;
     }
+
+    @FunctionalInterface
+    interface HandshakeResponseSender {
+
+        void sendResponse(Version version, TcpChannel channel, TransportResponse response, long requestId) throws IOException;
+
+    }
+
 }

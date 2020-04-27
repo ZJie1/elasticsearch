@@ -60,8 +60,6 @@ public abstract class SessionFactory {
     protected final boolean sslUsed;
     protected final boolean ignoreReferralErrors;
 
-    protected final LdapMetadataResolver metadataResolver;
-
     protected SessionFactory(RealmConfig config, SSLService sslService, ThreadPool threadPool) {
         this.config = config;
         this.logger = LogManager.getLogger(getClass());
@@ -80,7 +78,6 @@ public abstract class SessionFactory {
         this.serverSet = serverSet(config, sslService, ldapServers);
         this.sslUsed = ldapServers.ssl;
         this.ignoreReferralErrors = config.getSetting(SessionFactorySettings.IGNORE_REFERRAL_ERRORS_SETTING);
-        this.metadataResolver = new LdapMetadataResolver(config, ignoreReferralErrors);
     }
 
     /**
@@ -121,22 +118,7 @@ public abstract class SessionFactory {
         LDAPConnectionOptions options = new LDAPConnectionOptions();
         options.setConnectTimeoutMillis(Math.toIntExact(config.getSetting(SessionFactorySettings.TIMEOUT_TCP_CONNECTION_SETTING).millis()));
         options.setFollowReferrals(config.getSetting(SessionFactorySettings.FOLLOW_REFERRALS_SETTING));
-        final long responseTimeoutMillis;
-        if (config.hasSetting(SessionFactorySettings.TIMEOUT_RESPONSE_SETTING)) {
-            if (config.hasSetting(SessionFactorySettings.TIMEOUT_TCP_READ_SETTING)) {
-                throw new IllegalArgumentException("[" + RealmSettings.getFullSettingKey(config,
-                        SessionFactorySettings.TIMEOUT_TCP_READ_SETTING) + "] and [" + RealmSettings.getFullSettingKey(config,
-                        SessionFactorySettings.TIMEOUT_RESPONSE_SETTING) + "] may not be used at the same time");
-            }
-            responseTimeoutMillis = config.getSetting(SessionFactorySettings.TIMEOUT_RESPONSE_SETTING).millis();
-        } else {
-            if (config.hasSetting(SessionFactorySettings.TIMEOUT_TCP_READ_SETTING)) {
-                responseTimeoutMillis = config.getSetting(SessionFactorySettings.TIMEOUT_TCP_READ_SETTING).millis();
-            } else {
-                responseTimeoutMillis = config.getSetting(SessionFactorySettings.TIMEOUT_LDAP_SETTING).millis();
-            }
-        }
-        options.setResponseTimeoutMillis(responseTimeoutMillis);
+        options.setResponseTimeoutMillis(config.getSetting(SessionFactorySettings.TIMEOUT_TCP_READ_SETTING).millis());
         options.setAllowConcurrentSocketFactoryUse(true);
 
         final boolean verificationModeExists = config.hasSetting(SSLConfigurationSettings.VERIFICATION_MODE_SETTING_REALM);
@@ -157,14 +139,10 @@ public abstract class SessionFactory {
                 options.setSSLSocketVerifier(new HostNameSSLSocketVerifier(true));
             }
         } else if (hostnameVerificationExists) {
-            final String fullSettingKey = RealmSettings.getFullSettingKey(config, SessionFactorySettings.HOSTNAME_VERIFICATION_SETTING);
-            final String deprecationKey = "deprecated_setting_" + fullSettingKey.replace('.', '_');
-            new DeprecationLogger(logger).deprecatedAndMaybeLog(
-                deprecationKey,
-                "the setting [{}] has been deprecated and " + "will be removed in a future version. use [{}] instead",
-                fullSettingKey,
-                RealmSettings.getFullSettingKey(config, SSLConfigurationSettings.VERIFICATION_MODE_SETTING_REALM)
-            );
+            new DeprecationLogger(logger).deprecated("the setting [{}] has been deprecated and " +
+                            "will be removed in a future version. use [{}] instead",
+                    RealmSettings.getFullSettingKey(config, SessionFactorySettings.HOSTNAME_VERIFICATION_SETTING),
+                    RealmSettings.getFullSettingKey(config, SSLConfigurationSettings.VERIFICATION_MODE_SETTING_REALM));
             if (config.getSetting(SessionFactorySettings.HOSTNAME_VERIFICATION_SETTING)) {
                 options.setSSLSocketVerifier(new HostNameSSLSocketVerifier(true));
             }

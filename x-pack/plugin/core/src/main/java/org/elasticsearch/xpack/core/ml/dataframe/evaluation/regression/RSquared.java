@@ -6,7 +6,6 @@
 package org.elasticsearch.xpack.core.ml.dataframe.evaluation.regression;
 
 import org.elasticsearch.common.ParseField;
-import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.ObjectParser;
@@ -16,22 +15,17 @@ import org.elasticsearch.script.Script;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.Aggregations;
-import org.elasticsearch.search.aggregations.PipelineAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.ExtendedStats;
 import org.elasticsearch.search.aggregations.metrics.ExtendedStatsAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.NumericMetricsAggregation;
-import org.elasticsearch.xpack.core.ml.dataframe.evaluation.EvaluationMetric;
 import org.elasticsearch.xpack.core.ml.dataframe.evaluation.EvaluationMetricResult;
-import org.elasticsearch.xpack.core.ml.dataframe.evaluation.EvaluationParameters;
 
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
-
-import static org.elasticsearch.xpack.core.ml.dataframe.evaluation.MlEvaluationNamedXContentProvider.registeredMetricName;
 
 /**
  * Calculates R-Squared between two known numerical fields.
@@ -41,7 +35,7 @@ import static org.elasticsearch.xpack.core.ml.dataframe.evaluation.MlEvaluationN
  * SSres = Σ(y - y´)^2, The residual sum of squares
  * SStot =  Σ(y - y_mean)^2, The total sum of squares
  */
-public class RSquared implements EvaluationMetric {
+public class RSquared implements RegressionMetric {
 
     public static final ParseField NAME = new ParseField("r_squared");
 
@@ -59,53 +53,39 @@ public class RSquared implements EvaluationMetric {
         return PARSER.apply(parser, null);
     }
 
-    private EvaluationMetricResult result;
+    public RSquared(StreamInput in) {
 
-    public RSquared(StreamInput in) {}
+    }
 
-    public RSquared() {}
+    public RSquared() {
+
+    }
 
     @Override
-    public String getName() {
+    public String getMetricName() {
         return NAME.getPreferredName();
     }
 
     @Override
-    public Tuple<List<AggregationBuilder>, List<PipelineAggregationBuilder>> aggs(EvaluationParameters parameters,
-                                                                                  String actualField,
-                                                                                  String predictedField) {
-        if (result != null) {
-            return Tuple.tuple(List.of(), List.of());
-        }
-        return Tuple.tuple(
-            List.of(
-                AggregationBuilders.sum(SS_RES).script(new Script(buildScript(actualField, predictedField))),
-                AggregationBuilders.extendedStats(ExtendedStatsAggregationBuilder.NAME + "_actual").field(actualField)),
-            List.of());
+    public List<AggregationBuilder> aggs(String actualField, String predictedField) {
+        return Arrays.asList(
+            AggregationBuilders.sum(SS_RES).script(new Script(buildScript(actualField, predictedField))),
+            AggregationBuilders.extendedStats(ExtendedStatsAggregationBuilder.NAME + "_actual").field(actualField));
     }
 
     @Override
-    public void process(Aggregations aggs) {
+    public EvaluationMetricResult evaluate(Aggregations aggs) {
         NumericMetricsAggregation.SingleValue residualSumOfSquares = aggs.get(SS_RES);
         ExtendedStats extendedStats = aggs.get(ExtendedStatsAggregationBuilder.NAME + "_actual");
         // extendedStats.getVariance() is the statistical sumOfSquares divided by count
-        final boolean validResult = residualSumOfSquares == null
-            || extendedStats == null
-            || extendedStats.getCount() == 0
-            || extendedStats.getVariance() == 0;
-        result = validResult ?
+        return residualSumOfSquares == null || extendedStats == null || extendedStats.getCount() == 0 ?
             new Result(0.0) :
             new Result(1 - (residualSumOfSquares.value() / (extendedStats.getVariance() * extendedStats.getCount())));
     }
 
     @Override
-    public Optional<EvaluationMetricResult> getResult() {
-        return Optional.ofNullable(result);
-    }
-
-    @Override
     public String getWriteableName() {
-        return registeredMetricName(Regression.NAME, NAME);
+        return NAME.getPreferredName();
     }
 
     @Override
@@ -148,11 +128,11 @@ public class RSquared implements EvaluationMetric {
 
         @Override
         public String getWriteableName() {
-            return registeredMetricName(Regression.NAME, NAME);
+            return NAME.getPreferredName();
         }
 
         @Override
-        public String getMetricName() {
+        public String getName() {
             return NAME.getPreferredName();
         }
 

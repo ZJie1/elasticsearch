@@ -79,9 +79,6 @@ public class JobUpdateTests extends AbstractXContentTestCase<JobUpdate> {
         if (randomBoolean()) {
             update.setCustomSettings(Collections.singletonMap(randomAlphaOfLength(10), randomAlphaOfLength(10)));
         }
-        if (randomBoolean()) {
-            update.setAllowLazyOpen(randomBoolean());
-        }
 
         return update.build();
     }

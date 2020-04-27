@@ -42,7 +42,7 @@ public class ClusterStatsNodeResponse extends BaseNodeResponse {
         super(in);
         clusterStatus = null;
         if (in.readBoolean()) {
-            clusterStatus = ClusterHealthStatus.readFrom(in);
+            clusterStatus = ClusterHealthStatus.fromValue(in.readByte());
         }
         this.nodeInfo = new NodeInfo(in);
         this.nodeStats = new NodeStats(in);

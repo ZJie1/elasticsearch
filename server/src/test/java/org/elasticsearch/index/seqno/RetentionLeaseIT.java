@@ -38,7 +38,6 @@ import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.test.transport.MockTransportService;
 import org.elasticsearch.threadpool.ThreadPool;
-import org.elasticsearch.transport.AbstractSimpleTransportTestCase;
 import org.elasticsearch.transport.TransportService;
 
 import java.io.Closeable;
@@ -110,7 +109,7 @@ public class RetentionLeaseIT extends ESIntegTestCase  {
             final CountDownLatch latch = new CountDownLatch(1);
             final ActionListener<ReplicationResponse> listener = countDownLatchListener(latch);
             // simulate a peer recovery which locks the soft deletes policy on the primary
-            final Closeable retentionLock = randomBoolean() ? primary.acquireHistoryRetentionLock() : () -> {};
+            final Closeable retentionLock = randomBoolean() ? primary.acquireRetentionLock() : () -> {};
             currentRetentionLeases.put(id, primary.addRetentionLease(id, retainingSequenceNumber, source, listener));
             latch.await();
             retentionLock.close();
@@ -160,7 +159,7 @@ public class RetentionLeaseIT extends ESIntegTestCase  {
             final CountDownLatch latch = new CountDownLatch(1);
             final ActionListener<ReplicationResponse> listener = countDownLatchListener(latch);
             // simulate a peer recovery which locks the soft deletes policy on the primary
-            final Closeable retentionLock = randomBoolean() ? primary.acquireHistoryRetentionLock() : () -> {};
+            final Closeable retentionLock = randomBoolean() ? primary.acquireRetentionLock() : () -> {};
             currentRetentionLeases.put(id, primary.addRetentionLease(id, retainingSequenceNumber, source, listener));
             latch.await();
             retentionLock.close();
@@ -171,7 +170,7 @@ public class RetentionLeaseIT extends ESIntegTestCase  {
             final CountDownLatch latch = new CountDownLatch(1);
             primary.removeRetentionLease(id, countDownLatchListener(latch));
             // simulate a peer recovery which locks the soft deletes policy on the primary
-            final Closeable retentionLock = randomBoolean() ? primary.acquireHistoryRetentionLock() : () -> {};
+            final Closeable retentionLock = randomBoolean() ? primary.acquireRetentionLock() : () -> {};
             currentRetentionLeases.remove(id);
             latch.await();
             retentionLock.close();
@@ -335,6 +334,36 @@ public class RetentionLeaseIT extends ESIntegTestCase  {
         }
     }
 
+    public void testRetentionLeasesBackgroundSyncWithSoftDeletesDisabled() throws Exception {
+        final int numberOfReplicas = 2 - scaledRandomIntBetween(0, 2);
+        internalCluster().ensureAtLeastNumDataNodes(1 + numberOfReplicas);
+        TimeValue syncIntervalSetting = TimeValue.timeValueMillis(between(1, 100));
+        final Settings settings = Settings.builder()
+            .put("index.number_of_shards", 1)
+            .put("index.number_of_replicas", numberOfReplicas)
+            .put(IndexService.RETENTION_LEASE_SYNC_INTERVAL_SETTING.getKey(), syncIntervalSetting.getStringRep())
+            .put(IndexSettings.INDEX_SOFT_DELETES_SETTING.getKey(), false)
+            .build();
+        createIndex("index", settings);
+        final String primaryShardNodeId = clusterService().state().routingTable().index("index").shard(0).primaryShard().currentNodeId();
+        final String primaryShardNodeName = clusterService().state().nodes().get(primaryShardNodeId).getName();
+        final MockTransportService primaryTransportService = (MockTransportService) internalCluster().getInstance(
+            TransportService.class, primaryShardNodeName);
+        final AtomicBoolean backgroundSyncRequestSent = new AtomicBoolean();
+        primaryTransportService.addSendBehavior((connection, requestId, action, request, options) -> {
+            if (action.startsWith(RetentionLeaseBackgroundSyncAction.ACTION_NAME)) {
+                backgroundSyncRequestSent.set(true);
+            }
+            connection.sendRequest(requestId, action, request, options);
+        });
+        final long start = System.nanoTime();
+        ensureGreen("index");
+        final long syncEnd = System.nanoTime();
+        // We sleep long enough for the retention leases background sync to be triggered
+        Thread.sleep(Math.max(0, randomIntBetween(2, 3) * syncIntervalSetting.millis() - TimeUnit.NANOSECONDS.toMillis(syncEnd - start)));
+        assertFalse("retention leases background sync must be a noop if soft deletes is disabled", backgroundSyncRequestSent.get());
+    }
+
     public void testRetentionLeasesSyncOnRecovery() throws Exception {
         final int numberOfReplicas = 2 - scaledRandomIntBetween(0, 2);
         internalCluster().ensureAtLeastNumDataNodes(1 + numberOfReplicas);
@@ -391,7 +420,7 @@ public class RetentionLeaseIT extends ESIntegTestCase  {
                         internalCluster().getInstance(TransportService.class, connection.getNode().getName());
                     final DiscoveryNode primaryNode = primaryTransportService.getLocalNode();
                     replicaTransportService.disconnectFromNode(primaryNode);
-                    AbstractSimpleTransportTestCase.connectToNode(replicaTransportService, primaryNode);
+                    replicaTransportService.connectToNode(primaryNode);
                 } else {
                     // return an exception to the FINALIZE action
                     throw new ElasticsearchException("failing recovery for test purposes");

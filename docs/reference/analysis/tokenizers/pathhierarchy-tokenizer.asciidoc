@@ -8,7 +8,7 @@ tree.
 [float]
 === Example output
 
-[source,console]
+[source,js]
 ---------------------------
 POST _analyze
 {
@@ -16,10 +16,11 @@ POST _analyze
   "text": "/one/two/three"
 }
 ---------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -47,6 +48,7 @@ POST _analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 
@@ -89,7 +91,7 @@ The `path_hierarchy` tokenizer accepts the following parameters:
 In this example, we configure the `path_hierarchy` tokenizer to split on `-`
 characters, and to replace them with `/`.  The first two tokens are skipped:
 
-[source,console]
+[source,js]
 ----------------------------
 PUT my_index
 {
@@ -118,10 +120,11 @@ POST my_index/_analyze
   "text": "one-two-three-four-five"
 }
 ----------------------------
+// CONSOLE
 
 /////////////////////
 
-[source,console-result]
+[source,js]
 ----------------------------
 {
   "tokens": [
@@ -149,6 +152,7 @@ POST my_index/_analyze
   ]
 }
 ----------------------------
+// TESTRESPONSE
 
 /////////////////////
 

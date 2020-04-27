@@ -67,7 +67,6 @@ public class TestingConventionRule implements Serializable {
     public void taskName(Pattern expression) {
         taskNames.add(expression);
     }
-
     public void taskName(String expression) {
         taskNames.add(Pattern.compile(expression));
     }

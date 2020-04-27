@@ -8,44 +8,37 @@
 
 Removes the assigned lifecycle policy from an index.
 
-[[ilm-remove-policy-request]]
-==== {api-request-title}
+==== Request
 
 `POST <index>/_ilm/remove`
 
-[[ilm-remove-policy-prereqs]]
-==== {api-prereq-title}
-
-* If the {es} {security-features} are enabled, you must have the `manage_ilm`
-privileges on the indices being managed to use this API. For more information,
-see <<security-privileges>>.
-
-[[ilm-remove-policy-desc]]
-==== {api-description-title}
+==== Description
 
 Removes the assigned lifecycle policy and stops managing the specified index.
 If an index pattern is specified, removes the assigned policies from all matching
 indices.
 
-[[ilm-remove-policy-path-params]]
-==== {api-path-parms-title}
+==== Path Parameters
 
-`<index>`::
-  (Required, string) Identifier for the index.
+`index` (required)::
+  (string) Identifier for the index.
 
-[[ilm-remove-policy-query-params]]
-==== {api-query-parms-title}
+==== Request Parameters
 
 include::{docdir}/rest-api/common-parms.asciidoc[tag=timeoutparms]
 
-[[ilm-remove-policy-example]]
-==== {api-examples-title}
+==== Authorization
+
+You must have the `manage_ilm` privileges on the indices being managed to use this API.
+For more information, see {stack-ov}/security-privileges.html[Security Privileges].
+
+==== Examples
 
 The following example removes the assigned policy from `my_index`.
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ilm/policy/my_policy
 {
@@ -76,21 +69,26 @@ PUT my_index
   }
 }
 --------------------------------------------------
+// CONSOLE
+// TEST
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST my_index/_ilm/remove
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 If the request succeeds, you receive the following result:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "has_failures" : false,
   "failed_indexes" : []
 }
 --------------------------------------------------
+// CONSOLE
+// TESTRESPONSE

@@ -37,11 +37,9 @@ public class ConnectionBuilder {
      *
      * @param connectionStringArg the connection string to connect to
      * @param keystoreLocation    the location of the keystore to configure. If null then use the system keystore.
-     * @param binaryCommunication should the communication between the CLI and server be binary (CBOR)
      * @throws UserException if there is a problem with the information provided by the user
      */
-    public ConnectionConfiguration buildConnection(String connectionStringArg, String keystoreLocation,
-                                                   boolean binaryCommunication) throws UserException {
+    public ConnectionConfiguration buildConnection(String connectionStringArg, String keystoreLocation) throws UserException {
         final URI uri;
         final String connectionString;
         Properties properties = new Properties();
@@ -93,8 +91,6 @@ public class ConnectionBuilder {
             properties.setProperty(ConnectionConfiguration.AUTH_USER, user);
             properties.setProperty(ConnectionConfiguration.AUTH_PASS, password);
         }
-        
-        properties.setProperty(ConnectionConfiguration.BINARY_COMMUNICATION, Boolean.toString(binaryCommunication));
 
         return newConnectionConfiguration(uri, connectionString, properties);
     }

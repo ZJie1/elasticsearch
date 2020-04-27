@@ -18,12 +18,13 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 
 /**
  * Request to delete expired model snapshots and forecasts
  */
-public class DeleteExpiredDataRequest implements Validatable {
+public class DeleteExpiredDataRequest extends ActionRequest {
 
    /**
      * Create a new request to delete expired data
@@ -31,4 +32,8 @@ public class DeleteExpiredDataRequest implements Validatable {
     public DeleteExpiredDataRequest() {
     }
 
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
+    }
 }

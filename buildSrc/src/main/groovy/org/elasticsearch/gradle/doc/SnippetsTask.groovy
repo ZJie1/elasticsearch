@@ -28,7 +28,6 @@ import org.gradle.api.InvalidUserDataException
 import org.gradle.api.file.ConfigurableFileTree
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 
 import java.nio.file.Path
@@ -37,7 +36,7 @@ import java.util.regex.Matcher
 /**
  * A task which will run a closure on each snippet in the documentation.
  */
-class SnippetsTask extends DefaultTask {
+public class SnippetsTask extends DefaultTask {
     private static final String SCHAR = /(?:\\\/|[^\/])/
     private static final String SUBSTITUTION = /s\/($SCHAR+)\/($SCHAR*)\//
     private static final String CATCH = /catch:\s*((?:\/[^\/]+\/)|[^ \]]+)/
@@ -52,7 +51,6 @@ class SnippetsTask extends DefaultTask {
      * Action to take on each snippet. Called with a single parameter, an
      * instance of Snippet.
      */
-    @Internal
     Closure perSnippet
 
     /**
@@ -66,8 +64,6 @@ class SnippetsTask extends DefaultTask {
         exclude 'build.gradle'
         // That is where the snippets go, not where they come from!
         exclude 'build'
-        exclude 'build-idea'
-        exclude 'build-eclipse'
     }
 
     /**
@@ -77,14 +73,13 @@ class SnippetsTask extends DefaultTask {
     Map<String, String> defaultSubstitutions = [:]
 
     @TaskAction
-    void executeTask() {
+    public void executeTask() {
         /*
          * Walks each line of each file, building snippets as it encounters
          * the lines that make up the snippet.
          */
         for (File file: docs) {
             String lastLanguage
-            String name
             int lastLanguageLine
             Snippet snippet = null
             StringBuilder contents = null
@@ -158,21 +153,19 @@ class SnippetsTask extends DefaultTask {
                 if (line ==~ /-{4,}\s*/) { // Four dashes looks like a snippet
                     if (snippet == null) {
                         Path path = docs.dir.toPath().relativize(file.toPath())
-                        snippet = new Snippet(path: path, start: lineNumber, testEnv: testEnv, name: name)
+                        snippet = new Snippet(path: path, start: lineNumber, testEnv: testEnv)
                         if (lastLanguageLine == lineNumber - 1) {
                             snippet.language = lastLanguage
                         }
-                        name = null
                     } else {
                         snippet.end = lineNumber
                     }
                     return
                 }
-                def source = matchSource(line)
-                if (source.matches) {
-                    lastLanguage = source.language
+                matcher = line =~ /\["?source"?,\s*"?([-\w]+)"?(,.*)?].*/
+                if (matcher.matches()) {
+                    lastLanguage = matcher.group(1)
                     lastLanguageLine = lineNumber
-                    name = source.name
                     return
                 }
                 if (line ==~ /\/\/\s*AUTOSENSE\s*/) {
@@ -315,20 +308,6 @@ class SnippetsTask extends DefaultTask {
         }
     }
 
-    static Source matchSource(String line) {
-        def matcher = line =~ /\["?source"?,\s*"?([-\w]+)"?(,((?!id=).)*(id="?([-\w]+)"?)?(.*))?].*/
-        if(matcher.matches()){
-            return new Source(matches: true, language: matcher.group(1),  name: matcher.group(5))
-        }
-        return new Source(matches: false)
-    }
-
-    static class Source {
-        boolean matches
-        String language
-        String name
-    }
-
     static class Snippet {
         static final int NOT_FINISHED = -1
 
@@ -355,7 +334,6 @@ class SnippetsTask extends DefaultTask {
         boolean curl
         List warnings = new ArrayList()
         boolean skipShardsFailures = false
-        String name
 
         @Override
         public String toString() {

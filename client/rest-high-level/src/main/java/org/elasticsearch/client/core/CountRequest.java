@@ -19,16 +19,13 @@
 
 package org.elasticsearch.client.core;
 
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
+import org.elasticsearch.action.IndicesRequest;
 import org.elasticsearch.action.support.IndicesOptions;
-import org.elasticsearch.client.Validatable;
 import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.xcontent.ToXContentObject;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.internal.SearchContext;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -37,43 +34,37 @@ import static org.elasticsearch.action.search.SearchRequest.DEFAULT_INDICES_OPTI
 /**
  * Encapsulates a request to _count API against one, several or all indices.
  */
-public final class CountRequest implements Validatable, ToXContentObject {
+public final class CountRequest extends ActionRequest implements IndicesRequest.Replaceable {
 
     private String[] indices = Strings.EMPTY_ARRAY;
     private String[] types = Strings.EMPTY_ARRAY;
     private String routing;
     private String preference;
-    private QueryBuilder query;
+    private SearchSourceBuilder searchSourceBuilder;
     private IndicesOptions indicesOptions = DEFAULT_INDICES_OPTIONS;
-    private int terminateAfter = SearchContext.DEFAULT_TERMINATE_AFTER;
-    private Float minScore;
 
-    public CountRequest() {}
+    public CountRequest() {
+        this.searchSourceBuilder = new SearchSourceBuilder();
+    }
 
     /**
      * Constructs a new count request against the indices. No indices provided here means that count will execute on all indices.
      */
     public CountRequest(String... indices) {
-        indices(indices);
+        this(indices, new SearchSourceBuilder());
     }
 
     /**
      * Constructs a new search request against the provided indices with the given search source.
-     *
-     * @deprecated The count api only supports a query. Use {@link #CountRequest(String[], QueryBuilder)} instead.
      */
-    @Deprecated
     public CountRequest(String[] indices, SearchSourceBuilder searchSourceBuilder) {
         indices(indices);
-        this.query = Objects.requireNonNull(searchSourceBuilder, "source must not be null").query();
+        this.searchSourceBuilder = searchSourceBuilder;
     }
 
-    /**
-     * Constructs a new search request against the provided indices with the given query.
-     */
-    public CountRequest(String[] indices, QueryBuilder query) {
-        indices(indices);
-        this.query = Objects.requireNonNull(query, "query must not be null");;
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     /**
@@ -90,20 +81,9 @@ public final class CountRequest implements Validatable, ToXContentObject {
 
     /**
      * The source of the count request.
-     *
-     * @deprecated The count api only supports a query. Use {@link #query(QueryBuilder)} instead.
      */
-    @Deprecated
     public CountRequest source(SearchSourceBuilder searchSourceBuilder) {
-        this.query = Objects.requireNonNull(searchSourceBuilder, "source must not be null").query();
-        return this;
-    }
-
-    /**
-     * Sets the query to execute for this count request.
-     */
-    public CountRequest query(QueryBuilder query) {
-        this.query = Objects.requireNonNull(query, "query must not be null");
+        this.searchSourceBuilder = Objects.requireNonNull(searchSourceBuilder, "source must not be null");
         return this;
     }
 
@@ -176,23 +156,20 @@ public final class CountRequest implements Validatable, ToXContentObject {
     }
 
     public Float minScore() {
-        return minScore;
+        return this.searchSourceBuilder.minScore();
     }
 
     public CountRequest minScore(Float minScore) {
-        this.minScore = minScore;
+        this.searchSourceBuilder.minScore(minScore);
         return this;
     }
 
     public int terminateAfter() {
-        return this.terminateAfter;
+        return this.searchSourceBuilder.terminateAfter();
     }
 
     public CountRequest terminateAfter(int terminateAfter) {
-        if (terminateAfter < 0) {
-            throw new IllegalArgumentException("terminateAfter must be > 0");
-        }
-        this.terminateAfter = terminateAfter;
+        this.searchSourceBuilder.terminateAfter(terminateAfter);
         return this;
     }
 
@@ -205,31 +182,8 @@ public final class CountRequest implements Validatable, ToXContentObject {
         return Arrays.copyOf(this.types, this.types.length);
     }
 
-    /**
-     * @return the source builder
-     * @deprecated The count api only supports a query. Use {@link #query()} instead.
-     */
-    @Deprecated
     public SearchSourceBuilder source() {
-        return new SearchSourceBuilder().query(query);
-    }
-
-    /**
-     * @return The provided query to execute with the count request or
-     * <code>null</code> if no query was provided.
-     */
-    public QueryBuilder query() {
-        return query;
-    }
-
-    @Override
-    public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject();
-        if (query != null) {
-            builder.field("query", query);
-        }
-        builder.endObject();
-        return builder;
+        return this.searchSourceBuilder;
     }
 
     @Override
@@ -245,15 +199,12 @@ public final class CountRequest implements Validatable, ToXContentObject {
             Arrays.equals(indices, that.indices) &&
             Arrays.equals(types, that.types) &&
             Objects.equals(routing, that.routing) &&
-            Objects.equals(preference, that.preference) &&
-            Objects.equals(terminateAfter, that.terminateAfter) &&
-            Objects.equals(minScore, that.minScore) &&
-            Objects.equals(query, that.query);
+            Objects.equals(preference, that.preference);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(indicesOptions, routing, preference, terminateAfter, minScore, query);
+        int result = Objects.hash(indicesOptions, routing, preference);
         result = 31 * result + Arrays.hashCode(indices);
         result = 31 * result + Arrays.hashCode(types);
         return result;

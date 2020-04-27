@@ -11,11 +11,13 @@ import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
 import org.elasticsearch.test.NotEqualMessageBuilder;
 import org.elasticsearch.test.rest.ESRestTestCase;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.UnsupportedCharsetException;
 import java.sql.JDBCType;
 import java.util.HashMap;
@@ -25,8 +27,6 @@ import java.util.Map;
 import static java.util.Collections.singletonList;
 import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.mode;
 import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.randomMode;
-import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.toMap;
-import static org.elasticsearch.xpack.sql.qa.rest.BaseRestSqlTestCase.version;
 import static org.elasticsearch.xpack.sql.qa.rest.RestSqlTestCase.SQL_QUERY_REST_ENDPOINT;
 import static org.elasticsearch.xpack.sql.qa.rest.RestSqlTestCase.columnInfo;
 
@@ -101,7 +101,9 @@ public class RestSqlMultinodeIT extends ESRestTestCase {
     }
 
     private Map<String, Object> responseToMap(Response response) throws IOException {
-        return toMap(response, "plain");
+        try (InputStream content = response.getEntity().getContent()) {
+            return XContentHelper.convertToMap(JsonXContent.jsonXContent, content, false);
+        }
     }
 
     private void assertCount(RestClient client, int count) throws IOException {
@@ -111,8 +113,8 @@ public class RestSqlMultinodeIT extends ESRestTestCase {
         expected.put("rows", singletonList(singletonList(count)));
 
         Request request = new Request("POST", SQL_QUERY_REST_ENDPOINT);
-        request.setJsonEntity("{\"query\": \"SELECT COUNT(*) FROM test\"" + mode(mode) + version(mode) + "}");
-        Map<String, Object> actual = toMap(client.performRequest(request), mode);
+        request.setJsonEntity("{\"query\": \"SELECT COUNT(*) FROM test\"" + mode(mode) + "}");
+        Map<String, Object> actual = responseToMap(client.performRequest(request));
 
         if (false == expected.equals(actual)) {
             NotEqualMessageBuilder message = new NotEqualMessageBuilder();

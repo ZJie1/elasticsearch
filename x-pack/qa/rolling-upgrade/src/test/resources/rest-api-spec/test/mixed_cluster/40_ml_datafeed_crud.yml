@@ -1,3 +1,8 @@
+setup:
+  - skip:
+      version: "all"
+      reason:  "AwaitsFix https://github.com/elastic/elasticsearch/issues/42258"
+
 ---
 "Test old cluster datafeed without aggs":
   - do:
@@ -18,10 +23,7 @@
 ---
 "Test old cluster datafeed with aggs":
   - skip:
-      features: warnings
-      #TODO remove skip when master is bumped to 9.0.0
-      version: "all"
-      reason: "If we hit the old node we get a warning. If we hit the new node, we don't"
+      features: "warnings"
   - do:
       warnings:
         - '[interval] on [date_histogram] is deprecated, use [fixed_interval] or [calendar_interval] in the future.'
@@ -86,6 +88,9 @@
 
 ---
 "Put job and datafeed with aggs in mixed cluster":
+  - skip:
+      features: "warnings"
+
   - do:
       ml.put_job:
         job_id: mixed-cluster-datafeed-job-with-aggs
@@ -107,6 +112,9 @@
           }
 
   - do:
+      warnings:
+        - '[interval] on [date_histogram] is deprecated, use [fixed_interval] or [calendar_interval] in the future.'
+        - '[interval] on [date_histogram] is deprecated, use [fixed_interval] or [calendar_interval] in the future.'
       ml.put_datafeed:
         datafeed_id: mixed-cluster-datafeed-with-aggs
         body:  >
@@ -118,7 +126,7 @@
               "buckets": {
                 "date_histogram": {
                   "field": "time",
-                  "fixed_interval": "30s",
+                  "interval": "30s",
                   "time_zone": "UTC"
                 },
                 "aggregations": {

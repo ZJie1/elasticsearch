@@ -109,27 +109,6 @@ setup:
               ]
             }
 
-  - do:
-      security.put_role:
-        name: "role_containing_wildcard_app_name_and_plain_app_name"
-        body:  >
-          {
-            "cluster": [],
-            "indices": [],
-            "applications": [
-              {
-                "application": "myapp",
-                "privileges": ["user"],
-                "resources": ["*"]
-              },
-              {
-                "application": "yourapp-*",
-                "privileges": ["read"],
-                "resources": ["*"]
-              }
-            ]
-          }
-
   # And a user for each role
   - do:
       security.put_user:
@@ -155,14 +134,6 @@ setup:
                 "password": "p@ssw0rd",
                 "roles" : [ "yourapp_read_config" ]
               }
-  - do:
-      security.put_user:
-        username: "myapp_yourapp_wildard_role_user"
-        body:  >
-          {
-            "password": "p@ssw0rd",
-            "roles" : [ "role_containing_wildcard_app_name_and_plain_app_name" ]
-          }
 
 ---
 teardown:
@@ -198,11 +169,6 @@ teardown:
         ignore: 404
 
   - do:
-      security.delete_user:
-        username: "myapp_yourapp_wildard_role_user"
-        ignore: 404
-
-  - do:
       security.delete_role:
         name: "myapp_engineering_read"
         ignore: 404
@@ -216,12 +182,6 @@ teardown:
       security.delete_role:
         name: "yourapp_read_config"
         ignore: 404
-
-  - do:
-      security.delete_role:
-        name: "role_containing_wildcard_app_name_and_plain_app_name"
-        ignore: 404
-
 ---
 "Test has_privileges with application-privileges":
   - do:
@@ -331,48 +291,3 @@ teardown:
         }
       }
     } }
-
-  - do:
-      headers: { Authorization: "Basic bXlhcHBfeW91cmFwcF93aWxkYXJkX3JvbGVfdXNlcjpwQHNzdzByZA==" } # myapp_yourapp_wildard_role_user
-      security.has_privileges:
-        user: null
-        body: >
-          {
-            "application": [
-              {
-                "application" : "myapp",
-                "resources" : [ "*" ],
-                "privileges" : [ "action:login" ]
-              },
-              {
-                "application" : "yourapp-v1",
-                "resources" : [ "*" ],
-                "privileges" : [ "read" ]
-              },
-              {
-                "application" : "yourapp-v2",
-                "resources" : [ "*" ],
-                "privileges" : [ "read" ]
-              }
-            ]
-          }
-
-  - match: { "username" : "myapp_yourapp_wildard_role_user" }
-  - match: { "has_all_requested" : true }
-  - match: { "application" : {
-    "myapp" : {
-      "*" : {
-        "action:login" : true
-      }
-    },
-    "yourapp-v1": {
-      "*": {
-        "read": true
-      }
-    },
-    "yourapp-v2": {
-      "*": {
-        "read": true
-      }
-    }
-  } }

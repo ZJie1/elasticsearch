@@ -33,6 +33,7 @@ import org.elasticsearch.search.internal.InternalSearchResponse;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * This search phase is an optional phase that will be executed once all hits are fetched from the shards that executes
@@ -42,13 +43,14 @@ import java.util.List;
 final class ExpandSearchPhase extends SearchPhase {
     private final SearchPhaseContext context;
     private final InternalSearchResponse searchResponse;
-    private final String scrollId;
+    private final Function<InternalSearchResponse, SearchPhase> nextPhaseFactory;
 
-    ExpandSearchPhase(SearchPhaseContext context, InternalSearchResponse searchResponse, String scrollId) {
+    ExpandSearchPhase(SearchPhaseContext context, InternalSearchResponse searchResponse,
+                      Function<InternalSearchResponse, SearchPhase> nextPhaseFactory) {
         super("expand");
         this.context = context;
         this.searchResponse = searchResponse;
-        this.scrollId = scrollId;
+        this.nextPhaseFactory = nextPhaseFactory;
     }
 
     /**
@@ -110,11 +112,11 @@ final class ExpandSearchPhase extends SearchPhase {
                             hit.getInnerHits().put(innerHitBuilder.getName(), innerHits);
                         }
                     }
-                    context.sendSearchResponse(searchResponse, scrollId);
+                    context.executeNextPhase(this, nextPhaseFactory.apply(searchResponse));
                 }, context::onFailure)
             );
         } else {
-            context.sendSearchResponse(searchResponse, scrollId);
+            context.executeNextPhase(this, nextPhaseFactory.apply(searchResponse));
         }
     }
 

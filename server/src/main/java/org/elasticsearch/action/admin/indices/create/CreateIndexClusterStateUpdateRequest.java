@@ -24,12 +24,13 @@ import org.elasticsearch.action.admin.indices.shrink.ResizeType;
 import org.elasticsearch.action.support.ActiveShardCount;
 import org.elasticsearch.cluster.ack.ClusterStateUpdateRequest;
 import org.elasticsearch.cluster.block.ClusterBlock;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
-import org.elasticsearch.common.Nullable;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.Index;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -43,11 +44,10 @@ public class CreateIndexClusterStateUpdateRequest extends ClusterStateUpdateRequ
     private Index recoverFrom;
     private ResizeType resizeType;
     private boolean copySettings;
-    private Boolean preferV2Templates;
 
     private Settings settings = Settings.Builder.EMPTY_SETTINGS;
 
-    private String mappings = "{}";
+    private final Map<String, String> mappings = new HashMap<>();
 
     private final Set<Alias> aliases = new HashSet<>();
 
@@ -66,8 +66,8 @@ public class CreateIndexClusterStateUpdateRequest extends ClusterStateUpdateRequ
         return this;
     }
 
-    public CreateIndexClusterStateUpdateRequest mappings(String mappings) {
-        this.mappings = mappings;
+    public CreateIndexClusterStateUpdateRequest mappings(Map<String, String> mappings) {
+        this.mappings.putAll(mappings);
         return this;
     }
 
@@ -96,11 +96,6 @@ public class CreateIndexClusterStateUpdateRequest extends ClusterStateUpdateRequ
         return this;
     }
 
-    public CreateIndexClusterStateUpdateRequest preferV2Templates(@Nullable Boolean preferV2Templates) {
-        this.preferV2Templates = preferV2Templates;
-        return this;
-    }
-
     public String cause() {
         return cause;
     }
@@ -113,7 +108,7 @@ public class CreateIndexClusterStateUpdateRequest extends ClusterStateUpdateRequ
         return settings;
     }
 
-    public String mappings() {
+    public Map<String, String> mappings() {
         return mappings;
     }
 
@@ -131,7 +126,7 @@ public class CreateIndexClusterStateUpdateRequest extends ClusterStateUpdateRequ
 
     /**
      * The name that was provided by the user. This might contain a date math expression.
-     * @see IndexMetadata#SETTING_INDEX_PROVIDED_NAME
+     * @see IndexMetaData#SETTING_INDEX_PROVIDED_NAME
      */
     public String getProvidedName() {
         return providedName;
@@ -152,25 +147,4 @@ public class CreateIndexClusterStateUpdateRequest extends ClusterStateUpdateRequ
         return copySettings;
     }
 
-    @Nullable
-    public Boolean preferV2Templates() {
-        return preferV2Templates;
-    }
-
-    @Override
-    public String toString() {
-        return "CreateIndexClusterStateUpdateRequest{" +
-            "cause='" + cause + '\'' +
-            ", index='" + index + '\'' +
-            ", providedName='" + providedName + '\'' +
-            ", recoverFrom=" + recoverFrom +
-            ", resizeType=" + resizeType +
-            ", copySettings=" + copySettings +
-            ", settings=" + settings +
-            ", aliases=" + aliases +
-            ", blocks=" + blocks +
-            ", waitForActiveShards=" + waitForActiveShards +
-            ", preferV2Templates=" + preferV2Templates +
-            '}';
-    }
 }

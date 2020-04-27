@@ -28,7 +28,6 @@ import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.tasks.Task;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.BitSet;
@@ -111,8 +110,15 @@ public class DeprecationLogger {
         this.logger = LogManager.getLogger(name);
     }
 
+    /**
+     * Logs a deprecation message, adding a formatted warning message as a response header on the thread context.
+     */
+    public void deprecated(String msg, Object... params) {
+        deprecated(THREAD_CONTEXT, msg, params);
+    }
+
     // LRU set of keys used to determine if a deprecation message should be emitted to the deprecation logs
-    private final Set<String> keys = Collections.newSetFromMap(Collections.synchronizedMap(new LinkedHashMap<>() {
+    private Set<String> keys = Collections.newSetFromMap(Collections.synchronizedMap(new LinkedHashMap<String, Boolean>() {
         @Override
         protected boolean removeEldestEntry(final Map.Entry<String, Boolean> eldest) {
             return size() > 128;
@@ -129,8 +135,8 @@ public class DeprecationLogger {
      */
     public void deprecatedAndMaybeLog(final String key, final String msg, final Object... params) {
         String xOpaqueId = getXOpaqueId(THREAD_CONTEXT);
-        boolean shouldLog = keys.add(xOpaqueId + key);
-        deprecated(THREAD_CONTEXT, msg, shouldLog, params);
+        boolean log = keys.add(xOpaqueId + key);
+        deprecated(THREAD_CONTEXT, msg, log, params);
     }
 
     /*
@@ -168,8 +174,6 @@ public class DeprecationLogger {
                     "GMT" + // GMT
                     "\")?"); // closing quote (optional, since an older version can still send a warn-date)
 
-    public static final Pattern WARNING_XCONTENT_LOCATION_PATTERN = Pattern.compile("^\\[.*?]\\[-?\\d+:-?\\d+] ");
-
     /**
      * Extracts the warning value from the value of a warning header that is formatted according to RFC 7234. That is, given a string
      * {@code 299 Elasticsearch-6.0.0 "warning value"}, the return value of this method would be {@code warning value}.
@@ -177,7 +181,7 @@ public class DeprecationLogger {
      * @param s the value of a warning header formatted according to RFC 7234.
      * @return the extracted warning value
      */
-    public static String extractWarningValueFromWarningHeader(final String s, boolean stripXContentPosition) {
+    public static String extractWarningValueFromWarningHeader(final String s) {
         /*
          * We know the exact format of the warning header, so to extract the warning value we can skip forward from the front to the first
          * quote and we know the last quote is at the end of the string
@@ -192,14 +196,8 @@ public class DeprecationLogger {
          */
         final int firstQuote = s.indexOf('\"');
         final int lastQuote = s.length() - 1;
-        String warningValue = s.substring(firstQuote + 1, lastQuote);
+        final String warningValue = s.substring(firstQuote + 1, lastQuote);
         assert assertWarningValue(s, warningValue);
-        if (stripXContentPosition) {
-            Matcher matcher = WARNING_XCONTENT_LOCATION_PATTERN.matcher(warningValue);
-            if (matcher.find()) {
-                warningValue = warningValue.substring(matcher.end());
-            }
-        }
         return warningValue;
     }
 
@@ -228,13 +226,13 @@ public class DeprecationLogger {
         deprecated(threadContexts, message, true, params);
     }
 
-    void deprecated(final Set<ThreadContext> threadContexts, final String message, final boolean shouldLog, final Object... params) {
+    void deprecated(final Set<ThreadContext> threadContexts, final String message, final boolean log, final Object... params) {
         final Iterator<ThreadContext> iterator = threadContexts.iterator();
         if (iterator.hasNext()) {
             final String formattedMessage = LoggerMessageFormat.format(message, params);
             final String warningHeaderValue = formatWarning(formattedMessage);
             assert WARNING_HEADER_PATTERN.matcher(warningHeaderValue).matches();
-            assert extractWarningValueFromWarningHeader(warningHeaderValue, false).equals(escapeAndEncode(formattedMessage));
+            assert extractWarningValueFromWarningHeader(warningHeaderValue).equals(escapeAndEncode(formattedMessage));
             while (iterator.hasNext()) {
                 try {
                     final ThreadContext next = iterator.next();
@@ -245,17 +243,17 @@ public class DeprecationLogger {
             }
         }
 
-        if (shouldLog) {
+        if (log) {
             AccessController.doPrivileged(new PrivilegedAction<Void>() {
                 @SuppressLoggerChecks(reason = "safely delegates to logger")
                 @Override
                 public Void run() {
-                    /*
+                    /**
                      * There should be only one threadContext (in prod env), @see DeprecationLogger#setThreadContext
                      */
                     String opaqueId = getXOpaqueId(threadContexts);
 
-                    logger.warn(DeprecatedMessage.of(opaqueId, message, params));
+                    logger.warn(new DeprecatedMessage(message, opaqueId, params));
                     return null;
                 }
             });
@@ -264,6 +262,7 @@ public class DeprecationLogger {
 
     public String getXOpaqueId(Set<ThreadContext> threadContexts) {
         return threadContexts.stream()
+                             .filter(t -> t.isClosed() == false)
                              .filter(t -> t.getHeader(Task.X_OPAQUE_ID) != null)
                              .findFirst()
                              .map(t -> t.getHeader(Task.X_OPAQUE_ID))
@@ -354,7 +353,7 @@ public class DeprecationLogger {
         assert doesNotNeedEncoding.get('%') == false : doesNotNeedEncoding;
     }
 
-    private static final Charset UTF_8 = StandardCharsets.UTF_8;
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     /**
      * Encode a string containing characters outside of the legal characters for an RFC 7230 quoted-string.

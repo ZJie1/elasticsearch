@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.elasticsearch.xpack.core.ml.dataframe.evaluation.MlEvaluationNamedXContentProvider.registeredMetricName;
-
 public class Recall extends AbstractConfusionMatrixMetric {
 
     public static final ParseField NAME = new ParseField("recall");
@@ -37,7 +35,7 @@ public class Recall extends AbstractConfusionMatrixMetric {
     }
 
     public Recall(List<Double> at) {
-        super(at);
+        super(at.stream().mapToDouble(Double::doubleValue).toArray());
     }
 
     public Recall(StreamInput in) throws IOException {
@@ -46,11 +44,11 @@ public class Recall extends AbstractConfusionMatrixMetric {
 
     @Override
     public String getWriteableName() {
-        return registeredMetricName(BinarySoftClassification.NAME, NAME);
+        return NAME.getPreferredName();
     }
 
     @Override
-    public String getName() {
+    public String getMetricName() {
         return NAME.getPreferredName();
     }
 
@@ -68,23 +66,22 @@ public class Recall extends AbstractConfusionMatrixMetric {
     }
 
     @Override
-    protected List<AggregationBuilder> aggsAt(String actualField, String predictedProbabilityField) {
+    protected List<AggregationBuilder> aggsAt(String actualField, List<ClassInfo> classInfos, double threshold) {
         List<AggregationBuilder> aggs = new ArrayList<>();
-        for (int i = 0; i < thresholds.length; i++) {
-            double threshold = thresholds[i];
-            aggs.add(buildAgg(actualField, predictedProbabilityField, threshold, Condition.TP));
-            aggs.add(buildAgg(actualField, predictedProbabilityField, threshold, Condition.FN));
+        for (ClassInfo classInfo: classInfos) {
+            aggs.add(buildAgg(classInfo, threshold, Condition.TP));
+            aggs.add(buildAgg(classInfo, threshold, Condition.FN));
         }
         return aggs;
     }
 
     @Override
-    public EvaluationMetricResult evaluate(Aggregations aggs) {
+    public EvaluationMetricResult evaluate(ClassInfo classInfo, Aggregations aggs) {
         double[] recalls = new double[thresholds.length];
-        for (int i = 0; i < thresholds.length; i++) {
+        for (int i = 0; i < recalls.length; i++) {
             double threshold = thresholds[i];
-            Filter tpAgg = aggs.get(aggName(threshold, Condition.TP));
-            Filter fnAgg = aggs.get(aggName(threshold, Condition.FN));
+            Filter tpAgg = aggs.get(aggName(classInfo, threshold, Condition.TP));
+            Filter fnAgg = aggs.get(aggName(classInfo, threshold, Condition.FN));
             long tp = tpAgg.getDocCount();
             long fn = fnAgg.getDocCount();
             recalls[i] = tp + fn == 0 ? 0.0 : (double) tp / (tp + fn);

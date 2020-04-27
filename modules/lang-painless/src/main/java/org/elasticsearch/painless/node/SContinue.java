@@ -19,42 +19,55 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.ContinueNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+
+import java.util.Set;
 
 /**
  * Represents a continue statement.
  */
-public class SContinue extends AStatement {
+public final class SContinue extends AStatement {
 
     public SContinue(Location location) {
         super(location);
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        // do nothing
+    }
 
-        if (input.inLoop == false) {
+    @Override
+    void extractVariables(Set<String> variables) {
+        // Do nothing.
+    }
+
+    @Override
+    void analyze(Locals locals) {
+        if (!inLoop) {
             throw createError(new IllegalArgumentException("Continue statement outside of a loop."));
         }
 
-        if (input.lastLoop) {
+        if (lastLoop) {
             throw createError(new IllegalArgumentException("Extraneous continue statement."));
         }
 
-        output.allEscape = true;
-        output.anyContinue = true;
-        output.statementCount = 1;
+        allEscape = true;
+        anyContinue = true;
+        statementCount = 1;
+    }
 
-        ContinueNode continueNode = new ContinueNode();
-        continueNode.setLocation(location);
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.goTo(continu);
+    }
 
-        output.statementNode = continueNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString();
     }
 }

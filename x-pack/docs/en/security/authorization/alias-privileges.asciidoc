@@ -2,8 +2,7 @@
 [[securing-aliases]]
 === Granting privileges for indices and aliases
 
-Elasticsearch allows to execute operations against
-<<indices-aliases,index aliases>>,
+Elasticsearch allows to execute operations against {ref}/indices-aliases.html[index aliases],
 which are effectively virtual indices. An alias points to one or more indices,
 holds metadata and potentially a filter. The {es} {security-features} treat
 aliases and indices
@@ -26,11 +25,12 @@ points to it called `current_year`, and a user with the following role:
 
 The user attempts to retrieve a document from `current_year`:
 
-[source,console]
+[source,shell]
 -------------------------------------------------------------------------------
-GET /current_year/_doc/1
+GET /current_year/event/1
 -------------------------------------------------------------------------------
-// TEST[s/^/PUT 2015\n{"aliases": {"current_year": {}}}\nPUT 2015\/_doc\/1\n{}\n/]
+// CONSOLE
+// TEST[s/^/PUT 2015\n{"aliases": {"current_year": {}}}\nPUT 2015\/event\/1\n{}\n/]
 
 The above request gets rejected, although the user has `read` privilege on the
 concrete index that the `current_year` alias points to. The correct permission
@@ -52,7 +52,7 @@ Unlike creating indices, which requires the `create_index` privilege, adding,
 removing and retrieving aliases requires the `manage` permission. Aliases can be
 added to an index directly as part of the index creation:
 
-[source,console]
+[source,shell]
 -------------------------------------------------------------------------------
 PUT /2015
 {
@@ -61,10 +61,11 @@ PUT /2015
     }
 }
 -------------------------------------------------------------------------------
+// CONSOLE
 
 or via the dedicated aliases api if the index already exists:
 
-[source,console]
+[source,shell]
 -------------------------------------------------------------------------------
 POST /_aliases
 {
@@ -73,6 +74,7 @@ POST /_aliases
     ]
 }
 -------------------------------------------------------------------------------
+// CONSOLE
 // TEST[s/^/PUT 2015\n/]
 
 The above requests both require the `manage` privilege on the alias name as well
@@ -98,4 +100,4 @@ alias need the `manage` permission.
 Aliases can hold a filter, which allows to select a subset of documents that can
 be accessed out of all the documents that the physical index contains. These
 filters are not always applied and should not be used in place of
-<<document-level-security,document level security>>.
+<<document-level-security, document level security>>.

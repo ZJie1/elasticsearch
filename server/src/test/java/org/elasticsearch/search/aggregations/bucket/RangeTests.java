@@ -76,7 +76,7 @@ public class RangeTests extends BaseAggregationTestCase<RangeAggregationBuilder>
             "}";
         XContentParser parser = createParser(JsonXContent.jsonXContent, rangeAggregation);
         XContentParseException ex = expectThrows(XContentParseException.class,
-                () -> RangeAggregationBuilder.PARSER.parse(parser, "aggregationName"));
+                () -> RangeAggregationBuilder.parse("aggregationName", parser));
         assertThat(ex.getCause(), notNullValue());
         assertThat(ex.getCause().getMessage(), containsString("badField"));
     }
@@ -92,7 +92,7 @@ public class RangeTests extends BaseAggregationTestCase<RangeAggregationBuilder>
                 "]\n" +
             "}";
         XContentParser parser = createParser(JsonXContent.jsonXContent, rangeAggregation);
-        RangeAggregationBuilder aggregationBuilder = RangeAggregationBuilder.PARSER.parse(parser, "aggregationName");
+        RangeAggregationBuilder aggregationBuilder = (RangeAggregationBuilder) RangeAggregationBuilder.parse("aggregationName", parser);
         assertEquals(1, aggregationBuilder.ranges().size());
         assertEquals(Double.NEGATIVE_INFINITY, aggregationBuilder.ranges().get(0).getFrom(), 0.0);
         assertEquals(Double.POSITIVE_INFINITY, aggregationBuilder.ranges().get(0).getTo(), 0.0);

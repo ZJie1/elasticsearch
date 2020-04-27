@@ -8,7 +8,7 @@ Wraps a <<query-dsl-bool-query, filter query>> and returns every matching
 document with a <<relevance-scores,relevance score>> equal to the `boost`
 parameter value.
 
-[source,console]
+[source,js]
 ----
 GET /_search
 {
@@ -22,6 +22,7 @@ GET /_search
     }
 }
 ----
+// CONSOLE
 
 [[constant-score-top-level-params]]
 ==== Top-level parameters for `constant_score`

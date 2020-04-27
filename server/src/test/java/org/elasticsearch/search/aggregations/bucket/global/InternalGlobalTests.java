@@ -19,9 +19,11 @@
 
 package org.elasticsearch.search.aggregations.bucket.global;
 
+import org.elasticsearch.common.io.stream.Writeable.Reader;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.InternalSingleBucketAggregationTestCase;
 import org.elasticsearch.search.aggregations.bucket.ParsedSingleBucketAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
 import java.util.List;
 import java.util.Map;
@@ -29,13 +31,18 @@ import java.util.Map;
 public class InternalGlobalTests extends InternalSingleBucketAggregationTestCase<InternalGlobal> {
     @Override
     protected InternalGlobal createTestInstance(String name, long docCount, InternalAggregations aggregations,
-            Map<String, Object> metadata) {
-        return new InternalGlobal(name, docCount, aggregations, metadata);
+            List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData) {
+        return new InternalGlobal(name, docCount, aggregations, pipelineAggregators, metaData);
     }
 
     @Override
     protected void extraAssertReduced(InternalGlobal reduced, List<InternalGlobal> inputs) {
         // Nothing extra to assert
+    }
+
+    @Override
+    protected Reader<InternalGlobal> instanceReader() {
+        return InternalGlobal::new;
     }
 
     @Override

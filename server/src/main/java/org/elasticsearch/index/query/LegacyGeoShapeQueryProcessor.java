@@ -26,10 +26,8 @@ import org.apache.lucene.spatial.prefix.PrefixTreeStrategy;
 import org.apache.lucene.spatial.prefix.RecursivePrefixTreeStrategy;
 import org.apache.lucene.spatial.query.SpatialArgs;
 import org.apache.lucene.spatial.query.SpatialOperation;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.geo.ShapeRelation;
 import org.elasticsearch.common.geo.SpatialStrategy;
-import org.elasticsearch.common.geo.builders.CircleBuilder;
 import org.elasticsearch.common.geo.builders.EnvelopeBuilder;
 import org.elasticsearch.common.geo.builders.GeometryCollectionBuilder;
 import org.elasticsearch.common.geo.builders.LineStringBuilder;
@@ -39,7 +37,6 @@ import org.elasticsearch.common.geo.builders.MultiPolygonBuilder;
 import org.elasticsearch.common.geo.builders.PointBuilder;
 import org.elasticsearch.common.geo.builders.PolygonBuilder;
 import org.elasticsearch.common.geo.builders.ShapeBuilder;
-import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.geometry.Circle;
 import org.elasticsearch.geometry.Geometry;
 import org.elasticsearch.geometry.GeometryCollection;
@@ -52,8 +49,7 @@ import org.elasticsearch.geometry.MultiPolygon;
 import org.elasticsearch.geometry.Point;
 import org.elasticsearch.geometry.Polygon;
 import org.elasticsearch.geometry.Rectangle;
-import org.elasticsearch.index.mapper.AbstractShapeGeometryFieldMapper;
-import org.elasticsearch.index.mapper.AbstractGeometryFieldMapper.AbstractGeometryFieldType.QueryProcessor;
+import org.elasticsearch.index.mapper.AbstractGeometryFieldMapper;
 import org.elasticsearch.index.mapper.LegacyGeoShapeFieldMapper;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.spatial4j.shape.Shape;
@@ -61,13 +57,11 @@ import org.locationtech.spatial4j.shape.Shape;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.elasticsearch.search.SearchService.ALLOW_EXPENSIVE_QUERIES;
+public class LegacyGeoShapeQueryProcessor implements AbstractGeometryFieldMapper.QueryProcessor {
 
-public class LegacyGeoShapeQueryProcessor implements QueryProcessor {
+    private AbstractGeometryFieldMapper.AbstractGeometryFieldType ft;
 
-    private AbstractShapeGeometryFieldMapper.AbstractShapeGeometryFieldType ft;
-
-    public LegacyGeoShapeQueryProcessor(AbstractShapeGeometryFieldMapper.AbstractShapeGeometryFieldType ft) {
+    public LegacyGeoShapeQueryProcessor(AbstractGeometryFieldMapper.AbstractGeometryFieldType ft) {
         this.ft = ft;
     }
 
@@ -78,11 +72,6 @@ public class LegacyGeoShapeQueryProcessor implements QueryProcessor {
 
     @Override
     public Query process(Geometry shape, String fieldName, SpatialStrategy strategy, ShapeRelation relation, QueryShardContext context) {
-        if (context.allowExpensiveQueries() == false) {
-            throw new ElasticsearchException("[geo-shape] queries on [PrefixTree geo shapes] cannot be executed when '"
-                    + ALLOW_EXPENSIVE_QUERIES.getKey() + "' is set to false.");
-        }
-
         LegacyGeoShapeFieldMapper.GeoShapeFieldType shapeFieldType = (LegacyGeoShapeFieldMapper.GeoShapeFieldType) ft;
         SpatialStrategy spatialStrategy = shapeFieldType.strategy();
         if (strategy != null) {
@@ -134,7 +123,7 @@ public class LegacyGeoShapeQueryProcessor implements QueryProcessor {
         ShapeBuilder<?, ?, ?> shapeBuilder = geometry.visit(new GeometryVisitor<>() {
             @Override
             public ShapeBuilder<?, ?, ?> visit(Circle circle) {
-                return new CircleBuilder().center(circle.getLon(), circle.getLat()).radius(circle.getRadiusMeters(), DistanceUnit.METERS);
+                throw new UnsupportedOperationException("circle is not supported");
             }
 
             @Override

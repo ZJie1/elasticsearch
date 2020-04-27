@@ -21,27 +21,23 @@ package org.elasticsearch.client;
 
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.elasticsearch.action.admin.cluster.node.tasks.cancel.CancelTasksRequest;
 import org.elasticsearch.action.admin.cluster.node.tasks.list.ListTasksRequest;
 import org.elasticsearch.client.RequestConverters.EndpointBuilder;
-import org.elasticsearch.client.tasks.CancelTasksRequest;
 import org.elasticsearch.client.tasks.GetTaskRequest;
 
 final class TasksRequestConverters {
 
     private TasksRequestConverters() {}
 
-    static Request cancelTasks(CancelTasksRequest req) {
+    static Request cancelTasks(CancelTasksRequest cancelTasksRequest) {
         Request request = new Request(HttpPost.METHOD_NAME, "/_tasks/_cancel");
         RequestConverters.Params params = new RequestConverters.Params();
-        req.getTimeout().ifPresent(params::withTimeout);
-        req.getTaskId().ifPresent(params::withTaskId);
-        req.getParentTaskId().ifPresent(params::withParentTaskId);
-        params
-            .withNodes(req.getNodes())
-            .withActions(req.getActions());
-        if (req.getWaitForCompletion() != null) {
-            params.withWaitForCompletion(req.getWaitForCompletion());
-        }
+        params.withTimeout(cancelTasksRequest.getTimeout())
+            .withTaskId(cancelTasksRequest.getTaskId())
+            .withNodes(cancelTasksRequest.getNodes())
+            .withParentTaskId(cancelTasksRequest.getParentTaskId())
+            .withActions(cancelTasksRequest.getActions());
         request.addParameters(params.asMap());
         return request;
     }
@@ -74,5 +70,5 @@ final class TasksRequestConverters {
         request.addParameters(params.asMap());
         return request;
     }
-
+    
 }

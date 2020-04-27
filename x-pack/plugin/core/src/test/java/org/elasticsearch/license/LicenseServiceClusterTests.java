@@ -23,6 +23,7 @@ import java.util.Collection;
 
 import static org.elasticsearch.test.ESIntegTestCase.Scope.TEST;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.nullValue;
 
 @ClusterScope(scope = TEST, numDataNodes = 0, numClientNodes = 0, maxNumDataNodes = 0)
 public class LicenseServiceClusterTests extends AbstractLicensesIntegrationTestCase {
@@ -72,14 +73,14 @@ public class LicenseServiceClusterTests extends AbstractLicensesIntegrationTestC
         assertThat(licensingClient.prepareGetLicense().get().license(), equalTo(license));
         logger.info("--> remove licenses");
         licensingClient.prepareDeleteLicense().get();
-        assertOperationMode(License.OperationMode.BASIC);
+        assertOperationMode(License.OperationMode.MISSING);
 
         logger.info("--> restart all nodes");
         internalCluster().fullRestart();
         licensingClient = new LicensingClient(client());
         ensureYellow();
-        assertTrue(License.LicenseType.isBasic(licensingClient.prepareGetLicense().get().license().type()));
-        assertOperationMode(License.OperationMode.BASIC);
+        assertThat(licensingClient.prepareGetLicense().get().license(), nullValue());
+        assertOperationMode(License.OperationMode.MISSING);
 
 
         wipeAllLicenses();
@@ -168,15 +169,16 @@ public class LicenseServiceClusterTests extends AbstractLicensesIntegrationTestC
         assertLicenseActive(true);
     }
 
-    private void assertOperationMode(License.OperationMode operationMode) throws Exception {
-        assertBusy(() -> {
+    private void assertOperationMode(License.OperationMode operationMode) throws InterruptedException {
+        boolean success = awaitBusy(() -> {
             for (XPackLicenseState licenseState : internalCluster().getDataNodeInstances(XPackLicenseState.class)) {
                 if (licenseState.getOperationMode() == operationMode) {
-                    return;
+                    return true;
                 }
             }
-            fail("No data nodes found with operation mode [" + operationMode + "]");
+            return false;
         });
+        assertTrue(success);
     }
 
     private void writeCloudInternalMode(String mode) throws Exception {

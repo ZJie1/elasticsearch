@@ -41,8 +41,6 @@ public class NodeToolCli extends MultiCommand {
         subcommands.put("unsafe-bootstrap", new UnsafeBootstrapMasterCommand());
         subcommands.put("detach-cluster", new DetachClusterCommand());
         subcommands.put("override-version", new OverrideNodeVersionCommand());
-        subcommands.put("remove-settings", new RemoveSettingsCommand());
-        subcommands.put("remove-customs", new RemoveCustomsCommand());
     }
 
     public static void main(String[] args) throws Exception {

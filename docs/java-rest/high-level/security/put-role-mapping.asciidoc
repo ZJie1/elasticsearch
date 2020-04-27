@@ -1,4 +1,3 @@
-[role="xpack"]
 [[java-rest-high-security-put-role-mapping]]
 === Put Role Mapping API
 

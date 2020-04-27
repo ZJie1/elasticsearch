@@ -59,12 +59,12 @@ public class ScoresUpdaterTests extends ESTestCase {
     private Job job;
     private ScoresUpdater scoresUpdater;
 
-    private Bucket generateBucket(Date timestamp) {
+    private Bucket generateBucket(Date timestamp) throws IOException {
         return new Bucket(JOB_ID, timestamp, DEFAULT_BUCKET_SPAN);
     }
 
     @Before
-    public void setUpMocks() {
+    public void setUpMocks() throws IOException {
         MockitoAnnotations.initMocks(this);
 
         Job.Builder jobBuilder = new Job.Builder(JOB_ID);

@@ -45,7 +45,11 @@ public class JdkJarHellCheck {
                 String entry = root.relativize(file).toString().replace('\\', '/');
                 if (entry.endsWith(".class") && entry.endsWith("module-info.class") == false) {
                     if (ext.getResource(entry) != null) {
-                        detected.add(entry.replace("/", ".").replace(".class", ""));
+                        detected.add(
+                            entry
+                                .replace("/", ".")
+                                .replace(".class","")
+                        );
                     }
                 }
                 return FileVisitResult.CONTINUE;

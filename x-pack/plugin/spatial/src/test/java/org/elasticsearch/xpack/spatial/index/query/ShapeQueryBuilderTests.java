@@ -10,10 +10,12 @@ import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.Query;
 import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.bytes.BytesArray;
+import org.elasticsearch.common.compress.CompressedXContent;
 import org.elasticsearch.common.geo.GeoJson;
 import org.elasticsearch.common.geo.ShapeRelation;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
@@ -24,19 +26,21 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.geometry.Geometry;
 import org.elasticsearch.geometry.ShapeType;
 import org.elasticsearch.index.get.GetResult;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.index.query.QueryShardException;
 import org.elasticsearch.index.query.Rewriteable;
 import org.elasticsearch.plugins.Plugin;
+import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.test.AbstractQueryTestCase;
 import org.elasticsearch.xpack.spatial.SpatialPlugin;
+import org.elasticsearch.xpack.spatial.util.ShapeTestUtils;
 import org.junit.After;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -44,25 +48,28 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 
-public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<ShapeQueryBuilder> {
+public class ShapeQueryBuilderTests extends AbstractQueryTestCase<ShapeQueryBuilder> {
 
     protected static final String SHAPE_FIELD_NAME = "mapped_shape";
 
-    protected static String docType = "_doc";
+    private static String docType = "_doc";
 
     protected static String indexedShapeId;
+    protected static String indexedShapeType;
     protected static String indexedShapePath;
     protected static String indexedShapeIndex;
     protected static String indexedShapeRouting;
     protected static Geometry indexedShapeToReturn;
 
-    protected abstract ShapeRelation getShapeRelation(ShapeType type);
-
-    protected abstract Geometry getGeometry();
-
     @Override
     protected Collection<Class<? extends Plugin>> getPlugins() {
-        return Arrays.asList(SpatialPlugin.class);
+        return Collections.singleton(SpatialPlugin.class);
+    }
+
+    @Override
+    protected void initializeAdditionalMappings(MapperService mapperService) throws IOException {
+        mapperService.merge(docType, new CompressedXContent(Strings.toString(PutMappingRequest.buildFromSimplifiedDef(docType,
+            fieldName(), "type=shape"))), MapperService.MergeReason.MAPPING_UPDATE);
     }
 
     protected String fieldName() {
@@ -75,7 +82,11 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
     }
 
     protected ShapeQueryBuilder doCreateTestQueryBuilder(boolean indexedShape) {
-        Geometry shape = getGeometry();
+        Geometry shape;
+        // multipoint queries not (yet) supported
+        do {
+            shape = ShapeTestUtils.randomGeometry(false);
+        } while (shape.type() == ShapeType.MULTIPOINT || shape.type() == ShapeType.GEOMETRYCOLLECTION);
 
         ShapeQueryBuilder builder;
         clearShapeFields();
@@ -84,7 +95,8 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
         } else {
             indexedShapeToReturn = shape;
             indexedShapeId = randomAlphaOfLengthBetween(3, 20);
-            builder = new ShapeQueryBuilder(fieldName(), indexedShapeId);
+            indexedShapeType = randomBoolean() ? randomAlphaOfLengthBetween(3, 20) : null;
+            builder = new ShapeQueryBuilder(fieldName(), indexedShapeId, indexedShapeType);
             if (randomBoolean()) {
                 indexedShapeIndex = randomAlphaOfLengthBetween(3, 20);
                 builder.indexedShapeIndex(indexedShapeIndex);
@@ -99,8 +111,11 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
             }
         }
 
-        if (randomBoolean()) {
-            builder.relation(getShapeRelation(shape.type()));
+        if (shape.type() == ShapeType.LINESTRING || shape.type() == ShapeType.MULTILINESTRING) {
+            builder.relation(randomFrom(ShapeRelation.DISJOINT, ShapeRelation.INTERSECTS));
+        } else {
+            // XYShape does not support CONTAINS:
+            builder.relation(randomFrom(ShapeRelation.DISJOINT, ShapeRelation.INTERSECTS, ShapeRelation.WITHIN));
         }
 
         if (randomBoolean()) {
@@ -113,13 +128,14 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
     public void clearShapeFields() {
         indexedShapeToReturn = null;
         indexedShapeId = null;
+        indexedShapeType = null;
         indexedShapePath = null;
         indexedShapeIndex = null;
         indexedShapeRouting = null;
     }
 
     @Override
-    protected void doAssertLuceneQuery(ShapeQueryBuilder queryBuilder, Query query, QueryShardContext context) throws IOException {
+    protected void doAssertLuceneQuery(ShapeQueryBuilder queryBuilder, Query query, SearchContext context) throws IOException {
         // Logic for doToQuery is complex and is hard to test here. Need to rely
         // on Integration tests to determine if created query is correct
         // TODO improve ShapeQueryBuilder.doToQuery() method to make it
@@ -128,7 +144,7 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
     }
 
     public void testNoFieldName() {
-        Geometry shape = getGeometry();
+        Geometry shape = ShapeTestUtils.randomGeometry(false);
         IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> new ShapeQueryBuilder(null, shape));
         assertEquals("fieldName is required", e.getMessage());
     }
@@ -139,12 +155,12 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
 
     public void testNoIndexedShape() {
         IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
-            () -> new ShapeQueryBuilder(fieldName(), null, null));
+            () -> new ShapeQueryBuilder(fieldName(), null, "type"));
         assertEquals("either shape or indexedShapeId is required", e.getMessage());
     }
 
     public void testNoRelation() {
-        Geometry shape = getGeometry();
+        Geometry shape = ShapeTestUtils.randomGeometry(false);
         ShapeQueryBuilder builder = new ShapeQueryBuilder(fieldName(), shape);
         IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> builder.relation(null));
         assertEquals("No Shape Relation defined", e.getMessage());
@@ -166,7 +182,7 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
                 "  }\n" +
                 "}";
         ShapeQueryBuilder parsed = (ShapeQueryBuilder) parseQuery(json);
-        checkGeneratedJson(json.replaceAll("envelope", "Envelope"), parsed);
+        checkGeneratedJson(json, parsed);
         assertEquals(json, 42.0, parsed.boost(), 0.0001);
     }
 
@@ -199,7 +215,7 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
     }
 
     public void testIgnoreUnmapped() throws IOException {
-        Geometry shape = getGeometry();
+        Geometry shape = ShapeTestUtils.randomGeometry(false);
         final ShapeQueryBuilder queryBuilder = new ShapeQueryBuilder("unmapped", shape);
         queryBuilder.ignoreUnmapped(true);
         Query query = queryBuilder.toQuery(createShardContext());
@@ -209,14 +225,14 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
         final ShapeQueryBuilder failingQueryBuilder = new ShapeQueryBuilder("unmapped", shape);
         failingQueryBuilder.ignoreUnmapped(false);
         QueryShardException e = expectThrows(QueryShardException.class, () -> failingQueryBuilder.toQuery(createShardContext()));
-        assertThat(e.getMessage(), containsString("failed to find shape or point field [unmapped]"));
+        assertThat(e.getMessage(), containsString("failed to find shape field [unmapped]"));
     }
 
     public void testWrongFieldType() {
-        Geometry shape = getGeometry();
-        final ShapeQueryBuilder queryBuilder = new ShapeQueryBuilder(TEXT_FIELD_NAME, shape);
+        Geometry shape = ShapeTestUtils.randomGeometry(false);
+        final ShapeQueryBuilder queryBuilder = new ShapeQueryBuilder(STRING_FIELD_NAME, shape);
         QueryShardException e = expectThrows(QueryShardException.class, () -> queryBuilder.toQuery(createShardContext()));
-        assertThat(e.getMessage(), containsString("Field [mapped_string] is not of type [shape or point] but of type [text]"));
+        assertThat(e.getMessage(), containsString("Field [mapped_string] is not of type [shape] but of type [text]"));
     }
 
     public void testSerializationFailsUnlessFetched() throws IOException {
@@ -232,14 +248,22 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
     protected QueryBuilder parseQuery(XContentParser parser) throws IOException {
         QueryBuilder query = super.parseQuery(parser);
         assertThat(query, instanceOf(ShapeQueryBuilder.class));
+
+        ShapeQueryBuilder shapeQuery = (ShapeQueryBuilder) query;
+        if (shapeQuery.indexedShapeType() != null) {
+            assertWarnings(ShapeQueryBuilder.TYPES_DEPRECATION_MESSAGE);
+        }
         return query;
     }
 
     @Override
     protected GetResponse executeGet(GetRequest getRequest) {
+        String indexedType = indexedShapeType != null ? indexedShapeType : MapperService.SINGLE_MAPPING_NAME;
+
         assertThat(indexedShapeToReturn, notNullValue());
         assertThat(indexedShapeId, notNullValue());
         assertThat(getRequest.id(), equalTo(indexedShapeId));
+        assertThat(getRequest.type(), equalTo(indexedType));
         assertThat(getRequest.routing(), equalTo(indexedShapeRouting));
         String expectedShapeIndex = indexedShapeIndex == null ? ShapeQueryBuilder.DEFAULT_SHAPE_INDEX_NAME : indexedShapeIndex;
         assertThat(getRequest.index(), equalTo(expectedShapeIndex));
@@ -261,7 +285,7 @@ public abstract class ShapeQueryBuilderTests extends AbstractQueryTestCase<Shape
         } catch (IOException ex) {
             throw new ElasticsearchException("boom", ex);
         }
-        return new GetResponse(new GetResult(indexedShapeIndex, indexedShapeId, 0, 1, 0, true, new BytesArray(json),
+        return new GetResponse(new GetResult(indexedShapeIndex, indexedType, indexedShapeId, 0, 1, 0, true, new BytesArray(json),
             null, null));
     }
 }

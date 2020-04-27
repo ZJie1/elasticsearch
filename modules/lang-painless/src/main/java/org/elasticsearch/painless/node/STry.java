@@ -19,25 +19,26 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.BlockNode;
-import org.elasticsearch.painless.ir.CatchNode;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.TryNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+import org.objectweb.asm.Label;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+
+import static java.util.Collections.singleton;
 
 /**
  * Represents the try block as part of a try-catch block.
  */
-public class STry extends AStatement {
+public final class STry extends AStatement {
 
-    protected final SBlock block;
-    protected final List<SCatch> catches;
+    private final SBlock block;
+    private final List<SCatch> catches;
 
     public STry(Location location, SBlock block, List<SCatch> catches) {
         super(location);
@@ -47,62 +48,99 @@ public class STry extends AStatement {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        if (block != null) {
+            block.storeSettings(settings);
+        }
 
+        for (SCatch ctch : catches) {
+            ctch.storeSettings(settings);
+        }
+    }
+
+    @Override
+    void extractVariables(Set<String> variables) {
+        if (block != null) {
+            block.extractVariables(variables);
+        }
+        for (SCatch expr : catches) {
+            expr.extractVariables(variables);
+        }
+    }
+
+    @Override
+    void analyze(Locals locals) {
         if (block == null) {
             throw createError(new IllegalArgumentException("Extraneous try statement."));
         }
 
-        Input blockInput = new Input();
-        blockInput.lastSource = input.lastSource;
-        blockInput.inLoop = input.inLoop;
-        blockInput.lastLoop = input.lastLoop;
+        block.lastSource = lastSource;
+        block.inLoop = inLoop;
+        block.lastLoop = lastLoop;
 
-        Output blockOutput = block.analyze(classNode, scriptRoot, scope.newLocalScope(), blockInput);
+        block.analyze(Locals.newLocalScope(locals));
 
-        output.methodEscape = blockOutput.methodEscape;
-        output.loopEscape = blockOutput.loopEscape;
-        output.allEscape = blockOutput.allEscape;
-        output.anyContinue = blockOutput.anyContinue;
-        output.anyBreak = blockOutput.anyBreak;
+        methodEscape = block.methodEscape;
+        loopEscape = block.loopEscape;
+        allEscape = block.allEscape;
+        anyContinue = block.anyContinue;
+        anyBreak = block.anyBreak;
 
         int statementCount = 0;
 
-        List<Output> catchOutputs = new ArrayList<>();
+        for (SCatch catc : catches) {
+            catc.lastSource = lastSource;
+            catc.inLoop = inLoop;
+            catc.lastLoop = lastLoop;
+
+            catc.analyze(Locals.newLocalScope(locals));
+
+            methodEscape &= catc.methodEscape;
+            loopEscape &= catc.loopEscape;
+            allEscape &= catc.allEscape;
+            anyContinue |= catc.anyContinue;
+            anyBreak |= catc.anyBreak;
+
+            statementCount = Math.max(statementCount, catc.statementCount);
+        }
+
+        this.statementCount = block.statementCount + statementCount;
+    }
+
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeStatementOffset(location);
+
+        Label begin = new Label();
+        Label end = new Label();
+        Label exception = new Label();
+
+        writer.mark(begin);
+
+        block.continu = continu;
+        block.brake = brake;
+        block.write(writer, globals);
+
+        if (!block.allEscape) {
+            writer.goTo(exception);
+        }
+
+        writer.mark(end);
 
         for (SCatch catc : catches) {
-            Input catchInput = new Input();
-            catchInput.lastSource = input.lastSource;
-            catchInput.inLoop = input.inLoop;
-            catchInput.lastLoop = input.lastLoop;
-
-            Output catchOutput = catc.analyze(classNode, scriptRoot, scope.newLocalScope(), catchInput);
-
-            output.methodEscape &= catchOutput.methodEscape;
-            output.loopEscape &= catchOutput.loopEscape;
-            output.allEscape &= catchOutput.allEscape;
-            output.anyContinue |= catchOutput.anyContinue;
-            output.anyBreak |= catchOutput.anyBreak;
-
-            catchOutputs.add(catchOutput);
-
-            statementCount = Math.max(statementCount, catchOutput.statementCount);
+            catc.begin = begin;
+            catc.end = end;
+            catc.exception = catches.size() > 1 ? exception : null;
+            catc.write(writer, globals);
         }
 
-        output.statementCount = blockOutput.statementCount + statementCount;
-
-        TryNode tryNode = new TryNode();
-
-        for (Output catchOutput : catchOutputs) {
-            tryNode.addCatchNode((CatchNode)catchOutput.statementNode);
+        if (!block.allEscape || catches.size() > 1) {
+            writer.mark(exception);
         }
+    }
 
-        tryNode.setBlockNode((BlockNode)blockOutput.statementNode);
-        tryNode.setLocation(location);
-
-        output.statementNode = tryNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return multilineToString(singleton(block), catches);
     }
 }

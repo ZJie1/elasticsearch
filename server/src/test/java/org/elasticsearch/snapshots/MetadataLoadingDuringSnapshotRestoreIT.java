@@ -23,10 +23,10 @@ import org.elasticsearch.action.admin.cluster.snapshots.create.CreateSnapshotRes
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;
 import org.elasticsearch.action.admin.cluster.snapshots.restore.RestoreSnapshotResponse;
 import org.elasticsearch.action.admin.cluster.snapshots.status.SnapshotsStatusResponse;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
-import org.elasticsearch.cluster.metadata.Metadata;
-import org.elasticsearch.cluster.metadata.RepositoryMetadata;
-import org.elasticsearch.cluster.service.ClusterService;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.MetaData;
+import org.elasticsearch.cluster.metadata.RepositoryMetaData;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.plugins.Plugin;
@@ -35,6 +35,7 @@ import org.elasticsearch.repositories.RepositoriesService;
 import org.elasticsearch.repositories.Repository;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.snapshots.mockstore.MockRepository;
+import org.elasticsearch.threadpool.ThreadPool;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -64,13 +65,15 @@ public class MetadataLoadingDuringSnapshotRestoreIT extends AbstractSnapshotInte
     public void testWhenMetadataAreLoaded() throws Exception {
         createIndex("docs");
         indexRandom(true,
-            client().prepareIndex("docs").setId("1").setSource("rank", 1),
-            client().prepareIndex("docs").setId("2").setSource("rank", 2),
-            client().prepareIndex("docs").setId("3").setSource("rank", 3),
-            client().prepareIndex("others").setSource("rank", 4),
-            client().prepareIndex("others").setSource("rank", 5));
+            client().prepareIndex("docs", "doc", "1").setSource("rank", 1),
+            client().prepareIndex("docs", "doc", "2").setSource("rank", 2),
+            client().prepareIndex("docs", "doc", "3").setSource("rank", 3),
+            client().prepareIndex("others", "other").setSource("rank", 4),
+            client().prepareIndex("others", "other").setSource("rank", 5));
 
-        createRepository("repository", CountingMockRepositoryPlugin.TYPE, randomRepoPath());
+        assertAcked(client().admin().cluster().preparePutRepository("repository")
+                                              .setType("coutingmock")
+                                              .setSettings(Settings.builder().put("location", randomRepoPath())));
 
         // Creating a snapshot does not load any metadata
         CreateSnapshotResponse createSnapshotResponse = client().admin().cluster().prepareCreateSnapshot("repository", "snap")
@@ -180,35 +183,32 @@ public class MetadataLoadingDuringSnapshotRestoreIT extends AbstractSnapshotInte
         final Map<String, AtomicInteger> globalMetadata = new ConcurrentHashMap<>();
         final Map<String, AtomicInteger> indicesMetadata = new ConcurrentHashMap<>();
 
-        public CountingMockRepository(final RepositoryMetadata metadata,
+        public CountingMockRepository(final RepositoryMetaData metadata,
                                       final Environment environment,
-                                      final NamedXContentRegistry namedXContentRegistry, ClusterService clusterService) {
-            super(metadata, environment, namedXContentRegistry, clusterService);
+                                      final NamedXContentRegistry namedXContentRegistry, ThreadPool threadPool) {
+            super(metadata, environment, namedXContentRegistry, threadPool);
         }
 
         @Override
-        public Metadata getSnapshotGlobalMetadata(SnapshotId snapshotId) {
+        public MetaData getSnapshotGlobalMetaData(SnapshotId snapshotId) {
             globalMetadata.computeIfAbsent(snapshotId.getName(), (s) -> new AtomicInteger(0)).incrementAndGet();
-            return super.getSnapshotGlobalMetadata(snapshotId);
+            return super.getSnapshotGlobalMetaData(snapshotId);
         }
 
         @Override
-        public IndexMetadata getSnapshotIndexMetadata(SnapshotId snapshotId, IndexId indexId) throws IOException {
+        public IndexMetaData getSnapshotIndexMetaData(SnapshotId snapshotId, IndexId indexId) throws IOException {
             indicesMetadata.computeIfAbsent(key(snapshotId.getName(), indexId.getName()), (s) -> new AtomicInteger(0)).incrementAndGet();
-            return super.getSnapshotIndexMetadata(snapshotId, indexId);
+            return super.getSnapshotIndexMetaData(snapshotId, indexId);
         }
     }
 
     /** A plugin that uses CountingMockRepository as implementation of the Repository **/
     public static class CountingMockRepositoryPlugin extends MockRepository.Plugin {
-
-        public static final String TYPE = "countingmock";
-
         @Override
         public Map<String, Repository.Factory> getRepositories(Environment env, NamedXContentRegistry namedXContentRegistry,
-                                                               ClusterService clusterService) {
-            return Collections.singletonMap(TYPE,
-                metadata -> new CountingMockRepository(metadata, env, namedXContentRegistry, clusterService));
+                                                               ThreadPool threadPool) {
+            return Collections.singletonMap("coutingmock",
+                metadata -> new CountingMockRepository(metadata, env, namedXContentRegistry, threadPool));
         }
     }
 }

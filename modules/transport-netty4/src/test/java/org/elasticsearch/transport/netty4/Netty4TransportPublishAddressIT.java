@@ -29,7 +29,6 @@ import org.elasticsearch.common.transport.BoundTransportAddress;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.transport.Netty4Plugin;
-import org.elasticsearch.transport.TransportInfo;
 
 import java.net.Inet4Address;
 
@@ -69,7 +68,7 @@ public class Netty4TransportPublishAddressIT extends ESNetty4IntegTestCase {
         logger.info("--> checking if boundAddress matching publishAddress has same port");
         NodesInfoResponse nodesInfoResponse = client().admin().cluster().prepareNodesInfo().get();
         for (NodeInfo nodeInfo : nodesInfoResponse.getNodes()) {
-            BoundTransportAddress boundTransportAddress = nodeInfo.getInfo(TransportInfo.class).getAddress();
+            BoundTransportAddress boundTransportAddress = nodeInfo.getTransport().getAddress();
             if (nodeInfo.getNode().getName().equals(ipv4OnlyNode)) {
                 assertThat(boundTransportAddress.boundAddresses().length, equalTo(1));
                 assertThat(boundTransportAddress.boundAddresses()[0].getPort(), equalTo(boundTransportAddress.publishAddress().getPort()));
@@ -77,7 +76,7 @@ public class Netty4TransportPublishAddressIT extends ESNetty4IntegTestCase {
                 assertThat(boundTransportAddress.boundAddresses().length, greaterThan(1));
                 for (TransportAddress boundAddress : boundTransportAddress.boundAddresses()) {
                     assertThat(boundAddress, instanceOf(TransportAddress.class));
-                    TransportAddress inetBoundAddress = boundAddress;
+                    TransportAddress inetBoundAddress = (TransportAddress) boundAddress;
                     if (inetBoundAddress.address().getAddress() instanceof Inet4Address) {
                         // IPv4 address is preferred publish address for _local_
                         assertThat(inetBoundAddress.getPort(), equalTo(boundTransportAddress.publishAddress().getPort()));

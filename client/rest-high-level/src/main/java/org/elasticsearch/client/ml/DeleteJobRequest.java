@@ -18,14 +18,15 @@
  */
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 
 import java.util.Objects;
 
 /**
  * Request to delete a Machine Learning Job via its ID
  */
-public class DeleteJobRequest implements Validatable {
+public class DeleteJobRequest extends ActionRequest {
 
     private String jobId;
     private Boolean force;
@@ -73,6 +74,11 @@ public class DeleteJobRequest implements Validatable {
      */
     public void setWaitForCompletion(Boolean waitForCompletion) {
         this.waitForCompletion = waitForCompletion;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+       return null;
     }
 
     @Override

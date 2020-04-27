@@ -34,7 +34,7 @@ To run this example, first follow the steps in
 
 To sort results by the length of the `theatre` field, submit the following query:
 
-[source,console]
+[source,js]
 ----
 GET /_search
 {
@@ -57,4 +57,5 @@ GET /_search
 }
 
 ----
+// CONSOLE
 // TEST[setup:seats]

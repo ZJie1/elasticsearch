@@ -17,15 +17,12 @@
           "type": "geo_point",
           "doc_values": "false"
         },
-        "geoshape": {
+        "shape": {
           "type": "geo_shape"
         },
         "region_point": {
           "type": "keyword"
-        },
-        "shape": {
-          "type": "shape"
         }
-      }
+    }
   }
 }

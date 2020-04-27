@@ -19,36 +19,41 @@
 
 package org.elasticsearch.script.expression;
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.DoubleValues;
-import org.elasticsearch.index.fielddata.IndexFieldData;
-import org.elasticsearch.index.fielddata.LeafGeoPointFieldData;
-import org.elasticsearch.index.fielddata.MultiGeoPointValues;
-
 import java.io.IOException;
+import java.util.Map;
+import java.util.Objects;
+
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.queries.function.FunctionValues;
+import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.queries.function.docvalues.DoubleDocValues;
+import org.elasticsearch.index.fielddata.AtomicGeoPointFieldData;
+import org.elasticsearch.index.fielddata.IndexFieldData;
+import org.elasticsearch.index.fielddata.MultiGeoPointValues;
 
 /**
  * ValueSource to return non-zero if a field is missing.
  */
-final class GeoEmptyValueSource extends FieldDataBasedDoubleValuesSource {
+final class GeoEmptyValueSource extends ValueSource {
+    IndexFieldData<?> fieldData;
 
     GeoEmptyValueSource(IndexFieldData<?> fieldData) {
-        super(fieldData);
+        this.fieldData = Objects.requireNonNull(fieldData);
     }
 
     @Override
-    public DoubleValues getValues(LeafReaderContext leaf, DoubleValues scores) {
-        LeafGeoPointFieldData leafData = (LeafGeoPointFieldData) fieldData.load(leaf);
+    @SuppressWarnings("rawtypes") // ValueSource uses a rawtype
+    public FunctionValues getValues(Map context, LeafReaderContext leaf) throws IOException {
+        AtomicGeoPointFieldData leafData = (AtomicGeoPointFieldData) fieldData.load(leaf);
         final MultiGeoPointValues values = leafData.getGeoPointValues();
-        return new DoubleValues() {
+        return new DoubleDocValues(this) {
             @Override
-            public double doubleValue() {
-                return 1;
-            }
-
-            @Override
-            public boolean advanceExact(int doc) throws IOException {
-                return values.advanceExact(doc);
+            public double doubleVal(int doc) throws IOException {
+                if (values.advanceExact(doc)) {
+                    return 1;
+                } else {
+                    return 0;
+                }
             }
         };
     }
@@ -64,12 +69,12 @@ final class GeoEmptyValueSource extends FieldDataBasedDoubleValuesSource {
         if (obj == null) return false;
         if (getClass() != obj.getClass()) return false;
         GeoEmptyValueSource other = (GeoEmptyValueSource) obj;
-        return fieldData.equals(other.fieldData);
+        if (!fieldData.equals(other.fieldData)) return false;
+        return true;
     }
 
     @Override
-    public String toString() {
+    public String description() {
         return "empty: field(" + fieldData.getFieldName() + ")";
     }
-
 }

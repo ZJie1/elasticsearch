@@ -19,8 +19,6 @@
 
 package org.elasticsearch.action.admin.indices.delete;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ActionFilters;
@@ -31,7 +29,7 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.ack.ClusterStateUpdateResponse;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
-import org.elasticsearch.cluster.metadata.MetadataDeleteIndexService;
+import org.elasticsearch.cluster.metadata.MetaDataDeleteIndexService;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -50,14 +48,12 @@ import java.util.Set;
  */
 public class TransportDeleteIndexAction extends TransportMasterNodeAction<DeleteIndexRequest, AcknowledgedResponse> {
 
-    private static final Logger logger = LogManager.getLogger(TransportDeleteIndexAction.class);
-
-    private final MetadataDeleteIndexService deleteIndexService;
+    private final MetaDataDeleteIndexService deleteIndexService;
     private final DestructiveOperations destructiveOperations;
 
     @Inject
     public TransportDeleteIndexAction(TransportService transportService, ClusterService clusterService, ThreadPool threadPool,
-                                      MetadataDeleteIndexService deleteIndexService, ActionFilters actionFilters,
+                                      MetaDataDeleteIndexService deleteIndexService, ActionFilters actionFilters,
                                       IndexNameExpressionResolver indexNameExpressionResolver,
                                       DestructiveOperations destructiveOperations) {
         super(DeleteIndexAction.NAME, transportService, clusterService, threadPool, actionFilters, DeleteIndexRequest::new,

@@ -24,6 +24,7 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.test.AbstractQueryTestCase;
 
 import java.io.IOException;
@@ -55,8 +56,8 @@ public class DisMaxQueryBuilderTests extends AbstractQueryTestCase<DisMaxQueryBu
     }
 
     @Override
-    protected void doAssertLuceneQuery(DisMaxQueryBuilder queryBuilder, Query query, QueryShardContext context) throws IOException {
-        Collection<Query> queries = AbstractQueryBuilder.toQueries(queryBuilder.innerQueries(), context);
+    protected void doAssertLuceneQuery(DisMaxQueryBuilder queryBuilder, Query query, SearchContext context) throws IOException {
+        Collection<Query> queries = AbstractQueryBuilder.toQueries(queryBuilder.innerQueries(), context.getQueryShardContext());
         assertThat(query, instanceOf(DisjunctionMaxQuery.class));
         DisjunctionMaxQuery disjunctionMaxQuery = (DisjunctionMaxQuery) query;
         assertThat(disjunctionMaxQuery.getTieBreakerMultiplier(), equalTo(queryBuilder.tieBreaker()));
@@ -93,7 +94,7 @@ public class DisMaxQueryBuilderTests extends AbstractQueryTestCase<DisMaxQueryBu
                 "        \"queries\":[\n" +
                 "            {\n" +
                 "                \"prefix\":{\n" +
-                "                    \"" + TEXT_FIELD_NAME + "\":{\n" +
+                "                    \"" + STRING_FIELD_NAME + "\":{\n" +
                 "                        \"value\":\"sh\",\n" +
                 "                        \"boost\":1.2\n" +
                 "                    }\n" +
@@ -115,7 +116,7 @@ public class DisMaxQueryBuilderTests extends AbstractQueryTestCase<DisMaxQueryBu
         assertThat(boostQuery.getQuery(), instanceOf(PrefixQuery.class));
         PrefixQuery firstQ = (PrefixQuery) boostQuery.getQuery();
         // since age is automatically registered in data, we encode it as numeric
-        assertThat(firstQ.getPrefix(), equalTo(new Term(TEXT_FIELD_NAME, "sh")));
+        assertThat(firstQ.getPrefix(), equalTo(new Term(STRING_FIELD_NAME, "sh")));
 
     }
 

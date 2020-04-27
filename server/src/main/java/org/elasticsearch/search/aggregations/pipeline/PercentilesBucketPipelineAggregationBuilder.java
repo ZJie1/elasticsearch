@@ -20,15 +20,18 @@
 package org.elasticsearch.search.aggregations.pipeline;
 
 import com.carrotsearch.hppc.DoubleArrayList;
-
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregatorFactory;
+import org.elasticsearch.search.aggregations.PipelineAggregationBuilder;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 
@@ -101,18 +104,19 @@ public class PercentilesBucketPipelineAggregationBuilder
     }
 
     @Override
-    protected PipelineAggregator createInternal(Map<String, Object> metadata) {
-        return new PercentilesBucketPipelineAggregator(name, percents, keyed, bucketsPaths, gapPolicy(), formatter(), metadata);
+    protected PipelineAggregator createInternal(Map<String, Object> metaData) {
+        return new PercentilesBucketPipelineAggregator(name, percents, keyed, bucketsPaths, gapPolicy(), formatter(), metaData);
     }
 
     @Override
-    protected void validate(ValidationContext context) {
-        super.validate(context);
+    public void doValidate(AggregatorFactory parent, Collection<AggregationBuilder> aggFactories,
+            Collection<PipelineAggregationBuilder> pipelineAggregatorFactories) {
+        super.doValidate(parent, aggFactories, pipelineAggregatorFactories);
+
         for (Double p : percents) {
             if (p == null || p < 0.0 || p > 100.0) {
-                context.addValidationError(PERCENTS_FIELD.getPreferredName()
+                throw new IllegalStateException(PERCENTS_FIELD.getPreferredName()
                         + " must only contain non-null doubles from 0.0-100.0 inclusive");
-                return;
             }
         }
     }

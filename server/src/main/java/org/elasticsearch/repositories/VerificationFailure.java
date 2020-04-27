@@ -34,8 +34,4 @@ public class VerificationFailure {
     public String toString() {
         return "[" + nodeId + ", '" + cause + "']";
     }
-
-    public Exception getCause() {
-        return cause;
-    }
 }

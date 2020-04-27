@@ -176,7 +176,7 @@ final class SnapshotRequestConverters {
     static Request deleteSnapshot(DeleteSnapshotRequest deleteSnapshotRequest) {
         String endpoint = new RequestConverters.EndpointBuilder().addPathPartAsIs("_snapshot")
             .addPathPart(deleteSnapshotRequest.repository())
-            .addCommaSeparatedPathParts(deleteSnapshotRequest.snapshots())
+            .addPathPart(deleteSnapshotRequest.snapshot())
             .build();
         Request request = new Request(HttpDelete.METHOD_NAME, endpoint);
 

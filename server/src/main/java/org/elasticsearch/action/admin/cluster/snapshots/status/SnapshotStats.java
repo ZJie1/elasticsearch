@@ -19,7 +19,6 @@
 
 package org.elasticsearch.action.admin.cluster.snapshots.status;
 
-import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
@@ -65,7 +64,6 @@ public class SnapshotStats implements Writeable, ToXContentObject {
                   long incrementalSize, long totalSize, long processedSize) {
         this.startTime = startTime;
         this.time = time;
-        assert time >= 0 : "Tried to initialize snapshot stats with negative total time [" + time + "]";
         this.incrementalFileCount = incrementalFileCount;
         this.totalFileCount = totalFileCount;
         this.processedFileCount = processedFileCount;
@@ -317,8 +315,6 @@ public class SnapshotStats implements Writeable, ToXContentObject {
             // Update duration
             time = endTime - startTime;
         }
-        assert time >= 0
-            : "Update with [" + Strings.toString(stats) + "][" + updateTimestamps + "] resulted in negative total time [" + time + "]";
     }
 
     @Override

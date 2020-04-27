@@ -54,8 +54,7 @@ public class ChunkedDataExtractorFactory implements DataExtractorFactory {
                 timeAligner,
                 datafeedConfig.getHeaders(),
                 datafeedConfig.hasAggregations(),
-                datafeedConfig.hasAggregations() ? datafeedConfig.getHistogramIntervalMillis(xContentRegistry) : null,
-                datafeedConfig.getIndicesOptions()
+                datafeedConfig.hasAggregations() ? datafeedConfig.getHistogramIntervalMillis(xContentRegistry) : null
             );
         return new ChunkedDataExtractor(client, dataExtractorFactory, dataExtractorContext, timingStatsReporter);
     }

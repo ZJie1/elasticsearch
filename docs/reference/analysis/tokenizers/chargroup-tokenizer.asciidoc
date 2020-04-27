@@ -22,7 +22,7 @@ The `char_group` tokenizer accepts one parameter:
 [float]
 === Example output
 
-[source,console]
+[source,js]
 ---------------------------
 POST _analyze
 {
@@ -37,10 +37,11 @@ POST _analyze
   "text": "The QUICK brown-fox"
 }
 ---------------------------
+// CONSOLE
 
 returns
 
-[source,console-result]
+[source,js]
 ---------------------------
 {
   "tokens": [
@@ -75,3 +76,5 @@ returns
   ]
 }
 ---------------------------
+// TESTRESPONSE
+

@@ -22,6 +22,7 @@ package org.elasticsearch.index.query;
 import org.apache.logging.log4j.LogManager;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.Query;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.geo.ShapeRelation;
@@ -34,14 +35,12 @@ import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.geometry.Geometry;
-import org.elasticsearch.index.mapper.AbstractGeometryFieldMapper.AbstractGeometryFieldType;
-import org.elasticsearch.index.mapper.GeoPointFieldMapper;
+import org.elasticsearch.index.mapper.AbstractGeometryFieldMapper;
 import org.elasticsearch.index.mapper.GeoShapeFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -57,12 +56,6 @@ public class GeoShapeQueryBuilder extends AbstractGeometryQueryBuilder<GeoShapeQ
     protected static final ParseField STRATEGY_FIELD = new ParseField("strategy");
 
     private SpatialStrategy strategy;
-
-    protected static final List<String> validContentTypes =
-        Collections.unmodifiableList(
-            Arrays.asList(
-                GeoShapeFieldMapper.CONTENT_TYPE,
-                GeoPointFieldMapper.CONTENT_TYPE));
 
     /**
      * Creates a new GeoShapeQueryBuilder whose Query will be against the given
@@ -93,15 +86,27 @@ public class GeoShapeQueryBuilder extends AbstractGeometryQueryBuilder<GeoShapeQ
         super(fieldName, shape);
     }
 
+    public GeoShapeQueryBuilder(String fieldName, Supplier<Geometry> shapeSupplier, String indexedShapeId,
+                                @Nullable String indexedShapeType) {
+        super(fieldName, shapeSupplier, indexedShapeId, indexedShapeType);
+    }
+
     /**
      * Creates a new GeoShapeQueryBuilder whose Query will be against the given
-     * field name and will use the Shape found with the given shape id and supplier
-     * @param fieldName         Name of the field that will be queried
-     * @param shapeSupplier     A shape supplier
-     * @param indexedShapeId    The indexed id of a shape
+     * field name and will use the Shape found with the given ID in the given
+     * type
+     *
+     * @param fieldName
+     *            Name of the field that will be filtered
+     * @param indexedShapeId
+     *            ID of the indexed Shape that will be used in the Query
+     * @param indexedShapeType
+     *            Index type of the indexed Shapes
+     * @deprecated use {@link #GeoShapeQueryBuilder(String, String)} instead
      */
-    public GeoShapeQueryBuilder(String fieldName, Supplier<Geometry> shapeSupplier, String indexedShapeId) {
-        super(fieldName, shapeSupplier, indexedShapeId);
+    @Deprecated
+    public GeoShapeQueryBuilder(String fieldName, String indexedShapeId, String indexedShapeType) {
+        super(fieldName, indexedShapeId, indexedShapeType);
     }
 
     /**
@@ -176,8 +181,13 @@ public class GeoShapeQueryBuilder extends AbstractGeometryQueryBuilder<GeoShapeQ
     }
 
     @Override
-    protected List<String> validContentTypes() {
-        return validContentTypes;
+    protected List validContentTypes() {
+        return Arrays.asList(GeoShapeFieldMapper.CONTENT_TYPE);
+    }
+
+    @Override
+    public String queryFieldType() {
+        return GeoShapeFieldMapper.CONTENT_TYPE;
     }
 
     @Override
@@ -194,21 +204,18 @@ public class GeoShapeQueryBuilder extends AbstractGeometryQueryBuilder<GeoShapeQ
 
     @Override
     protected GeoShapeQueryBuilder newShapeQueryBuilder(String fieldName, Supplier<Geometry> shapeSupplier,
-                                                        String indexedShapeId) {
-        return new GeoShapeQueryBuilder(fieldName, shapeSupplier, indexedShapeId);
+                                                        String indexedShapeId, String indexedShapeType) {
+        return new GeoShapeQueryBuilder(fieldName, shapeSupplier, indexedShapeId, indexedShapeType);
     }
 
     @Override
     public Query buildShapeQuery(QueryShardContext context, MappedFieldType fieldType) {
-        if (validContentTypes().contains(fieldType.typeName()) == false) {
+        if (fieldType.typeName().equals(GeoShapeFieldMapper.CONTENT_TYPE) == false) {
             throw new QueryShardException(context,
-                "Field [" + fieldName + "] is of unsupported type [" + fieldType.typeName() + "]. ["
-                + NAME + "] query supports the following types ["
-                + String.join(",", validContentTypes()) +  "]");
+                "Field [" + fieldName + "] is not of type [" + queryFieldType() + "] but of type [" + fieldType.typeName() + "]");
         }
 
-        final AbstractGeometryFieldType ft =
-            (AbstractGeometryFieldType) fieldType;
+        final AbstractGeometryFieldMapper.AbstractGeometryFieldType ft = (AbstractGeometryFieldMapper.AbstractGeometryFieldType) fieldType;
         return new ConstantScoreQuery(ft.geometryQueryBuilder().process(shape, fieldName, strategy, relation, context));
     }
 
@@ -258,11 +265,14 @@ public class GeoShapeQueryBuilder extends AbstractGeometryQueryBuilder<GeoShapeQ
             (ParsedGeoShapeQueryParams) AbstractGeometryQueryBuilder.parsedParamsFromXContent(parser, new ParsedGeoShapeQueryParams());
 
         GeoShapeQueryBuilder builder;
+        if (pgsqp.type != null) {
+            deprecationLogger.deprecatedAndMaybeLog("geo_share_query_with_types", TYPES_DEPRECATION_MESSAGE);
+        }
 
         if (pgsqp.shape != null) {
             builder = new GeoShapeQueryBuilder(pgsqp.fieldName, pgsqp.shape);
         } else {
-            builder = new GeoShapeQueryBuilder(pgsqp.fieldName, pgsqp.id);
+            builder = new GeoShapeQueryBuilder(pgsqp.fieldName, pgsqp.id, pgsqp.type);
         }
 
         if (pgsqp.index != null) {

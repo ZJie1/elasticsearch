@@ -20,5 +20,5 @@
 test.enabled = false
 
 // test depend on ES core...
-disableTasks('forbiddenApisMain')
+forbiddenApisMain.enabled = false
 jarHell.enabled = false

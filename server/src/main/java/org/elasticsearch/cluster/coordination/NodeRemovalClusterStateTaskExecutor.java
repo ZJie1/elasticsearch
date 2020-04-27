@@ -26,7 +26,7 @@ import org.elasticsearch.cluster.ClusterStateTaskListener;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.allocation.AllocationService;
-import org.elasticsearch.persistent.PersistentTasksCustomMetadata;
+import org.elasticsearch.persistent.PersistentTasksCustomMetaData;
 
 import java.util.List;
 
@@ -56,7 +56,7 @@ public class NodeRemovalClusterStateTaskExecutor implements ClusterStateTaskExec
 
         @Override
         public String toString() {
-            return node + " reason: " + reason;
+            return node + " " + reason;
         }
     }
 
@@ -92,7 +92,7 @@ public class NodeRemovalClusterStateTaskExecutor implements ClusterStateTaskExec
 
     protected ClusterTasksResult<Task> getTaskClusterTasksResult(ClusterState currentState, List<Task> tasks,
                                                                  ClusterState remainingNodesClusterState) {
-        ClusterState ptasksDisassociatedState = PersistentTasksCustomMetadata.disassociateDeadNodes(remainingNodesClusterState);
+        ClusterState ptasksDisassociatedState = PersistentTasksCustomMetaData.disassociateDeadNodes(remainingNodesClusterState);
         final ClusterTasksResult.Builder<Task> resultBuilder = ClusterTasksResult.<Task>builder().successes(tasks);
         return resultBuilder.build(allocationService.disassociateDeadNodes(ptasksDisassociatedState, true, describeTasks(tasks)));
     }

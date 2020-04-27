@@ -819,7 +819,7 @@ public final class XContentBuilder implements Closeable, Flushable {
         } else if (value instanceof Map) {
             @SuppressWarnings("unchecked")
             final Map<String, ?> valueMap = (Map<String, ?>) value;
-            map(valueMap, ensureNoSelfReferences, true);
+            map(valueMap, ensureNoSelfReferences);
         } else if (value instanceof Iterable) {
             value((Iterable<?>) value, ensureNoSelfReferences);
         } else if (value instanceof Object[]) {
@@ -867,15 +867,10 @@ public final class XContentBuilder implements Closeable, Flushable {
     }
 
     public XContentBuilder map(Map<String, ?> values) throws IOException {
-        return map(values, true, true);
+        return map(values, true);
     }
 
-    /** writes a map without the start object and end object headers */
-    public XContentBuilder mapContents(Map<String, ?> values) throws IOException {
-        return map(values, true, false);
-    }
-
-    private XContentBuilder map(Map<String, ?> values, boolean ensureNoSelfReferences, boolean writeStartAndEndHeaders) throws IOException {
+    private XContentBuilder map(Map<String, ?> values, boolean ensureNoSelfReferences) throws IOException {
         if (values == null) {
             return nullValue();
         }
@@ -886,17 +881,13 @@ public final class XContentBuilder implements Closeable, Flushable {
             ensureNoSelfReferences(values);
         }
 
-        if (writeStartAndEndHeaders) {
-            startObject();
-        }
+        startObject();
         for (Map.Entry<String, ?> value : values.entrySet()) {
             field(value.getKey());
             // pass ensureNoSelfReferences=false as we already performed the check at a higher level
             unknownValue(value.getValue(), false);
         }
-        if (writeStartAndEndHeaders) {
-            endObject();
-        }
+        endObject();
         return this;
     }
 

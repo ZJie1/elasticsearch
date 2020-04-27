@@ -28,7 +28,7 @@ import org.elasticsearch.action.admin.cluster.snapshots.restore.RestoreSnapshotR
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.common.Priority;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.ByteSizeUnit;
@@ -40,16 +40,15 @@ import org.elasticsearch.test.ESIntegTestCase;
 import java.util.Collections;
 import java.util.List;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_REPLICAS;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_SHARDS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_REPLICAS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_SHARDS;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.lessThanOrEqualTo;
 
 @ESIntegTestCase.ClusterScope(scope = ESIntegTestCase.Scope.TEST)
 public class ClusterShardLimitIT extends ESIntegTestCase {
-    private static final String shardsPerNodeKey = Metadata.SETTING_CLUSTER_MAX_SHARDS_PER_NODE.getKey();
+    private static final String shardsPerNodeKey = MetaData.SETTING_CLUSTER_MAX_SHARDS_PER_NODE.getKey();
 
     public void testSettingClusterMaxShards() {
         int shardsPerNode = between(1, 500_000);
@@ -100,14 +99,26 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
             verifyException(dataNodes, counts, e);
         }
         ClusterState clusterState = client().admin().cluster().prepareState().get().getState();
-        assertFalse(clusterState.getMetadata().hasIndex("should-fail"));
+        assertFalse(clusterState.getMetaData().hasIndex("should-fail"));
     }
 
     public void testIndexCreationOverLimitFromTemplate() {
         int dataNodes = client().admin().cluster().prepareState().get().getState().getNodes().getDataNodes().size();
 
-        final ShardCounts counts = ShardCounts.forDataNodeCount(dataNodes);
-
+        final ShardCounts counts;
+        {
+            final ShardCounts temporaryCounts = ShardCounts.forDataNodeCount(dataNodes);
+            /*
+             * We are going to create an index that will bring us up to one below the limit; we go one below the limit to ensure the
+             * template is used instead of one shard.
+             */
+            counts = new ShardCounts(
+                temporaryCounts.shardsPerNode,
+                temporaryCounts.firstIndexShards - 1,
+                temporaryCounts.firstIndexReplicas,
+                temporaryCounts.failingIndexShards + 1,
+                temporaryCounts.failingIndexReplicas);
+        }
         setShardsPerNode(counts.getShardsPerNode());
 
         if (counts.firstIndexShards > 0) {
@@ -133,7 +144,7 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
             expectThrows(IllegalArgumentException.class, () -> client().admin().indices().prepareCreate("should-fail").get());
         verifyException(dataNodes, counts, e);
         ClusterState clusterState = client().admin().cluster().prepareState().get().getState();
-        assertFalse(clusterState.getMetadata().hasIndex("should-fail"));
+        assertFalse(clusterState.getMetaData().hasIndex("should-fail"));
     }
 
     public void testIncreaseReplicasOverLimit() {
@@ -160,7 +171,7 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
                 + "] maximum shards open;";
             assertEquals(expectedError, e.getMessage());
         }
-        Metadata clusterState = client().admin().cluster().prepareState().get().getState().metadata();
+        MetaData clusterState = client().admin().cluster().prepareState().get().getState().metaData();
         assertEquals(0, clusterState.index("growing-should-fail").getNumberOfReplicas());
     }
 
@@ -207,7 +218,7 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
                 + "] maximum shards open;";
             assertEquals(expectedError, e.getMessage());
         }
-        Metadata clusterState = client().admin().cluster().prepareState().get().getState().metadata();
+        MetaData clusterState = client().admin().cluster().prepareState().get().getState().metaData();
         assertEquals(firstIndexReplicas, clusterState.index("test-1-index").getNumberOfReplicas());
         assertEquals(secondIndexReplicas, clusterState.index("test-2-index").getNumberOfReplicas());
     }
@@ -234,7 +245,7 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
             .setSettings(Settings.builder().put("number_of_replicas", dataNodes))
             .get());
         ClusterState clusterState = client().admin().cluster().prepareState().get().getState();
-        assertEquals(0, clusterState.getMetadata().index("test-index").getNumberOfReplicas());
+        assertEquals(0, clusterState.getMetaData().index("test-index").getNumberOfReplicas());
     }
 
     public void testRestoreSnapshotOverLimit() {
@@ -292,7 +303,7 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
         }
         ensureGreen();
         ClusterState clusterState = client.admin().cluster().prepareState().get().getState();
-        assertFalse(clusterState.getMetadata().hasIndex("snapshot-index"));
+        assertFalse(clusterState.getMetaData().hasIndex("snapshot-index"));
     }
 
     public void testOpenIndexOverLimit() {
@@ -324,7 +335,7 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
             verifyException(dataNodes, counts, e);
         }
         ClusterState clusterState = client.admin().cluster().prepareState().get().getState();
-        assertFalse(clusterState.getMetadata().hasIndex("snapshot-index"));
+        assertFalse(clusterState.getMetaData().hasIndex("snapshot-index"));
     }
 
     private int ensureMultipleDataNodes(int dataNodes) {
@@ -389,13 +400,10 @@ public class ClusterShardLimitIT extends ESIntegTestCase {
         }
 
         public static ShardCounts forDataNodeCount(int dataNodes) {
-            assertThat("this method will not work reliably with this many data nodes due to the limit of shards in a single index," +
-                "use fewer data nodes or multiple indices", dataNodes, lessThanOrEqualTo(90));
             int mainIndexReplicas = between(0, dataNodes - 1);
             int mainIndexShards = between(1, 10);
             int totalShardsInIndex = (mainIndexReplicas + 1) * mainIndexShards;
-            // Sometimes add some headroom to the limit to check that it works even if you're not already right up against the limit
-            int shardsPerNode = (int) Math.ceil((double) totalShardsInIndex / dataNodes) + between(0, 10);
+            int shardsPerNode = (int) Math.ceil((double) totalShardsInIndex / dataNodes);
             int totalCap = shardsPerNode * dataNodes;
 
             int failingIndexShards;

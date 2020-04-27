@@ -19,8 +19,6 @@
 package org.elasticsearch.common.blobstore;
 
 import java.io.Closeable;
-import java.util.Collections;
-import java.util.Map;
 
 /**
  * An interface for storing blobs.
@@ -31,11 +29,4 @@ public interface BlobStore extends Closeable {
      * Get a blob container instance for storing blobs at the given {@link BlobPath}.
      */
     BlobContainer blobContainer(BlobPath path);
-
-    /**
-     * Returns statistics on the count of operations that have been performed on this blob store
-     */
-    default Map<String, Long> stats() {
-        return Collections.emptyMap();
-    }
 }

@@ -45,7 +45,8 @@ public class UpdateShasTaskTests extends GradleUnitTestCase {
     }
 
     @Test
-    public void whenDependencyDoesntExistThenShouldDeleteDependencySha() throws IOException, NoSuchAlgorithmException {
+    public void whenDependencyDoesntExistThenShouldDeleteDependencySha()
+        throws IOException, NoSuchAlgorithmException {
 
         File unusedSha = createFileIn(getLicensesDir(project), "test.sha1", "");
         task.updateShas();
@@ -54,19 +55,23 @@ public class UpdateShasTaskTests extends GradleUnitTestCase {
     }
 
     @Test
-    public void whenDependencyExistsButShaNotThenShouldCreateNewShaFile() throws IOException, NoSuchAlgorithmException {
+    public void whenDependencyExistsButShaNotThenShouldCreateNewShaFile()
+        throws IOException, NoSuchAlgorithmException {
         project.getDependencies().add("compile", dependency);
 
         getLicensesDir(project).mkdir();
         task.updateShas();
 
-        Path groovySha = Files.list(getLicensesDir(project).toPath()).findFirst().get();
+        Path groovySha = Files
+            .list(getLicensesDir(project).toPath())
+            .findFirst().get();
 
         assertTrue(groovySha.toFile().getName().startsWith("groovy-all"));
     }
 
     @Test
-    public void whenDependencyAndWrongShaExistsThenShouldNotOverwriteShaFile() throws IOException, NoSuchAlgorithmException {
+    public void whenDependencyAndWrongShaExistsThenShouldNotOverwriteShaFile()
+        throws IOException, NoSuchAlgorithmException {
         project.getDependencies().add("compile", dependency);
 
         File groovyJar = task.getParentTask().getDependencies().getFiles().iterator().next();
@@ -79,7 +84,8 @@ public class UpdateShasTaskTests extends GradleUnitTestCase {
     }
 
     @Test
-    public void whenLicensesDirDoesntExistThenShouldThrowException() throws IOException, NoSuchAlgorithmException {
+    public void whenLicensesDirDoesntExistThenShouldThrowException()
+        throws IOException, NoSuchAlgorithmException {
         expectedException.expect(GradleException.class);
         expectedException.expectMessage(containsString("isn't a valid directory"));
 
@@ -113,14 +119,16 @@ public class UpdateShasTaskTests extends GradleUnitTestCase {
     }
 
     private UpdateShasTask createUpdateShasTask(Project project) {
-        UpdateShasTask task = project.getTasks().register("updateShas", UpdateShasTask.class).get();
+        UpdateShasTask task =  project.getTasks()
+            .register("updateShas", UpdateShasTask.class)
+            .get();
 
         task.setParentTask(createDependencyLicensesTask(project));
         return task;
     }
 
     private TaskProvider<DependencyLicensesTask> createDependencyLicensesTask(Project project) {
-        TaskProvider<DependencyLicensesTask> task = project.getTasks()
+        TaskProvider<DependencyLicensesTask> task =  project.getTasks()
             .register("dependencyLicenses", DependencyLicensesTask.class, new Action<DependencyLicensesTask>() {
                 @Override
                 public void execute(DependencyLicensesTask dependencyLicensesTask) {

@@ -1,5 +1,3 @@
-// To mute tests follow example in file: example.csv-spec
-
 //
 // Commands on OGC data
 //
@@ -7,8 +5,8 @@
 showTables
 SHOW TABLES "ogc";
 
- name:s        | type:s | kind:s
-ogc            |TABLE   |INDEX
+ name:s        | type:s      | kind:s
+ogc            |BASE TABLE   |INDEX
 ;
 
 // DESCRIBE
@@ -21,18 +19,18 @@ address              | VARCHAR   | text
 address.keyword      | VARCHAR   | keyword
 aliases              | VARCHAR   | text
 aliases.keyword      | VARCHAR   | keyword
-boundary             | GEOMETRY  | shape
-centerline           | GEOMETRY  | shape
-centerlines          | GEOMETRY  | shape
+boundary             | GEOMETRY  | geo_shape
+centerline           | GEOMETRY  | geo_shape
+centerlines          | GEOMETRY  | geo_shape
 fid                  | INTEGER   | integer
-footprint            | GEOMETRY  | shape
+footprint            | GEOMETRY  | geo_shape
 name                 | VARCHAR   | text
 name.keyword         | VARCHAR   | keyword
-neatline             | GEOMETRY  | shape
+neatline             | GEOMETRY  | geo_shape
 num_lanes            | INTEGER   | integer
 ogc_type             | VARCHAR   | keyword
-position             | GEOMETRY  | shape
-shore                | GEOMETRY  | shape
-shores               | GEOMETRY  | shape
+position             | GEOMETRY  | geo_shape
+shore                | GEOMETRY  | geo_shape
+shores               | GEOMETRY  | geo_shape
 type                 | VARCHAR   | keyword
 ;

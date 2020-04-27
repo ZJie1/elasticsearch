@@ -117,7 +117,7 @@ public class BytesRestResponseTests extends ESTestCase {
         String text = response.content().utf8ToString();
         assertThat(text, containsString("\"type\":\"unknown_exception\",\"reason\":\"an error occurred reading data\""));
         assertThat(text, containsString("{\"type\":\"file_not_found_exception\""));
-        assertThat(text, containsString("\"stack_trace\":\"org.elasticsearch.ElasticsearchException$1: an error occurred reading data"));
+        assertThat(text, containsString("\"stack_trace\":\"[an error occurred reading data]"));
     }
 
     public void testGuessRootCause() throws IOException {
@@ -164,7 +164,7 @@ public class BytesRestResponseTests extends ESTestCase {
             "\"reason\":\"foobar\",\"line\":1,\"col\":2}}]},\"status\":400}";
         assertEquals(expected.trim(), text.trim());
         String stackTrace = ExceptionsHelper.stackTrace(ex);
-        assertThat(stackTrace, containsString("org.elasticsearch.common.ParsingException: foobar"));
+        assertTrue(stackTrace.contains("Caused by: ParsingException[foobar]"));
     }
 
     public void testResponseWhenPathContainsEncodingError() throws IOException {

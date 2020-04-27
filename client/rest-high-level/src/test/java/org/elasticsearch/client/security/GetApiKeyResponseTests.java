@@ -40,9 +40,7 @@ public class GetApiKeyResponseTests extends ESTestCase {
                 "user-a", "realm-x");
         ApiKey apiKeyInfo2 = createApiKeyInfo("name2", "id-2", Instant.ofEpochMilli(100000L), Instant.ofEpochMilli(10000000L), true,
                 "user-b", "realm-y");
-        ApiKey apiKeyInfo3 = createApiKeyInfo(null, "id-3", Instant.ofEpochMilli(100000L), null, true,
-            "user-c", "realm-z");
-        GetApiKeyResponse response = new GetApiKeyResponse(Arrays.asList(apiKeyInfo1, apiKeyInfo2, apiKeyInfo3));
+        GetApiKeyResponse response = new GetApiKeyResponse(Arrays.asList(apiKeyInfo1, apiKeyInfo2));
         final XContentType xContentType = randomFrom(XContentType.values());
         final XContentBuilder builder = XContentFactory.contentBuilder(xContentType);
         toXContent(response, builder);

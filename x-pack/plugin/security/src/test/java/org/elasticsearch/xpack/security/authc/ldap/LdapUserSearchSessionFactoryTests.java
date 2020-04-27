@@ -21,6 +21,7 @@ import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
+import org.elasticsearch.env.Environment;
 import org.elasticsearch.env.TestEnvironment;
 import org.elasticsearch.threadpool.TestThreadPool;
 import org.elasticsearch.threadpool.ThreadPool;
@@ -42,8 +43,8 @@ import java.util.List;
 
 import static org.elasticsearch.xpack.core.security.authc.RealmSettings.getFullSettingKey;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.emptyString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.isEmptyString;
 import static org.hamcrest.Matchers.notNullValue;
 
 public class LdapUserSearchSessionFactoryTests extends LdapTestCase {
@@ -55,18 +56,18 @@ public class LdapUserSearchSessionFactoryTests extends LdapTestCase {
     @Before
     public void init() throws Exception {
         Path certPath = getDataPath("support/smb_ca.crt");
+        Environment env = TestEnvironment.newEnvironment(Settings.builder().put("path.home", createTempDir()).build());
         /*
          * Prior to each test we reinitialize the socket factory with a new SSLService so that we get a new SSLContext.
-         * If we re-use an SSLContext, previously connected sessions can get re-established which breaks hostname
+         * If we re-use a SSLContext, previously connected sessions can get re-established which breaks hostname
          * verification tests since a re-established connection does not perform hostname verification.
          */
 
         globalSettings = Settings.builder()
             .put("path.home", createTempDir())
-            .put("xpack.security.transport.ssl.enabled", false)
             .put("xpack.security.transport.ssl.certificate_authorities", certPath)
             .build();
-        sslService = new SSLService(TestEnvironment.newEnvironment(globalSettings));
+        sslService = new SSLService(globalSettings, env);
         threadPool = new TestThreadPool("LdapUserSearchSessionFactoryTests");
     }
 
@@ -523,7 +524,7 @@ public class LdapUserSearchSessionFactoryTests extends LdapTestCase {
                 TestEnvironment.newEnvironment(globalSettings), new ThreadContext(globalSettings));
         try (LdapUserSearchSessionFactory searchSessionFactory = getLdapUserSearchSessionFactory(config, sslService, threadPool)) {
             assertThat(searchSessionFactory.bindCredentials, notNullValue());
-            assertThat(searchSessionFactory.bindCredentials.getBindDN(), is(emptyString()));
+            assertThat(searchSessionFactory.bindCredentials.getBindDN(), isEmptyString());
         }
         assertDeprecationWarnings(config.identifier(), false, useLegacyBindPassword);
     }

@@ -3,9 +3,8 @@
 :request: WatcherStatsRequest
 :response: WatcherStatsResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
-=== Get Watcher stats API
+=== Watcher Stats API
 
 [id="{upid}-{api}-request"]
 ==== Execution

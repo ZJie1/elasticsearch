@@ -38,7 +38,7 @@ city) OR (big apple)` into two parts: `new york city` and `big apple`. The
 before returning matching documents. Because the query syntax does not use
 whitespace as an operator, `new york city` is passed as-is to the analyzer.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -50,6 +50,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 [[query-string-top-level-params]]
 ==== Top-level parameters for `query_string`
@@ -251,7 +252,7 @@ field1:query_term OR field2:query_term | ...
 
 For example, the following query
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -263,11 +264,12 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 matches the same words as
 
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -278,12 +280,13 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 Since several queries are generated from the individual search terms,
 combining them is automatically done using a `dis_max` query with a `tie_breaker`.
 For example (the `name` is boosted by 5 using `^5` notation):
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -296,13 +299,14 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 Simple wildcard can also be used to search "within" specific inner
 elements of the document. For example, if we have a `city` object with
 several fields (or inner object with fields) in it, we can automatically
 search on all "city" fields:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -314,12 +318,13 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 Another option is to provide the wildcard fields search in the query
 string itself (properly escaping the `*` sign), for example:
 `city.\*:something`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -330,6 +335,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 NOTE: Since `\` (backslash) is a special character in json strings, it needs to
 be escaped, hence the two backslashes in the above `query_string`.
@@ -338,7 +344,7 @@ The fields parameter can also include pattern based field names,
 allowing to automatically expand to the relevant fields (dynamically
 introduced fields included). For example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -350,6 +356,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 [[query-string-multi-field-parms]]
 ====== Additional parameters for multiple field searches
@@ -404,7 +411,7 @@ For example, the following synonym: `ny, new york` would produce:
 
 It is also possible to match multi terms synonyms with conjunctions instead:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -417,6 +424,7 @@ GET /_search
    }
 }
 --------------------------------------------------
+// CONSOLE
 
 The example above creates a boolean query:
 
@@ -432,7 +440,7 @@ The `query_string` splits the query around each operator to create a boolean
 query for the entire input. You can use `minimum_should_match` to control how
 many "should" clauses in the resulting query should match.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -447,6 +455,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 The example above creates a boolean query:
 
@@ -458,7 +467,7 @@ in the single field `title`.
 [[query-string-min-should-match-multi]]
 ===== How `minimum_should_match` works for multiple fields
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -474,6 +483,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 The example above creates a boolean query:
 
@@ -482,7 +492,7 @@ The example above creates a boolean query:
 that matches documents with the disjunction max over the fields `title` and
 `content`. Here the `minimum_should_match` parameter can't be applied.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -498,6 +508,7 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 Adding explicit operators forces each term to be considered as a separate clause.
 
@@ -514,7 +525,7 @@ them made of the disjunction max over the fields for each term.
 A `cross_fields` value in the `type` field indicates fields with the same
 analyzer are grouped together when the input is analyzed.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -531,15 +542,10 @@ GET /_search
     }
 }
 --------------------------------------------------
+// CONSOLE
 
 The example above creates a boolean query:
 
 `(blended(terms:[field2:this, field1:this]) blended(terms:[field2:that, field1:that]) blended(terms:[field2:thus, field1:thus]))~2`
 
 that matches documents with at least two of the three per-term blended queries.
-
-==== Notes
-===== Allow expensive queries
-Query string query can be internally be transformed to a <<query-dsl-prefix-query, `prefix query`>> which means
-that if the prefix queries are disabled as explained <<prefix-query-allow-expensive-queries, here>> the query will not be
-executed and an exception will be thrown.

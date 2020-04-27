@@ -6,18 +6,15 @@
 package org.elasticsearch.xpack.ml.datafeed.extractor.scroll;
 
 import org.apache.lucene.search.TotalHits;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.search.ClearScrollAction;
 import org.elasticsearch.action.search.ClearScrollRequest;
 import org.elasticsearch.action.search.ClearScrollResponse;
 import org.elasticsearch.action.search.SearchPhaseExecutionException;
-import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.ShardSearchFailure;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
@@ -35,9 +32,8 @@ import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedTimingStats;
 import org.elasticsearch.xpack.ml.datafeed.DatafeedTimingStatsReporter;
 import org.elasticsearch.xpack.ml.datafeed.DatafeedTimingStatsReporter.DatafeedTimingStatsPersister;
-import org.elasticsearch.xpack.ml.extractor.DocValueField;
-import org.elasticsearch.xpack.ml.extractor.ExtractedField;
-import org.elasticsearch.xpack.ml.extractor.TimeField;
+import org.elasticsearch.xpack.ml.datafeed.extractor.fields.ExtractedField;
+import org.elasticsearch.xpack.ml.datafeed.extractor.fields.TimeBasedExtractedFields;
 import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 
@@ -83,8 +79,7 @@ public class ScrollDataExtractorTests extends ESTestCase {
 
     private class TestDataExtractor extends ScrollDataExtractor {
 
-        private Queue<Tuple<SearchResponse, ElasticsearchException>> responses = new LinkedList<>();
-        private int numScrollReset;
+        private Queue<SearchResponse> responses = new LinkedList<>();
 
         TestDataExtractor(long start, long end) {
             this(createContext(start, end));
@@ -103,39 +98,22 @@ public class ScrollDataExtractorTests extends ESTestCase {
         @Override
         protected SearchResponse executeSearchRequest(SearchRequestBuilder searchRequestBuilder) {
             capturedSearchRequests.add(searchRequestBuilder);
-            Tuple<SearchResponse, ElasticsearchException> responseOrException = responses.remove();
-            if (responseOrException.v2() != null) {
-                throw responseOrException.v2();
-            }
-            return responseOrException.v1();
+            return responses.remove();
         }
 
         @Override
         protected SearchResponse executeSearchScrollRequest(String scrollId) {
             capturedContinueScrollIds.add(scrollId);
-            Tuple<SearchResponse, ElasticsearchException> responseOrException = responses.remove();
-            if (responseOrException.v2() != null) {
-                throw responseOrException.v2();
+            SearchResponse searchResponse = responses.remove();
+            if (searchResponse == null) {
+                throw new SearchPhaseExecutionException("foo", "bar", new ShardSearchFailure[] {});
+            } else {
+                return searchResponse;
             }
-            return responseOrException.v1();
-        }
-
-        @Override
-        void markScrollAsErrored() {
-            ++numScrollReset;
-            super.markScrollAsErrored();
-        }
-
-        int getNumScrollReset() {
-            return numScrollReset;
         }
 
         void setNextResponse(SearchResponse searchResponse) {
-            responses.add(Tuple.tuple(searchResponse, null));
-        }
-
-        void setNextResponseToError(ElasticsearchException ex) {
-            responses.add(Tuple.tuple(null, ex));
+            responses.add(searchResponse);
         }
 
         public long getInitScrollStartTime() {
@@ -157,9 +135,11 @@ public class ScrollDataExtractorTests extends ESTestCase {
         capturedSearchRequests = new ArrayList<>();
         capturedContinueScrollIds = new ArrayList<>();
         jobId = "test-job";
-        ExtractedField timeField = new TimeField("time", ExtractedField.Method.DOC_VALUE);
+        ExtractedField timeField = ExtractedField.newField("time", Collections.singleton("date"),
+            ExtractedField.ExtractionMethod.DOC_VALUE);
         extractedFields = new TimeBasedExtractedFields(timeField,
-                Arrays.asList(timeField, new DocValueField("field_1", Collections.singleton("keyword"))));
+                Arrays.asList(timeField, ExtractedField.newField("field_1", Collections.singleton("keyword"),
+                    ExtractedField.ExtractionMethod.DOC_VALUE)));
         indices = Arrays.asList("index-1", "index-2");
         query = QueryBuilders.matchAllQuery();
         scriptFields = Collections.emptyList();
@@ -300,13 +280,12 @@ public class ScrollDataExtractorTests extends ESTestCase {
         assertThat(capturedClearScrollIds.get(0), equalTo(response2.getScrollId()));
     }
 
-    public void testExtractionGivenInitSearchResponseHasError() {
+    public void testExtractionGivenInitSearchResponseHasError() throws IOException {
         TestDataExtractor extractor = new TestDataExtractor(1000L, 2000L);
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(createErrorResponse());
 
         assertThat(extractor.hasNext(), is(true));
-        expectThrows(SearchPhaseExecutionException.class, extractor::next);
+        expectThrows(IOException.class, extractor::next);
     }
 
     public void testExtractionGivenContinueScrollResponseHasError() throws IOException {
@@ -323,21 +302,36 @@ public class ScrollDataExtractorTests extends ESTestCase {
         Optional<InputStream> stream = extractor.next();
         assertThat(stream.isPresent(), is(true));
 
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(createErrorResponse());
         assertThat(extractor.hasNext(), is(true));
-        expectThrows(SearchPhaseExecutionException.class, extractor::next);
+        expectThrows(IOException.class, extractor::next);
 
-        assertThat(extractor.getNumScrollReset(), equalTo(1));
+        List<String> capturedClearScrollIds = getCapturedClearScrollIds();
+        assertThat(capturedClearScrollIds.size(), equalTo(1));
     }
 
-    public void testExtractionGivenInitSearchResponseEncounteredFailure() {
+    public void testExtractionGivenInitSearchResponseHasShardFailures() throws IOException {
         TestDataExtractor extractor = new TestDataExtractor(1000L, 2000L);
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(createResponseWithShardFailures());
+        extractor.setNextResponse(createResponseWithShardFailures());
 
         assertThat(extractor.hasNext(), is(true));
-        expectThrows(SearchPhaseExecutionException.class, extractor::next);
+        expectThrows(IOException.class, extractor::next);
+
+        List<String> capturedClearScrollIds = getCapturedClearScrollIds();
+        // We should clear the scroll context twice: once for the first search when we retry
+        // and once after the retry where we'll have an exception
+        assertThat(capturedClearScrollIds.size(), equalTo(2));
+    }
+
+    public void testExtractionGivenInitSearchResponseEncounteredUnavailableShards() throws IOException {
+        TestDataExtractor extractor = new TestDataExtractor(1000L, 2000L);
+        extractor.setNextResponse(createResponseWithUnavailableShards(1));
+        extractor.setNextResponse(createResponseWithUnavailableShards(1));
+
+        assertThat(extractor.hasNext(), is(true));
+        IOException e = expectThrows(IOException.class, extractor::next);
+        assertThat(e.getMessage(), equalTo("[" + jobId + "] Search request encountered [1] unavailable shards"));
     }
 
     public void testResetScrollAfterShardFailure() throws IOException {
@@ -349,9 +343,9 @@ public class ScrollDataExtractorTests extends ESTestCase {
                 Arrays.asList("b1", "b2")
         );
         extractor.setNextResponse(goodResponse);
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(createResponseWithShardFailures());
         extractor.setNextResponse(goodResponse);
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(createResponseWithShardFailures());
 
         // first response is good
         assertThat(extractor.hasNext(), is(true));
@@ -363,12 +357,13 @@ public class ScrollDataExtractorTests extends ESTestCase {
         assertThat(output.isPresent(), is(true));
         // A second failure is not tolerated
         assertThat(extractor.hasNext(), is(true));
-        expectThrows(SearchPhaseExecutionException.class, extractor::next);
+        expectThrows(IOException.class, extractor::next);
 
-        assertThat(extractor.getNumScrollReset(), equalTo(1));
+        List<String> capturedClearScrollIds = getCapturedClearScrollIds();
+        assertThat(capturedClearScrollIds.size(), equalTo(2));
     }
 
-    public void testResetScrollUsesLastResultTimestamp() throws IOException {
+    public void testResetScollUsesLastResultTimestamp() throws IOException {
         TestDataExtractor extractor = new TestDataExtractor(1000L, 2000L);
 
         SearchResponse goodResponse = createSearchResponse(
@@ -378,14 +373,14 @@ public class ScrollDataExtractorTests extends ESTestCase {
         );
 
         extractor.setNextResponse(goodResponse);
-        extractor.setNextResponseToError(new ElasticsearchException("something not search phase exception"));
-        extractor.setNextResponseToError(new ElasticsearchException("something not search phase exception"));
+        extractor.setNextResponse(createResponseWithShardFailures());
+        extractor.setNextResponse(createResponseWithShardFailures());
 
         Optional<InputStream> output = extractor.next();
         assertThat(output.isPresent(), is(true));
         assertEquals(1000L, extractor.getInitScrollStartTime());
 
-        expectThrows(ElasticsearchException.class, extractor::next);
+        expectThrows(IOException.class, () -> extractor.next());
         // the new start time after error is the last record timestamp +1
         assertEquals(1201L, extractor.getInitScrollStartTime());
     }
@@ -405,9 +400,9 @@ public class ScrollDataExtractorTests extends ESTestCase {
         );
 
         extractor.setNextResponse(firstResponse);
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(null); // this will throw a SearchPhaseExecutionException
         extractor.setNextResponse(secondResponse);
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(null); // this will throw a SearchPhaseExecutionException
 
 
         // first response is good
@@ -423,18 +418,22 @@ public class ScrollDataExtractorTests extends ESTestCase {
         assertThat(extractor.hasNext(), is(true));
         expectThrows(SearchPhaseExecutionException.class, extractor::next);
 
-        assertThat(extractor.getNumScrollReset(), equalTo(1));
+        List<String> capturedClearScrollIds = getCapturedClearScrollIds();
+        assertThat(capturedClearScrollIds.size(), equalTo(2));
     }
 
-    public void testSearchPhaseExecutionExceptionOnInitScroll() {
+    public void testSearchPhaseExecutionExceptionOnInitScroll() throws IOException {
         TestDataExtractor extractor = new TestDataExtractor(1000L, 2000L);
 
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
-        extractor.setNextResponseToError(new SearchPhaseExecutionException("search phase 1", "boom", ShardSearchFailure.EMPTY_ARRAY));
+        extractor.setNextResponse(createResponseWithShardFailures());
+        extractor.setNextResponse(createResponseWithShardFailures());
 
-        expectThrows(SearchPhaseExecutionException.class, extractor::next);
+        expectThrows(IOException.class, extractor::next);
 
-        assertThat(extractor.getNumScrollReset(), equalTo(1));
+        List<String> capturedClearScrollIds = getCapturedClearScrollIds();
+        // We should clear the scroll context twice: once for the first search when we retry
+        // and once after the retry where we'll have an exception
+        assertThat(capturedClearScrollIds.size(), equalTo(2));
     }
 
     public void testDomainSplitScriptField() throws IOException {
@@ -446,7 +445,7 @@ public class ScrollDataExtractorTests extends ESTestCase {
 
         List<SearchSourceBuilder.ScriptField> sFields = Arrays.asList(withoutSplit, withSplit);
         ScrollDataExtractorContext context = new ScrollDataExtractorContext(jobId, extractedFields, indices,
-                query, sFields, scrollSize, 1000, 2000, Collections.emptyMap(), SearchRequest.DEFAULT_INDICES_OPTIONS);
+                query, sFields, scrollSize, 1000, 2000, Collections.emptyMap());
 
         TestDataExtractor extractor = new TestDataExtractor(context);
 
@@ -492,7 +491,7 @@ public class ScrollDataExtractorTests extends ESTestCase {
 
     private ScrollDataExtractorContext createContext(long start, long end) {
         return new ScrollDataExtractorContext(jobId, extractedFields, indices, query, scriptFields, scrollSize, start, end,
-            Collections.emptyMap(), SearchRequest.DEFAULT_INDICES_OPTIONS);
+                Collections.emptyMap());
     }
 
     private SearchResponse createEmptySearchResponse() {
@@ -517,6 +516,32 @@ public class ScrollDataExtractorTests extends ESTestCase {
             new TotalHits(hits.size(), TotalHits.Relation.EQUAL_TO), 1);
         when(searchResponse.getHits()).thenReturn(searchHits);
         when(searchResponse.getTook()).thenReturn(TimeValue.timeValueMillis(randomNonNegativeLong()));
+        return searchResponse;
+    }
+
+    private SearchResponse createErrorResponse() {
+        SearchResponse searchResponse = mock(SearchResponse.class);
+        when(searchResponse.status()).thenReturn(RestStatus.INTERNAL_SERVER_ERROR);
+        when(searchResponse.getScrollId()).thenReturn(randomAlphaOfLength(1000));
+        return searchResponse;
+    }
+
+    private SearchResponse createResponseWithShardFailures() {
+        SearchResponse searchResponse = mock(SearchResponse.class);
+        when(searchResponse.status()).thenReturn(RestStatus.OK);
+        when(searchResponse.getShardFailures()).thenReturn(
+                new ShardSearchFailure[] { new ShardSearchFailure(new RuntimeException("shard failed"))});
+        when(searchResponse.getFailedShards()).thenReturn(1);
+        when(searchResponse.getScrollId()).thenReturn(randomAlphaOfLength(1000));
+        return searchResponse;
+    }
+
+    private SearchResponse createResponseWithUnavailableShards(int unavailableShards) {
+        SearchResponse searchResponse = mock(SearchResponse.class);
+        when(searchResponse.status()).thenReturn(RestStatus.OK);
+        when(searchResponse.getSuccessfulShards()).thenReturn(2);
+        when(searchResponse.getTotalShards()).thenReturn(2 + unavailableShards);
+        when(searchResponse.getFailedShards()).thenReturn(unavailableShards);
         return searchResponse;
     }
 

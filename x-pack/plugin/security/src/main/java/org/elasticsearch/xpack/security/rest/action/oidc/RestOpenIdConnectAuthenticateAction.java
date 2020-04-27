@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.security.rest.action.oidc;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.settings.Settings;
@@ -15,6 +13,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.license.XPackLicenseState;
 import org.elasticsearch.rest.BytesRestResponse;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.RestStatus;
@@ -24,7 +23,6 @@ import org.elasticsearch.xpack.core.security.action.oidc.OpenIdConnectAuthentica
 import org.elasticsearch.xpack.core.security.action.oidc.OpenIdConnectAuthenticateResponse;
 
 import java.io.IOException;
-import java.util.List;
 
 import static org.elasticsearch.rest.RestRequest.Method.POST;
 
@@ -32,7 +30,6 @@ import static org.elasticsearch.rest.RestRequest.Method.POST;
  * Rest handler that authenticates the user based on the information provided as parameters of the redirect_uri
  */
 public class RestOpenIdConnectAuthenticateAction extends OpenIdConnectBaseRestHandler {
-    private static final Logger logger = LogManager.getLogger();
 
     static final ObjectParser<OpenIdConnectAuthenticateRequest, Void> PARSER = new ObjectParser<>("oidc_authn",
         OpenIdConnectAuthenticateRequest::new);
@@ -44,13 +41,9 @@ public class RestOpenIdConnectAuthenticateAction extends OpenIdConnectBaseRestHa
         PARSER.declareStringOrNull(OpenIdConnectAuthenticateRequest::setRealm, new ParseField("realm"));
     }
 
-    public RestOpenIdConnectAuthenticateAction(Settings settings, XPackLicenseState licenseState) {
+    public RestOpenIdConnectAuthenticateAction(Settings settings, RestController controller, XPackLicenseState licenseState) {
         super(settings, licenseState);
-    }
-
-    @Override
-    public List<Route> routes() {
-        return List.of(new Route(POST, "/_security/oidc/authenticate"));
+        controller.registerHandler(POST, "/_security/oidc/authenticate", this);
     }
 
     @Override

@@ -41,15 +41,13 @@ public final class SplitProcessor extends AbstractProcessor {
     private final String field;
     private final String separator;
     private final boolean ignoreMissing;
-    private final boolean preserveTrailing;
     private final String targetField;
 
-    SplitProcessor(String tag, String field, String separator, boolean ignoreMissing, boolean preserveTrailing, String targetField) {
+    SplitProcessor(String tag, String field, String separator, boolean ignoreMissing, String targetField) {
         super(tag);
         this.field = field;
         this.separator = separator;
         this.ignoreMissing = ignoreMissing;
-        this.preserveTrailing = preserveTrailing;
         this.targetField = targetField;
     }
 
@@ -65,8 +63,6 @@ public final class SplitProcessor extends AbstractProcessor {
         return ignoreMissing;
     }
 
-    boolean isPreserveTrailing() { return preserveTrailing; }
-
     String getTargetField() {
         return targetField;
     }
@@ -81,7 +77,7 @@ public final class SplitProcessor extends AbstractProcessor {
             throw new IllegalArgumentException("field [" + field + "] is null, cannot split.");
         }
 
-        String[] strings = oldVal.split(separator, preserveTrailing ? -1 : 0);
+        String[] strings = oldVal.split(separator);
         List<String> splitList = new ArrayList<>(strings.length);
         Collections.addAll(splitList, strings);
         document.setFieldValue(targetField, splitList);
@@ -99,10 +95,9 @@ public final class SplitProcessor extends AbstractProcessor {
                                      Map<String, Object> config) throws Exception {
             String field = ConfigurationUtils.readStringProperty(TYPE, processorTag, config, "field");
             boolean ignoreMissing = ConfigurationUtils.readBooleanProperty(TYPE, processorTag, config, "ignore_missing", false);
-            boolean preserveTrailing = ConfigurationUtils.readBooleanProperty(TYPE, processorTag, config, "preserve_trailing", false);
             String targetField = ConfigurationUtils.readStringProperty(TYPE, processorTag, config, "target_field", field);
-            String separator = ConfigurationUtils.readStringProperty(TYPE, processorTag, config, "separator");
-            return new SplitProcessor(processorTag, field, separator, ignoreMissing, preserveTrailing, targetField);
+            return new SplitProcessor(processorTag, field,
+                ConfigurationUtils.readStringProperty(TYPE, processorTag, config, "separator"), ignoreMissing, targetField);
         }
     }
 }

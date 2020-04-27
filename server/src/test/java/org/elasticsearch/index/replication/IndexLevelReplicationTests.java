@@ -30,7 +30,7 @@ import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkShardRequest;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
@@ -62,6 +62,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -130,8 +131,8 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
                 (indexShard, node) -> new RecoveryTarget(indexShard, node, recoveryListener) {
                     @Override
                     public void cleanFiles(int totalTranslogOps, long globalCheckpoint,
-                                           Store.MetadataSnapshot sourceMetadata, ActionListener<Void> listener) {
-                        super.cleanFiles(totalTranslogOps, globalCheckpoint, sourceMetadata, ActionListener.runAfter(listener, () -> {
+                                           Store.MetadataSnapshot sourceMetaData, ActionListener<Void> listener) {
+                        super.cleanFiles(totalTranslogOps, globalCheckpoint, sourceMetaData, ActionListener.runAfter(listener, () -> {
                             latch.countDown();
                             try {
                                 latch.await();
@@ -153,7 +154,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     public void testRetryAppendOnlyAfterRecovering() throws Exception {
         try (ReplicationGroup shards = createGroup(0)) {
             shards.startAll();
-            final IndexRequest originalRequest = new IndexRequest(index.getName()).source("{}", XContentType.JSON);
+            final IndexRequest originalRequest = new IndexRequest(index.getName(), "type").source("{}", XContentType.JSON);
             originalRequest.process(Version.CURRENT, null, index.getName());
             final IndexRequest retryRequest = copyIndexRequest(originalRequest);
             retryRequest.onRetry();
@@ -170,7 +171,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     public void testAppendOnlyRecoveryThenReplication() throws Exception {
         CountDownLatch indexedOnPrimary = new CountDownLatch(1);
         CountDownLatch recoveryDone = new CountDownLatch(1);
-        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetadata(1)) {
+        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetaData(1)) {
             @Override
             protected EngineFactory getEngineFactory(ShardRouting routing) {
                 return config -> new InternalEngine(config) {
@@ -194,7 +195,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
         }) {
             shards.startAll();
             Thread thread = new Thread(() -> {
-                IndexRequest indexRequest = new IndexRequest(index.getName()).source("{}", XContentType.JSON);
+                IndexRequest indexRequest = new IndexRequest(index.getName(), "type").source("{}", XContentType.JSON);
                 try {
                     shards.index(indexRequest);
                 } catch (Exception e) {
@@ -225,7 +226,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     public void testInheritMaxValidAutoIDTimestampOnRecovery() throws Exception {
         try (ReplicationGroup shards = createGroup(0)) {
             shards.startAll();
-            final IndexRequest indexRequest = new IndexRequest(index.getName()).source("{}", XContentType.JSON);
+            final IndexRequest indexRequest = new IndexRequest(index.getName(), "type").source("{}", XContentType.JSON);
             indexRequest.onRetry(); // force an update of the timestamp
             final BulkItemResponse response = shards.index(indexRequest);
             assertEquals(DocWriteResponse.Result.CREATED, response.getResponse().getResult());
@@ -294,12 +295,13 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     }
 
     public void testConflictingOpsOnReplica() throws Exception {
-        String mappings = "{ \"_doc\": { \"properties\": { \"f\": { \"type\": \"keyword\"} }}}";
-        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetadata(2, mappings))) {
+        Map<String, String> mappings =
+                Collections.singletonMap("type", "{ \"type\": { \"properties\": { \"f\": { \"type\": \"keyword\"} }}}");
+        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetaData(2, mappings))) {
             shards.startAll();
             List<IndexShard> replicas = shards.getReplicas();
             IndexShard replica1 = replicas.get(0);
-            IndexRequest indexRequest = new IndexRequest(index.getName()).id("1").source("{ \"f\": \"1\"}", XContentType.JSON);
+            IndexRequest indexRequest = new IndexRequest(index.getName(), "type", "1").source("{ \"f\": \"1\"}", XContentType.JSON);
             logger.info("--> isolated replica " + replica1.routingEntry());
             BulkShardRequest replicationRequest = indexOnPrimary(indexRequest, shards.getPrimary());
             for (int i = 1; i < replicas.size(); i++) {
@@ -308,7 +310,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
 
             logger.info("--> promoting replica to primary " + replica1.routingEntry());
             shards.promoteReplicaToPrimary(replica1).get();
-            indexRequest = new IndexRequest(index.getName()).id("1").source("{ \"f\": \"2\"}", XContentType.JSON);
+            indexRequest = new IndexRequest(index.getName(), "type", "1").source("{ \"f\": \"2\"}", XContentType.JSON);
             shards.index(indexRequest);
             shards.refresh("test");
             for (IndexShard shard : shards) {
@@ -321,8 +323,9 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     }
 
     public void testReplicaTermIncrementWithConcurrentPrimaryPromotion() throws Exception {
-        String mappings = "{ \"_doc\": { \"properties\": { \"f\": { \"type\": \"keyword\"} }}}";
-        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetadata(2, mappings))) {
+        Map<String, String> mappings =
+            Collections.singletonMap("type", "{ \"type\": { \"properties\": { \"f\": { \"type\": \"keyword\"} }}}");
+        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetaData(2, mappings))) {
             shards.startAll();
             long primaryPrimaryTerm = shards.getPrimary().getPendingPrimaryTerm();
             List<IndexShard> replicas = shards.getReplicas();
@@ -335,7 +338,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
 
             assertEquals(primaryPrimaryTerm, replica2.getPendingPrimaryTerm());
 
-            IndexRequest indexRequest = new IndexRequest(index.getName()).id("1").source("{ \"f\": \"1\"}", XContentType.JSON);
+            IndexRequest indexRequest = new IndexRequest(index.getName(), "type", "1").source("{ \"f\": \"1\"}", XContentType.JSON);
             BulkShardRequest replicationRequest = indexOnPrimary(indexRequest, replica1);
 
             CyclicBarrier barrier = new CyclicBarrier(2);
@@ -368,11 +371,12 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     }
 
     public void testReplicaOperationWithConcurrentPrimaryPromotion() throws Exception {
-        String mappings = "{ \"_doc\": { \"properties\": { \"f\": { \"type\": \"keyword\"} }}}";
-        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetadata(1, mappings))) {
+        Map<String, String> mappings =
+            Collections.singletonMap("type", "{ \"type\": { \"properties\": { \"f\": { \"type\": \"keyword\"} }}}");
+        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetaData(1, mappings))) {
             shards.startAll();
             long primaryPrimaryTerm = shards.getPrimary().getPendingPrimaryTerm();
-            IndexRequest indexRequest = new IndexRequest(index.getName()).id("1").source("{ \"f\": \"1\"}", XContentType.JSON);
+            IndexRequest indexRequest = new IndexRequest(index.getName(), "type", "1").source("{ \"f\": \"1\"}", XContentType.JSON);
             BulkShardRequest replicationRequest = indexOnPrimary(indexRequest, shards.getPrimary());
 
             List<IndexShard> replicas = shards.getReplicas();
@@ -439,7 +443,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
                     }
                 }
             }, null, null, config);
-        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetadata(0)) {
+        try (ReplicationGroup shards = new ReplicationGroup(buildIndexMetaData(0)) {
             @Override
             protected EngineFactory getEngineFactory(ShardRouting routing) { return engineFactory; }}) {
 
@@ -447,7 +451,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
             shards.startPrimary();
             long primaryTerm = shards.getPrimary().getPendingPrimaryTerm();
             List<Translog.Operation> expectedTranslogOps = new ArrayList<>();
-            BulkItemResponse indexResp = shards.index(new IndexRequest(index.getName()).id("1").source("{}", XContentType.JSON));
+            BulkItemResponse indexResp = shards.index(new IndexRequest(index.getName(), "type", "1").source("{}", XContentType.JSON));
             assertThat(indexResp.isFailed(), equalTo(true));
             assertThat(indexResp.getFailure().getCause(), equalTo(indexException));
             expectedTranslogOps.add(new Translog.NoOp(0, primaryTerm, indexException.toString()));
@@ -470,12 +474,12 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
                         assertThat(snapshot.totalOperations(), equalTo(0));
                     }
                 }
-                try (Translog.Snapshot snapshot = shard.newChangesSnapshot("test", 0, Long.MAX_VALUE, false)) {
+                try (Translog.Snapshot snapshot = shard.getHistoryOperations("test", 0)) {
                     assertThat(snapshot, SnapshotMatchers.containsOperationsInAnyOrder(expectedTranslogOps));
                 }
             }
             // the failure replicated directly from the replication channel.
-            indexResp = shards.index(new IndexRequest(index.getName()).id("any").source("{}", XContentType.JSON));
+            indexResp = shards.index(new IndexRequest(index.getName(), "type", "any").source("{}", XContentType.JSON));
             assertThat(indexResp.getFailure().getCause(), equalTo(indexException));
             Translog.NoOp noop2 = new Translog.NoOp(1, primaryTerm, indexException.toString());
             expectedTranslogOps.add(noop2);
@@ -488,7 +492,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
                         assertThat(snapshot, SnapshotMatchers.containsOperationsInAnyOrder(Collections.singletonList(noop2)));
                     }
                 }
-                try (Translog.Snapshot snapshot = shard.newChangesSnapshot("test", 0, Long.MAX_VALUE, false)) {
+                try (Translog.Snapshot snapshot = shard.getHistoryOperations("test", 0)) {
                     assertThat(snapshot, SnapshotMatchers.containsOperationsInAnyOrder(expectedTranslogOps));
                 }
             }
@@ -503,7 +507,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
         try (ReplicationGroup shards = createGroup(0)) {
             shards.startAll();
             BulkItemResponse response = shards.index(
-                    new IndexRequest(index.getName()).id("1")
+                    new IndexRequest(index.getName(), "type", "1")
                             .source("{}", XContentType.JSON)
                             .version(2)
             );
@@ -522,7 +526,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
             }
             shards.startReplicas(nReplica);
             response = shards.index(
-                    new IndexRequest(index.getName()).id("1")
+                    new IndexRequest(index.getName(), "type", "1")
                             .source("{}", XContentType.JSON)
                             .version(2)
             );
@@ -546,7 +550,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
             shards.syncGlobalCheckpoint();
 
             logger.info("--> Isolate replica1");
-            IndexRequest indexDoc1 = new IndexRequest(index.getName()).id("d1").source("{}", XContentType.JSON);
+            IndexRequest indexDoc1 = new IndexRequest(index.getName(), "type", "d1").source("{}", XContentType.JSON);
             BulkShardRequest replicationRequest = indexOnPrimary(indexDoc1, shards.getPrimary());
             indexOnReplica(replicationRequest, shards, replica2);
 
@@ -564,17 +568,19 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
                 assertThat(snapshot.next(), nullValue());
                 assertThat(snapshot.skippedOperations(), equalTo(0));
             }
+            // Make sure that replica2 receives translog ops (eg. op2) from replica1
+            // and does not overwrite its stale operation (op1) as it is trimmed.
             logger.info("--> Promote replica1 as the primary");
             shards.promoteReplicaToPrimary(replica1).get(); // wait until resync completed.
-            shards.index(new IndexRequest(index.getName()).id("d2").source("{}", XContentType.JSON));
+            shards.index(new IndexRequest(index.getName(), "type", "d2").source("{}", XContentType.JSON));
             final Translog.Operation op2;
             try (Translog.Snapshot snapshot = getTranslog(replica2).newSnapshot()) {
-                assertThat(snapshot.totalOperations(), equalTo(1));
+                assertThat(snapshot.totalOperations(), equalTo(initDocs + 2));
                 op2 = snapshot.next();
                 assertThat(op2.seqNo(), equalTo(op1.seqNo()));
                 assertThat(op2.primaryTerm(), greaterThan(op1.primaryTerm()));
-                assertNull(snapshot.next());
-                assertThat(snapshot.skippedOperations(), equalTo(0));
+                assertThat("Remaining of snapshot should contain init operations", snapshot, containsOperationsInAnyOrder(initOperations));
+                assertThat(snapshot.skippedOperations(), equalTo(1));
             }
 
             // Make sure that peer-recovery transfers all but non-overridden operations.
@@ -583,7 +589,7 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
             shards.promoteReplicaToPrimary(replica2).get();
             logger.info("--> Recover replica3 from replica2");
             recoverReplica(replica3, replica2, true);
-            try (Translog.Snapshot snapshot = replica3.newChangesSnapshot("test", 0, Long.MAX_VALUE, false)) {
+            try (Translog.Snapshot snapshot = replica3.getHistoryOperations("test", 0)) {
                 assertThat(snapshot.totalOperations(), equalTo(initDocs + 1));
                 final List<Translog.Operation> expectedOps = new ArrayList<>(initOperations);
                 expectedOps.add(op2);
@@ -614,8 +620,8 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
 
             updateGCDeleteCycle(replica, gcInterval);
             final BulkShardRequest indexRequest = indexOnPrimary(
-                new IndexRequest(index.getName()).id("d1").source("{}", XContentType.JSON), primary);
-            final BulkShardRequest deleteRequest = deleteOnPrimary(new DeleteRequest(index.getName()).id("d1"), primary);
+                new IndexRequest(index.getName(), "type", "d1").source("{}", XContentType.JSON), primary);
+            final BulkShardRequest deleteRequest = deleteOnPrimary(new DeleteRequest(index.getName(), "type", "d1"), primary);
             deleteOnReplica(deleteRequest, shards, replica); // delete arrives on replica first.
             final long deleteTimestamp = threadPool.relativeTimeInMillis();
             replica.refresh("test");
@@ -629,12 +635,12 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
     }
 
     private void updateGCDeleteCycle(IndexShard shard, TimeValue interval) {
-        IndexMetadata.Builder builder = IndexMetadata.builder(shard.indexSettings().getIndexMetadata());
+        IndexMetaData.Builder builder = IndexMetaData.builder(shard.indexSettings().getIndexMetaData());
         builder.settings(Settings.builder()
             .put(shard.indexSettings().getSettings())
             .put(IndexSettings.INDEX_GC_DELETES_SETTING.getKey(), interval.getStringRep())
         );
-        shard.indexSettings().updateIndexMetadata(builder.build());
+        shard.indexSettings().updateIndexMetaData(builder.build());
         shard.onSettingsChanged();
     }
 
@@ -650,9 +656,9 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
             final IndexShard replica = shards.getReplicas().get(0);
             // Append-only request - without id
             final BulkShardRequest indexRequest = indexOnPrimary(
-                new IndexRequest(index.getName()).source("{}", XContentType.JSON), primary);
+                new IndexRequest(index.getName(), "type", null).source("{}", XContentType.JSON), primary);
             final String docId = Iterables.get(getShardDocUIDs(primary), 0);
-            final BulkShardRequest deleteRequest = deleteOnPrimary(new DeleteRequest(index.getName()).id(docId), primary);
+            final BulkShardRequest deleteRequest = deleteOnPrimary(new DeleteRequest(index.getName(), "type", docId), primary);
             deleteOnReplica(deleteRequest, shards, replica);
             indexOnReplica(indexRequest, shards, replica);
             shards.assertAllEqual(0);
@@ -668,12 +674,12 @@ public class IndexLevelReplicationTests extends ESIndexLevelReplicationTestCase 
             for (int i = 0; i < numDocs; i++) {
                 String id = Integer.toString(randomIntBetween(1, 100));
                 if (randomBoolean()) {
-                    group.index(new IndexRequest(index.getName()).id(id).source("{}", XContentType.JSON));
+                    group.index(new IndexRequest(index.getName(), "type", id).source("{}", XContentType.JSON));
                     if (liveDocs.add(id) == false) {
                         versionLookups++;
                     }
                 } else {
-                    group.delete(new DeleteRequest(index.getName()).id(id));
+                    group.delete(new DeleteRequest(index.getName(), "type", id));
                     liveDocs.remove(id);
                     versionLookups++;
                 }

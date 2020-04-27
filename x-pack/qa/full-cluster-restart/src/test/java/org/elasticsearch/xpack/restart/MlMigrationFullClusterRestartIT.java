@@ -35,8 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.isEmptyOrNullString;
 
 public class MlMigrationFullClusterRestartIT extends AbstractFullClusterRestartTestCase {
 
@@ -66,6 +65,7 @@ public class MlMigrationFullClusterRestartIT extends AbstractFullClusterRestartT
                 "\"airline\": {\"type\": \"keyword\"}," +
                 "\"responsetime\": {\"type\": \"float\"}" +
                 "}}}}");
+        createTestIndex.setOptions(allowTypesRemovalWarnings());
         client().performRequest(createTestIndex);
     }
 
@@ -153,7 +153,7 @@ public class MlMigrationFullClusterRestartIT extends AbstractFullClusterRestartT
 
             assertEquals(jobId, XContentMapValues.extractValue("job_id", jobStats.get(0)));
             assertEquals("opened", XContentMapValues.extractValue("state", jobStats.get(0)));
-            assertThat((String) XContentMapValues.extractValue("assignment_explanation", jobStats.get(0)), is(emptyOrNullString()));
+            assertThat((String) XContentMapValues.extractValue("assignment_explanation", jobStats.get(0)), isEmptyOrNullString());
             assertNotNull(XContentMapValues.extractValue("node", jobStats.get(0)));
         }, 30, TimeUnit.SECONDS);
     }
@@ -169,7 +169,7 @@ public class MlMigrationFullClusterRestartIT extends AbstractFullClusterRestartT
 
             assertEquals(datafeedId, XContentMapValues.extractValue("datafeed_id", datafeedStats.get(0)));
             assertEquals("started", XContentMapValues.extractValue("state", datafeedStats.get(0)));
-            assertThat((String) XContentMapValues.extractValue("assignment_explanation", datafeedStats.get(0)), is(emptyOrNullString()));
+            assertThat((String) XContentMapValues.extractValue("assignment_explanation", datafeedStats.get(0)), isEmptyOrNullString());
             assertNotNull(XContentMapValues.extractValue("node", datafeedStats.get(0)));
         }, 30, TimeUnit.SECONDS);
     }

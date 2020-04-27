@@ -16,7 +16,7 @@ expression.
 An example pipeline that points documents to a monthly index that starts with a `myindex-` prefix based on a
 date in the `date1` field:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/monthlyindex
 {
@@ -32,23 +32,26 @@ PUT _ingest/pipeline/monthlyindex
   ]
 }
 --------------------------------------------------
+// CONSOLE
 
 
 Using that pipeline for an index request:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /myindex/_doc/1?pipeline=monthlyindex
 {
   "date1" : "2016-04-25T12:02:01.789Z"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "_index" : "myindex-2016-04-01",
+  "_type" : "_doc",
   "_id" : "1",
   "_version" : 1,
   "result" : "created",
@@ -71,7 +74,7 @@ To see the date-math value of the index supplied in the actual index request whi
 indexed into `myindex-2016-04-01` we can inspect the effects of the processor using a simulate request.
 
 
-[source,console]
+[source,js]
 --------------------------------------------------
 POST _ingest/pipeline/_simulate
 {
@@ -97,10 +100,11 @@ POST _ingest/pipeline/_simulate
   ]
 }
 --------------------------------------------------
+// CONSOLE
 
 and the result:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "docs" : [
@@ -108,6 +112,7 @@ and the result:
       "doc" : {
         "_id" : "_id",
         "_index" : "<myindex-{2016-04-25||/M{yyyy-MM-dd|UTC}}>",
+        "_type" : "_doc",
         "_source" : {
           "date1" : "2016-04-25T12:02:01.789Z"
         },

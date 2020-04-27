@@ -27,6 +27,7 @@ import org.apache.lucene.search.spell.NGramDistance;
 import org.apache.lucene.search.spell.StringDistance;
 import org.apache.lucene.search.spell.SuggestMode;
 import org.apache.lucene.util.automaton.LevenshteinAutomata;
+import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -489,7 +490,7 @@ public final class DirectCandidateGeneratorBuilder implements CandidateGenerator
             toXContent(builder, EMPTY_PARAMS);
             return Strings.toString(builder);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            return "{ \"error\" : \"" + ExceptionsHelper.detailedMessage(e) + "\"}";
         }
     }
 

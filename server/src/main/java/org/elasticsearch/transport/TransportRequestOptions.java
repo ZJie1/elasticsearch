@@ -53,6 +53,10 @@ public class TransportRequestOptions {
         return new Builder();
     }
 
+    public static Builder builder(TransportRequestOptions options) {
+        return new Builder().withTimeout(options.timeout).withType(options.type());
+    }
+
     public static class Builder {
         private TimeValue timeout;
         private Type type = Type.REG;

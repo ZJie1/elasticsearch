@@ -38,13 +38,13 @@ public class WatcherConcreteIndexTests extends AbstractWatcherIntegrationTestCas
             .trigger(schedule(interval("3s")))
             .input(noneInput())
             .condition(InternalAlwaysCondition.INSTANCE)
-            .addAction("indexer", indexAction(watchResultsIndex)))
+            .addAction("indexer", indexAction(watchResultsIndex, "_doc")))
             .get();
 
         assertTrue(putWatchResponse.isCreated());
         refresh();
 
-        assertBusy(() -> timeWarp().trigger("mywatch"));
+        timeWarp().trigger("mywatch");
 
         assertBusy(() -> {
             SearchResponse searchResult = client().prepareSearch(watchResultsIndex).setTrackTotalHits(true).get();

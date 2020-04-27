@@ -19,7 +19,6 @@
 
 package org.elasticsearch.plugin.repository.url;
 
-import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.env.Environment;
@@ -27,6 +26,7 @@ import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.plugins.RepositoryPlugin;
 import org.elasticsearch.repositories.Repository;
 import org.elasticsearch.repositories.url.URLRepository;
+import org.elasticsearch.threadpool.ThreadPool;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,8 +46,8 @@ public class URLRepositoryPlugin extends Plugin implements RepositoryPlugin {
 
     @Override
     public Map<String, Repository.Factory> getRepositories(Environment env, NamedXContentRegistry namedXContentRegistry,
-                                                           ClusterService clusterService) {
+                                                           ThreadPool threadPool) {
         return Collections.singletonMap(URLRepository.TYPE,
-            metadata -> new URLRepository(metadata, env, namedXContentRegistry, clusterService));
+            metadata -> new URLRepository(metadata, env, namedXContentRegistry, threadPool));
     }
 }

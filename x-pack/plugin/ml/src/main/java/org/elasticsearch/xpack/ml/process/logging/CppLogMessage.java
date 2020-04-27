@@ -75,7 +75,7 @@ public class CppLogMessage implements ToXContentObject, Writeable {
 
     public CppLogMessage(StreamInput in) throws IOException {
         logger = in.readString();
-        if (in.getVersion().onOrAfter(Version.V_7_4_0)) {
+        if (in.getVersion().onOrAfter(Version.CURRENT)) {
             timestamp = in.readInstant();
         } else {
             timestamp = Instant.ofEpochMilli(in.readVLong());
@@ -93,7 +93,7 @@ public class CppLogMessage implements ToXContentObject, Writeable {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(logger);
-        if (out.getVersion().onOrAfter(Version.V_7_4_0)) {
+        if (out.getVersion().onOrAfter(Version.CURRENT)) {
             out.writeInstant(timestamp);
         } else {
             out.writeVLong(timestamp.toEpochMilli());

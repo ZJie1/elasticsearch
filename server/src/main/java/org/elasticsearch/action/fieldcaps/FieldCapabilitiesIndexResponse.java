@@ -29,13 +29,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Response for {@link TransportFieldCapabilitiesIndexAction}.
+ * Response for {@link FieldCapabilitiesIndexRequest} requests.
  */
 public class FieldCapabilitiesIndexResponse extends ActionResponse implements Writeable {
     private String indexName;
-    private Map<String, IndexFieldCapabilities> responseMap;
+    private Map<String, FieldCapabilities> responseMap;
 
-    FieldCapabilitiesIndexResponse(String indexName, Map<String, IndexFieldCapabilities> responseMap) {
+    FieldCapabilitiesIndexResponse(String indexName, Map<String, FieldCapabilities> responseMap) {
         this.indexName = indexName;
         this.responseMap = responseMap;
     }
@@ -44,8 +44,9 @@ public class FieldCapabilitiesIndexResponse extends ActionResponse implements Wr
         super(in);
         this.indexName = in.readString();
         this.responseMap =
-            in.readMap(StreamInput::readString, IndexFieldCapabilities::new);
+            in.readMap(StreamInput::readString, FieldCapabilities::new);
     }
+
 
     /**
      * Get the index name
@@ -57,7 +58,7 @@ public class FieldCapabilitiesIndexResponse extends ActionResponse implements Wr
     /**
      * Get the field capabilities map
      */
-    public Map<String, IndexFieldCapabilities> get() {
+    public Map<String, FieldCapabilities> get() {
         return responseMap;
     }
 
@@ -65,7 +66,7 @@ public class FieldCapabilitiesIndexResponse extends ActionResponse implements Wr
      *
      * Get the field capabilities for the provided {@code field}
      */
-    public IndexFieldCapabilities getField(String field) {
+    public FieldCapabilities getField(String field) {
         return responseMap.get(field);
     }
 

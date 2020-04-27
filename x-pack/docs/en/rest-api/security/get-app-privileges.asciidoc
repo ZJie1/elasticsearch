@@ -5,7 +5,8 @@
 <titleabbrev>Get application privileges</titleabbrev>
 ++++
 
-Retrieves <<application-privileges,application privileges>>.
+Retrieves 
+{stack-ov}/security-privileges.html#application-privileges[application privileges].
 
 [[security-api-get-privileges-request]]
 ==== {api-request-title}
@@ -54,16 +55,17 @@ To check a user's application privileges, use the
 The following example retrieves information about the `read` privilege for the 
 `app01` application:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_security/privilege/myapp/read
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:app0102_privileges]
 
 A successful call returns an object keyed by application name and privilege
 name. If the privilege is not defined, the request responds with a 404 status.
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "myapp": {
@@ -81,17 +83,20 @@ name. If the privilege is not defined, the request responds with a 404 status.
   }
 }
 --------------------------------------------------
+// TESTRESPONSE
 
 To retrieve all privileges for an application, omit the privilege name:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_security/privilege/myapp/
 --------------------------------------------------
+// CONSOLE
 
 To retrieve every privilege, omit both the application and privilege names:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_security/privilege/
 --------------------------------------------------
+// CONSOLE

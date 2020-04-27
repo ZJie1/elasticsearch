@@ -7,7 +7,7 @@
 Matches spans containing a term. The span term query maps to Lucene
 `SpanTermQuery`. Here is an example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -16,10 +16,11 @@ GET /_search
     }
 }    
 --------------------------------------------------
+// CONSOLE
 
 A boost can also be associated with the query:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -28,10 +29,11 @@ GET /_search
     }
 }    
 --------------------------------------------------
+// CONSOLE
 
 Or :
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_search
 {
@@ -40,3 +42,4 @@ GET /_search
     }
 }    
 --------------------------------------------------
+// CONSOLE

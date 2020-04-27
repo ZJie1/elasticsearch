@@ -19,6 +19,8 @@
 
 package org.elasticsearch.search.aggregations.pipeline;
 
+import org.elasticsearch.common.io.stream.StreamInput;
+import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.script.BucketAggregationScript;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.search.DocValueFormat;
@@ -28,6 +30,7 @@ import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.InternalMultiBucketAggregation;
 import org.elasticsearch.search.aggregations.pipeline.BucketHelpers.GapPolicy;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +53,31 @@ public class BucketScriptPipelineAggregator extends PipelineAggregator {
         this.script = script;
         this.formatter = formatter;
         this.gapPolicy = gapPolicy;
+    }
+
+    /**
+     * Read from a stream.
+     */
+    @SuppressWarnings("unchecked")
+    public BucketScriptPipelineAggregator(StreamInput in) throws IOException {
+        super(in);
+        script = new Script(in);
+        formatter = in.readNamedWriteable(DocValueFormat.class);
+        gapPolicy = GapPolicy.readFrom(in);
+        bucketsPathsMap = (Map<String, String>) in.readGenericValue();
+    }
+
+    @Override
+    protected void doWriteTo(StreamOutput out) throws IOException {
+        script.writeTo(out);
+        out.writeNamedWriteable(formatter);
+        gapPolicy.writeTo(out);
+        out.writeGenericValue(bucketsPathsMap);
+    }
+
+    @Override
+    public String getWriteableName() {
+        return BucketScriptPipelineAggregationBuilder.NAME;
     }
 
     @Override
@@ -87,7 +115,8 @@ public class BucketScriptPipelineAggregator extends PipelineAggregator {
                     final List<InternalAggregation> aggs = StreamSupport.stream(bucket.getAggregations().spliterator(), false).map(
                         (p) -> (InternalAggregation) p).collect(Collectors.toList());
 
-                    InternalSimpleValue simpleValue = new InternalSimpleValue(name(), returned.doubleValue(), formatter, metadata());
+                    InternalSimpleValue simpleValue = new InternalSimpleValue(name(), returned.doubleValue(),
+                        formatter, new ArrayList<>(), metaData());
                     aggs.add(simpleValue);
                     InternalMultiBucketAggregation.InternalBucket newBucket = originalAgg.createBucket(new InternalAggregations(aggs),
                         bucket);

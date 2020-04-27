@@ -8,14 +8,15 @@ package org.elasticsearch.xpack.ccr;
 
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.IndexNotFoundException;
+import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.xpack.CcrSingleNodeTestCase;
 import org.elasticsearch.xpack.core.ccr.action.FollowInfoAction;
 import org.elasticsearch.xpack.core.ccr.action.PauseFollowAction;
 import org.elasticsearch.xpack.core.ccr.action.PutFollowAction;
 
-import java.util.Collections;
 import java.util.Comparator;
 
+import static java.util.Collections.singletonMap;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
 import static org.elasticsearch.xpack.ccr.LocalIndexFollowingIT.getIndexSettings;
 import static org.elasticsearch.xpack.core.ccr.action.FollowInfoAction.Response.Status;
@@ -26,7 +27,8 @@ import static org.hamcrest.Matchers.nullValue;
 public class FollowInfoIT extends CcrSingleNodeTestCase {
 
     public void testFollowInfoApiFollowerIndexFiltering() throws Exception {
-        final String leaderIndexSettings = getIndexSettings(1, 0, Collections.emptyMap());
+        final String leaderIndexSettings = getIndexSettings(1, 0,
+            singletonMap(IndexSettings.INDEX_SOFT_DELETES_SETTING.getKey(), "true"));
         assertAcked(client().admin().indices().prepareCreate("leader1").setSource(leaderIndexSettings, XContentType.JSON));
         ensureGreen("leader1");
         assertAcked(client().admin().indices().prepareCreate("leader2").setSource(leaderIndexSettings, XContentType.JSON));
@@ -109,7 +111,8 @@ public class FollowInfoIT extends CcrSingleNodeTestCase {
     }
 
     public void testFollowInfoApiIndexMissing() throws Exception {
-        final String leaderIndexSettings = getIndexSettings(1, 0, Collections.emptyMap());
+        final String leaderIndexSettings = getIndexSettings(1, 0,
+            singletonMap(IndexSettings.INDEX_SOFT_DELETES_SETTING.getKey(), "true"));
         assertAcked(client().admin().indices().prepareCreate("leader1").setSource(leaderIndexSettings, XContentType.JSON));
         ensureGreen("leader1");
         assertAcked(client().admin().indices().prepareCreate("leader2").setSource(leaderIndexSettings, XContentType.JSON));

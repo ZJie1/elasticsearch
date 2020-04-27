@@ -24,6 +24,7 @@ import org.elasticsearch.common.breaker.CircuitBreaker;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.BoundTransportAddress;
@@ -56,7 +57,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
@@ -104,8 +104,7 @@ public class RestControllerTests extends ESTestCase {
 
     public void testApplyRelevantHeaders() throws Exception {
         final ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        Set<RestHeaderDefinition> headers = new HashSet<>(Arrays.asList(new RestHeaderDefinition("header.1", true),
-            new RestHeaderDefinition("header.2", true)));
+        Set<String> headers = new HashSet<>(Arrays.asList("header.1", "header.2"));
         final RestController restController = new RestController(headers, null, null, circuitBreakerService, usageService);
         Map<String, List<String>> restHeaders = new HashMap<>();
         restHeaders.put("header.1", Collections.singletonList("true"));
@@ -138,40 +137,6 @@ public class RestControllerTests extends ESTestCase {
         assertNull(threadContext.getHeader("header.3"));
     }
 
-    public void testRequestWithDisallowedMultiValuedHeader() {
-        final ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        Set<RestHeaderDefinition> headers = new HashSet<>(Arrays.asList(new RestHeaderDefinition("header.1", true),
-            new RestHeaderDefinition("header.2", false)));
-        final RestController restController = new RestController(headers, null, null, circuitBreakerService, usageService);
-        Map<String, List<String>> restHeaders = new HashMap<>();
-        restHeaders.put("header.1", Collections.singletonList("boo"));
-        restHeaders.put("header.2", List.of("foo", "bar"));
-        RestRequest fakeRequest = new FakeRestRequest.Builder(xContentRegistry()).withHeaders(restHeaders).build();
-        AssertingChannel channel = new AssertingChannel(fakeRequest, false, RestStatus.BAD_REQUEST);
-        restController.dispatchRequest(fakeRequest, channel, threadContext);
-        assertTrue(channel.getSendResponseCalled());
-    }
-
-    public void testRequestWithDisallowedMultiValuedHeaderButSameValues() {
-        final ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
-        Set<RestHeaderDefinition> headers = new HashSet<>(Arrays.asList(new RestHeaderDefinition("header.1", true),
-            new RestHeaderDefinition("header.2", false)));
-        final RestController restController = new RestController(headers, null, null, circuitBreakerService, usageService);
-        Map<String, List<String>> restHeaders = new HashMap<>();
-        restHeaders.put("header.1", Collections.singletonList("boo"));
-        restHeaders.put("header.2", List.of("foo", "foo"));
-        RestRequest fakeRequest = new FakeRestRequest.Builder(xContentRegistry()).withHeaders(restHeaders).withPath("/bar").build();
-        restController.registerHandler(RestRequest.Method.GET, "/bar", new RestHandler() {
-            @Override
-            public void handleRequest(RestRequest request, RestChannel channel, NodeClient client) throws Exception {
-                channel.sendResponse(new BytesRestResponse(RestStatus.OK, BytesRestResponse.TEXT_CONTENT_TYPE, BytesArray.EMPTY));
-            }
-        });
-        AssertingChannel channel = new AssertingChannel(fakeRequest, false, RestStatus.OK);
-        restController.dispatchRequest(fakeRequest, channel, threadContext);
-        assertTrue(channel.getSendResponseCalled());
-    }
-
     public void testRegisterAsDeprecatedHandler() {
         RestController controller = mock(RestController.class);
 
@@ -179,11 +144,12 @@ public class RestControllerTests extends ESTestCase {
         String path = "/_" + randomAlphaOfLengthBetween(1, 6);
         RestHandler handler = mock(RestHandler.class);
         String deprecationMessage = randomAlphaOfLengthBetween(1, 10);
+        DeprecationLogger logger = mock(DeprecationLogger.class);
 
         // don't want to test everything -- just that it actually wraps the handler
-        doCallRealMethod().when(controller).registerAsDeprecatedHandler(method, path, handler, deprecationMessage);
+        doCallRealMethod().when(controller).registerAsDeprecatedHandler(method, path, handler, deprecationMessage, logger);
 
-        controller.registerAsDeprecatedHandler(method, path, handler, deprecationMessage);
+        controller.registerAsDeprecatedHandler(method, path, handler, deprecationMessage, logger);
 
         verify(controller).registerHandler(eq(method), eq(path), any(DeprecationRestHandler.class));
     }
@@ -196,35 +162,18 @@ public class RestControllerTests extends ESTestCase {
         final RestHandler handler = mock(RestHandler.class);
         final RestRequest.Method deprecatedMethod = randomFrom(RestRequest.Method.values());
         final String deprecatedPath = "/_" + randomAlphaOfLengthBetween(1, 6);
+        final DeprecationLogger logger = mock(DeprecationLogger.class);
 
         final String deprecationMessage = "[" + deprecatedMethod.name() + " " + deprecatedPath + "] is deprecated! Use [" +
             method.name() + " " + path + "] instead.";
 
         // don't want to test everything -- just that it actually wraps the handlers
-        doCallRealMethod().when(controller).registerWithDeprecatedHandler(method, path, handler, deprecatedMethod, deprecatedPath);
+        doCallRealMethod().when(controller).registerWithDeprecatedHandler(method, path, handler, deprecatedMethod, deprecatedPath, logger);
 
-        controller.registerWithDeprecatedHandler(method, path, handler, deprecatedMethod, deprecatedPath);
+        controller.registerWithDeprecatedHandler(method, path, handler, deprecatedMethod, deprecatedPath, logger);
 
         verify(controller).registerHandler(method, path, handler);
-        verify(controller).registerAsDeprecatedHandler(deprecatedMethod, deprecatedPath, handler, deprecationMessage);
-    }
-
-    public void testRegisterSecondMethodWithDifferentNamedWildcard() {
-        final RestController restController = new RestController(null, null, null, circuitBreakerService, usageService);
-
-        RestRequest.Method firstMethod = randomFrom(RestRequest.Method.values());
-        RestRequest.Method secondMethod =
-            randomFrom(Arrays.stream(RestRequest.Method.values()).filter(m -> m != firstMethod).collect(Collectors.toList()));
-
-        final String path = "/_" + randomAlphaOfLengthBetween(1, 6);
-
-        RestHandler handler = mock(RestHandler.class);
-        restController.registerHandler(firstMethod, path + "/{wildcard1}", handler);
-
-        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
-            () -> restController.registerHandler(secondMethod, path + "/{wildcard2}", handler));
-
-        assertThat(exception.getMessage(), equalTo("Trying to use conflicting wildcard names for same path: wildcard1 and wildcard2"));
+        verify(controller).registerAsDeprecatedHandler(deprecatedMethod, deprecatedPath, handler, deprecationMessage, logger);
     }
 
     public void testRestHandlerWrapper() throws Exception {
@@ -245,6 +194,27 @@ public class RestControllerTests extends ESTestCase {
         httpServerTransport.start();
         assertTrue(wrapperCalled.get());
         assertFalse(handlerCalled.get());
+    }
+
+    /**
+     * Useful for testing with deprecation handler.
+     */
+    private static class FakeRestHandler implements RestHandler {
+        private final boolean canTripCircuitBreaker;
+
+        private FakeRestHandler(boolean canTripCircuitBreaker) {
+            this.canTripCircuitBreaker = canTripCircuitBreaker;
+        }
+
+        @Override
+        public void handleRequest(RestRequest request, RestChannel channel, NodeClient client) throws Exception {
+            //no op
+        }
+
+        @Override
+        public boolean canTripCircuitBreaker() {
+            return canTripCircuitBreaker;
+        }
     }
 
     public void testDispatchRequestAddsAndFreesBytesOnSuccess() {
@@ -584,15 +554,6 @@ public class RestControllerTests extends ESTestCase {
             public HttpResponse createResponse(RestStatus status, BytesReference content) {
                 return null;
             }
-
-            @Override
-            public void release() {
-            }
-
-            @Override
-            public HttpRequest releaseAndCopy() {
-                return this;
-            }
         }, null);
 
         final AssertingChannel channel = new AssertingChannel(request, true, RestStatus.METHOD_NOT_ALLOWED);
@@ -639,12 +600,12 @@ public class RestControllerTests extends ESTestCase {
         }
     }
 
-    public static final class AssertingChannel extends AbstractRestChannel {
+    private static final class AssertingChannel extends AbstractRestChannel {
 
         private final RestStatus expectedStatus;
         private final AtomicReference<RestResponse> responseReference = new AtomicReference<>();
 
-        public AssertingChannel(RestRequest request, boolean detailedErrorsEnabled, RestStatus expectedStatus) {
+        protected AssertingChannel(RestRequest request, boolean detailedErrorsEnabled, RestStatus expectedStatus) {
             super(request, detailedErrorsEnabled);
             this.expectedStatus = expectedStatus;
         }

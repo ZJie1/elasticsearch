@@ -7,7 +7,7 @@ Executes another pipeline.
 [options="header"]
 |======
 | Name             | Required  | Default  | Description
-| `name`           | yes       | -        | The name of the pipeline to execute. Supports <<accessing-template-fields,template snippets>>.
+| `name`           | yes       | -        | The name of the pipeline to execute
 include::common-options.asciidoc[]
 |======
 
@@ -21,13 +21,11 @@ include::common-options.asciidoc[]
 --------------------------------------------------
 // NOTCONSOLE
 
-The name of the current pipeline can be accessed from the `_ingest.pipeline` ingest metadata key.
-
 An example of using this processor for nesting pipelines would be:
 
 Define an inner pipeline:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/pipelineA
 {
@@ -42,10 +40,11 @@ PUT _ingest/pipeline/pipelineA
   ]
 }
 --------------------------------------------------
+// CONSOLE
 
 Define another pipeline that uses the previously defined inner pipeline:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT _ingest/pipeline/pipelineB
 {
@@ -65,26 +64,29 @@ PUT _ingest/pipeline/pipelineB
   ]
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 Now indexing a document while applying the outer pipeline will see the inner pipeline executed
 from the outer pipeline:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /myindex/_doc/1?pipeline=pipelineB
 {
   "field": "value"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 Response from the index request:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "_index": "myindex",
+  "_type": "_doc",
   "_id": "1",
   "_version": 1,
   "result": "created",

@@ -66,10 +66,8 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 
@@ -89,7 +87,6 @@ import static java.util.Map.entry;
 public abstract class StreamOutput extends OutputStream {
 
     private static final Map<TimeUnit, Byte> TIME_UNIT_BYTE_MAP;
-    private static final int MAX_NESTED_EXCEPTION_LEVEL = 100;
 
     static {
         final Map<TimeUnit, Byte> timeUnitByteMap = new EnumMap<>(TimeUnit.class);
@@ -273,15 +270,6 @@ public abstract class StreamOutput extends OutputStream {
             throw new IllegalStateException("Negative longs unsupported, use writeLong or writeZLong for negative numbers [" + i + "]");
         }
         writeVLongNoCheck(i);
-    }
-
-    public void writeOptionalVLong(@Nullable  Long l) throws IOException {
-        if (l == null) {
-            writeBoolean(false);
-        } else {
-            writeBoolean(true);
-            writeVLong(l);
-        }
     }
 
     /**
@@ -792,36 +780,8 @@ public abstract class StreamOutput extends OutputStream {
                         // joda does not understand "Z" for utc, so we must special case
                         o.writeString(zoneId.equals("Z") ? DateTimeZone.UTC.getID() : zoneId);
                         o.writeLong(zonedDateTime.toInstant().toEpochMilli());
-                    }),
-            entry(
-                    Set.class,
-                    (o, v) -> {
-                        if (v instanceof LinkedHashSet) {
-                            o.writeByte((byte) 24);
-                        } else {
-                            o.writeByte((byte) 25);
-                        }
-                        o.writeCollection((Set<?>) v, StreamOutput::writeGenericValue);
-                    }
-            ));
+                    }));
 
-    private static Class<?> getGenericType(Object value) {
-        if (value instanceof List) {
-            return List.class;
-        } else if (value instanceof Object[]) {
-            return Object[].class;
-        } else if (value instanceof Map) {
-            return Map.class;
-        } else if (value instanceof Set) {
-            return Set.class;
-        } else if (value instanceof ReadableInstant) {
-            return ReadableInstant.class;
-        } else if (value instanceof BytesReference) {
-            return BytesReference.class;
-        } else {
-            return value.getClass();
-        }
-    }
     /**
      * Notice: when serialization a map, the stream out map with the stream in map maybe have the
      * different key-value orders, they will maybe have different stream order.
@@ -833,44 +793,25 @@ public abstract class StreamOutput extends OutputStream {
             writeByte((byte) -1);
             return;
         }
-        final Class<?> type = getGenericType(value);
+        final Class type;
+        if (value instanceof List) {
+            type = List.class;
+        } else if (value instanceof Object[]) {
+            type = Object[].class;
+        } else if (value instanceof Map) {
+            type = Map.class;
+        } else if (value instanceof ReadableInstant) {
+            type = ReadableInstant.class;
+        } else if (value instanceof BytesReference) {
+            type = BytesReference.class;
+        } else {
+            type = value.getClass();
+        }
         final Writer writer = WRITERS.get(type);
         if (writer != null) {
             writer.write(this, value);
         } else {
-            throw new IllegalArgumentException("can not write type [" + type + "]");
-        }
-    }
-
-    public static void checkWriteable(@Nullable Object value) throws IllegalArgumentException {
-        if (value == null) {
-            return;
-        }
-        final Class<?> type = getGenericType(value);
-
-        if (type == List.class) {
-            @SuppressWarnings("unchecked") List<Object> list = (List<Object>) value;
-            for (Object v : list) {
-                checkWriteable(v);
-            }
-        } else if (type == Object[].class) {
-            Object[] array = (Object[]) value;
-            for (Object v : array) {
-                checkWriteable(v);
-            }
-        } else if (type == Map.class) {
-            @SuppressWarnings("unchecked") Map<String, Object> map = (Map<String, Object>) value;
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                checkWriteable(entry.getKey());
-                checkWriteable(entry.getValue());
-            }
-        } else if (type == Set.class) {
-            @SuppressWarnings("unchecked") Set<Object> set = (Set<Object>) value;
-            for (Object v : set) {
-                checkWriteable(v);
-            }
-        } else if (WRITERS.containsKey(type) == false) {
-            throw new IllegalArgumentException("Cannot write type [" + type.getCanonicalName() + "] to stream");
+            throw new IOException("can not write type [" + type + "]");
         }
     }
 
@@ -973,15 +914,8 @@ public abstract class StreamOutput extends OutputStream {
     }
 
     public void writeException(Throwable throwable) throws IOException {
-        writeException(throwable, throwable, 0);
-    }
-
-    private void writeException(Throwable rootException, Throwable throwable, int nestedLevel) throws IOException {
         if (throwable == null) {
             writeBoolean(false);
-        } else if (nestedLevel > MAX_NESTED_EXCEPTION_LEVEL) {
-            assert failOnTooManyNestedExceptions(rootException);
-            writeException(new IllegalStateException("too many nested exceptions"));
         } else {
             writeBoolean(true);
             boolean writeCause = true;
@@ -1090,14 +1024,10 @@ public abstract class StreamOutput extends OutputStream {
                 writeOptionalString(throwable.getMessage());
             }
             if (writeCause) {
-                writeException(rootException, throwable.getCause(), nestedLevel + 1);
+                writeException(throwable.getCause());
             }
-            ElasticsearchException.writeStackTraces(throwable, this, (o, t) -> o.writeException(rootException, t, nestedLevel + 1));
+            ElasticsearchException.writeStackTraces(throwable, this);
         }
-    }
-
-    boolean failOnTooManyNestedExceptions(Throwable throwable) {
-        throw new AssertionError("too many nested exceptions", throwable);
     }
 
     /**
@@ -1206,22 +1136,6 @@ public abstract class StreamOutput extends OutputStream {
      */
     public void writeStringCollection(final Collection<String> collection) throws IOException {
         writeCollection(collection, StreamOutput::writeString);
-    }
-
-    /**
-     * Writes an optional collection of a strings. The corresponding collection can be read from a stream input using
-     * {@link StreamInput#readList(Writeable.Reader)}.
-     *
-     * @param collection the collection of strings
-     * @throws IOException if an I/O exception occurs writing the collection
-     */
-    public void writeOptionalStringCollection(final Collection<String> collection) throws IOException {
-        if (collection != null) {
-            writeBoolean(true);
-            writeCollection(collection, StreamOutput::writeString);
-        } else {
-            writeBoolean(false);
-        }
     }
 
     /**

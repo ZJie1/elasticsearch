@@ -22,7 +22,6 @@ package org.elasticsearch.nio;
 import org.elasticsearch.common.concurrent.CompletableContext;
 
 import java.io.IOException;
-import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.channels.ServerSocketChannel;
@@ -79,8 +78,7 @@ public class ServerChannelContext extends ChannelContext<ServerSocketChannel> {
             rawChannel.bind(localAddress);
             bindContext.complete(null);
         } catch (IOException e) {
-            BindException exception = new BindException("Failed to bind server socket channel {localAddress=" + localAddress + "}.");
-            exception.initCause(e);
+            IOException exception = new IOException("Failed to bind server socket channel {localAddress=" + localAddress + "}.", e);
             bindContext.completeExceptionally(exception);
             throw exception;
         }

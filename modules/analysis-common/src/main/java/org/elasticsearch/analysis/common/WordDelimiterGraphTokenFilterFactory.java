@@ -19,10 +19,12 @@
 
 package org.elasticsearch.analysis.common;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterGraphFilter;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterIterator;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.index.IndexSettings;
@@ -45,6 +47,9 @@ import static org.apache.lucene.analysis.miscellaneous.WordDelimiterGraphFilter.
 import static org.elasticsearch.analysis.common.WordDelimiterTokenFilterFactory.parseTypes;
 
 public class WordDelimiterGraphTokenFilterFactory extends AbstractTokenFilterFactory {
+
+    private static final DeprecationLogger DEPRECATION_LOGGER =
+        new DeprecationLogger(LogManager.getLogger(WordDelimiterGraphTokenFilterFactory.class));
 
     private final byte[] charTypeTable;
     private final int flags;

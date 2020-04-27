@@ -15,7 +15,6 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.license.LicenseUtils;
 import org.elasticsearch.license.XPackLicenseState;
-import org.elasticsearch.license.XPackLicenseState.Feature;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationResult;
 import org.elasticsearch.xpack.core.security.authc.Realm;
 import org.elasticsearch.xpack.core.security.authc.RealmConfig;
@@ -81,8 +80,7 @@ public class DelegatedAuthorizationSupport {
      * with a meaningful diagnostic message.
      */
     public void resolve(String username, ActionListener<AuthenticationResult> resultListener) {
-        boolean authzOk = licenseState.isSecurityEnabled() && licenseState.isAllowed(Feature.SECURITY_AUTHORIZATION_REALM);
-        if (authzOk == false) {
+        if (licenseState.isAuthorizationRealmAllowed() == false) {
             resultListener.onResponse(AuthenticationResult.unsuccessful(
                 DelegatedAuthorizationSettings.AUTHZ_REALMS_SUFFIX + " are not permitted",
                 LicenseUtils.newComplianceException(DelegatedAuthorizationSettings.AUTHZ_REALMS_SUFFIX)

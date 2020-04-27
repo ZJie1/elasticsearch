@@ -19,7 +19,7 @@
 
 package org.elasticsearch.index.fielddata;
 
-public interface IndexNumericFieldData extends IndexFieldData<LeafNumericFieldData> {
+public interface IndexNumericFieldData extends IndexFieldData<AtomicNumericFieldData> {
 
     enum NumericType {
         BOOLEAN(false),

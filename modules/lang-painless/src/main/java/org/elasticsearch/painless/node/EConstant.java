@@ -19,20 +19,19 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.ConstantNode;
-import org.elasticsearch.painless.lookup.PainlessLookupUtility;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+
+import java.util.Set;
 
 /**
  * Represents a constant inserted into the tree replacing
  * other constants during constant folding.  (Internal only.)
  */
-public class EConstant extends AExpression {
-
-    protected Object constant;
+final class EConstant extends AExpression {
 
     EConstant(Location location, Object constant) {
         super(location);
@@ -41,48 +40,62 @@ public class EConstant extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException("invalid assignment: cannot assign a value to constant [" + constant + "]"));
-        }
+    void storeSettings(CompilerSettings settings) {
+        throw new IllegalStateException("illegal tree structure");
+    }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException("not a statement: constant [" + constant + "] not used"));
-        }
+    @Override
+    void extractVariables(Set<String> variables) {
+        throw new IllegalStateException("Illegal tree structure.");
+    }
 
-        Output output = new Output();
-
+    @Override
+    void analyze(Locals locals) {
         if (constant instanceof String) {
-            output.actual = String.class;
+            actual = String.class;
         } else if (constant instanceof Double) {
-            output.actual = double.class;
+            actual = double.class;
         } else if (constant instanceof Float) {
-            output.actual = float.class;
+            actual = float.class;
         } else if (constant instanceof Long) {
-            output.actual = long.class;
+            actual = long.class;
         } else if (constant instanceof Integer) {
-            output.actual = int.class;
+            actual = int.class;
         } else if (constant instanceof Character) {
-            output.actual = char.class;
+            actual = char.class;
         } else if (constant instanceof Short) {
-            output.actual = short.class;
+            actual = short.class;
         } else if (constant instanceof Byte) {
-            output.actual = byte.class;
+            actual = byte.class;
         } else if (constant instanceof Boolean) {
-            output.actual = boolean.class;
+            actual = boolean.class;
         } else {
-            throw createError(new IllegalStateException("unexpected type " +
-                    "[" + PainlessLookupUtility.typeToCanonicalTypeName(constant.getClass()) + "] " +
-                    "for constant node"));
+            throw createError(new IllegalStateException("Illegal tree structure."));
         }
+    }
 
-        ConstantNode constantNode = new ConstantNode();
-        constantNode.setLocation(location);
-        constantNode.setExpressionType(output.actual);
-        constantNode.setConstant(constant);
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        if      (actual == String.class) writer.push((String)constant);
+        else if (actual == double.class) writer.push((double)constant);
+        else if (actual == float.class) writer.push((float)constant);
+        else if (actual == long.class) writer.push((long)constant);
+        else if (actual == int.class) writer.push((int)constant);
+        else if (actual == char.class) writer.push((char)constant);
+        else if (actual == short.class) writer.push((short)constant);
+        else if (actual == byte.class) writer.push((byte)constant);
+        else if (actual == boolean.class) writer.push((boolean)constant);
+        else {
+            throw createError(new IllegalStateException("Illegal tree structure."));
+        }
+    }
 
-        output.expressionNode = constantNode;
-
-        return output;
+    @Override
+    public String toString() {
+        String c = constant.toString();
+        if (constant instanceof String) {
+            c = "'" + c + "'";
+        }
+        return singleLineToString(constant.getClass().getSimpleName(), c);
     }
 }

@@ -7,7 +7,7 @@ filter.
 
 Example:
 
-[source,console,id=filters-aggregation-example]
+[source,js]
 --------------------------------------------------
 PUT /logs/_bulk?refresh
 { "index" : { "_id" : 1 } }
@@ -32,6 +32,7 @@ GET logs/_search
   }
 }
 --------------------------------------------------
+// CONSOLE
 
 In the above example, we analyze log messages. The aggregation will build two
 collection (buckets) of log messages - one for all those containing an error,
@@ -39,7 +40,7 @@ and another for all those containing a warning.
 
 Response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "took": 9,
@@ -69,7 +70,7 @@ Response:
 The filters field can also be provided as an array of filters, as in the
 following request:
 
-[source,console,id=filters-aggregation-anonymous-example]
+[source,js]
 --------------------------------------------------
 GET logs/_search
 {
@@ -86,12 +87,13 @@ GET logs/_search
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 The filtered buckets are returned in the same order as provided in the
 request.  The response for this example would be:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "took": 4,
@@ -131,7 +133,7 @@ this parameter will implicitly set the `other_bucket` parameter to `true`.
 
 The following snippet shows a response where the `other` bucket is requested to be named `other_messages`.
 
-[source,console,id=filters-aggregation-other-bucket-example]
+[source,js]
 --------------------------------------------------
 PUT logs/_doc/4?refresh
 {
@@ -154,11 +156,12 @@ GET logs/_search
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 The response would be something like the following:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "took": 3,

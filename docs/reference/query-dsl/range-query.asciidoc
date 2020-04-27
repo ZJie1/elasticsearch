@@ -12,9 +12,9 @@ Returns documents that contain terms within a provided range.
 The following search returns documents where the `age` field contains a term
 between `10` and `20`.
 
-[source,console]
+[source,js]
 ----
-GET /_search
+GET _search
 {
     "query": {
         "range" : {
@@ -27,6 +27,7 @@ GET /_search
     }
 }
 ----
+// CONSOLE 
 
 [[range-query-top-level-params]]
 ==== Top-level parameters for `range`
@@ -134,11 +135,6 @@ increases the relevance score.
 [[range-query-notes]]
 ==== Notes
 
-[[ranges-on-text-and-keyword]]
-===== Using the `range` query with `text` and `keyword` fields
-Range queries on <<text, `text`>> or <<keyword, `keyword`>> files will not be executed if
-<<query-dsl-allow-expensive-queries, `search.allow_expensive_queries`>> is set to false.
-
 [[ranges-on-dates]]
 ===== Using the `range` query with `date` fields
 
@@ -153,9 +149,9 @@ When the `<field>` parameter is a <<date,`date`>> field datatype, you can use
 For example, the following search returns documents where the `timestamp` field
 contains a date between today and yesterday.
 
-[source,console]
+[source,js]
 ----
-GET /_search
+GET _search
 {
     "query": {
         "range" : {
@@ -167,6 +163,7 @@ GET /_search
     }
 }
 ----
+// CONSOLE
 
 
 [[range-query-date-math-rounding]]
@@ -176,10 +173,10 @@ GET /_search
 `gt`::
 +
 --
-Rounds up to the first millisecond not covered by the rounded date.
+Rounds up to the lastest millisecond.
 
-For example, `2014-11-18||/M` rounds up to `2014-12-01T00:00:00.000`, excluding
-the entire month of November.
+For example, `2014-11-18||/M` rounds up to `2014-11-30T23:59:59.999`, including
+the entire month.
 --
 
 `gte`::
@@ -187,23 +184,23 @@ the entire month of November.
 --
 Rounds down to the first millisecond.
 
-For example, `2014-11-18||/M` rounds down to `2014-11-01T00:00:00.000`, including
+For example, `2014-11-18||/M` rounds down to `2014-11-01`, excluding
 the entire month.
 --
 
 `lt`::
 +
 --
-Rounds down to the last millisecond before the rounded value.
+Rounds down to the first millisecond.
 
-For example, `2014-11-18||/M` rounds down to `2014-10-31T23:59:59.999`, excluding
-the entire month of November.
+For example, `2014-11-18||/M` rounds down to `2014-11-01`, excluding
+the entire month.
 --
 
 `lte`::
 +
 --
-Rounds up to the latest millisecond in the rounding interval.
+Rounds up to the lastest millisecond.
 
 For example, `2014-11-18||/M` rounds up to `2014-11-30T23:59:59.999`, including
 the entire month.
@@ -215,24 +212,23 @@ the entire month.
 You can use the `time_zone` parameter to convert `date` values to UTC using a
 UTC offset. For example:
 
-[source,console]
+[source,js]
 ----
-GET /_search
+GET _search
 {
-  "query": {
-    "range": {
-      "timestamp": {
-        "time_zone": "+01:00",        <1>
-        "gte": "2020-01-01T00:00:00", <2>
-        "lte": "now"                  <3>
-      }
+    "query": {
+        "range" : {
+            "timestamp" : {
+                "time_zone": "+01:00", <1>
+                "gte": "2015-01-01 00:00:00", <2>
+                "lte": "now" <3>
+            }
+        }
     }
-  }
 }
 ----
-// TEST[continued]
-
+// CONSOLE
 <1> Indicates that `date` values use a UTC offset of `+01:00`.
 <2> With a UTC offset of `+01:00`, {es} converts this date to
-`2019-12-31T23:00:00 UTC`.
+`2014-12-31T23:00:00 UTC`.
 <3> The `time_zone` parameter does not affect the `now` value.

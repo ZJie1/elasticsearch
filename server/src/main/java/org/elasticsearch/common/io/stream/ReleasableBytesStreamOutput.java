@@ -19,8 +19,7 @@
 
 package org.elasticsearch.common.io.stream;
 
-import org.elasticsearch.common.bytes.PagedBytesReference;
-import org.elasticsearch.common.bytes.ReleasableBytesReference;
+import org.elasticsearch.common.bytes.ReleasablePagedBytesReference;
 import org.elasticsearch.common.lease.Releasable;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.BigArrays;
@@ -32,7 +31,7 @@ import org.elasticsearch.common.util.PageCacheRecycler;
  * expecting it to require releasing its content ({@link #bytes()}) once done.
  * <p>
  * Please note, closing this stream will release the bytes that are in use by any
- * {@link ReleasableBytesReference} returned from {@link #bytes()}, so this
+ * {@link ReleasablePagedBytesReference} returned from {@link #bytes()}, so this
  * stream should only be closed after the bytes have been output or copied
  * elsewhere.
  */
@@ -56,8 +55,8 @@ public class ReleasableBytesStreamOutput extends BytesStreamOutput
      * the bytes in the stream.
      */
     @Override
-    public ReleasableBytesReference bytes() {
-        return new ReleasableBytesReference(new PagedBytesReference(bytes, count), releasable);
+    public ReleasablePagedBytesReference bytes() {
+        return new ReleasablePagedBytesReference(bytes, count, releasable);
     }
 
     @Override

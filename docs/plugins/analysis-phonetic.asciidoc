@@ -27,7 +27,7 @@ The `phonetic` token filter takes the following settings:
     token. Accepts `true` (default) and `false`.  Not supported by
     `beider_morse` encoding.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT phonetic_sample
 {
@@ -61,6 +61,7 @@ GET phonetic_sample/_analyze
   "text": "Joe Bloggs" <1>
 }
 --------------------------------------------------
+// CONSOLE
 
 <1> Returns: `J`, `joe`, `BLKS`, `bloggs`
 

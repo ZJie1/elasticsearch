@@ -98,7 +98,7 @@ public class ConditionalProcessorTests extends ESTestCase {
         String falseValue = "falsy";
         IngestDocument ingestDocument = RandomDocumentPicks.randomIngestDocument(random(), document);
         ingestDocument.setFieldValue(conditionalField, falseValue);
-        processor.execute(ingestDocument, (result, e) -> {});
+        processor.execute(ingestDocument);
         assertThat(ingestDocument.getSourceAndMetadata().get(conditionalField), is(falseValue));
         assertThat(ingestDocument.getSourceAndMetadata(), not(hasKey("foo")));
         assertStats(processor, 0, 0, 0);
@@ -106,13 +106,13 @@ public class ConditionalProcessorTests extends ESTestCase {
         ingestDocument = RandomDocumentPicks.randomIngestDocument(random(), document);
         ingestDocument.setFieldValue(conditionalField, falseValue);
         ingestDocument.setFieldValue("error", true);
-        processor.execute(ingestDocument, (result, e) -> {});
+        processor.execute(ingestDocument);
         assertStats(processor, 0, 0, 0);
 
         //true, always call processor and increments metrics
         ingestDocument = RandomDocumentPicks.randomIngestDocument(random(), document);
         ingestDocument.setFieldValue(conditionalField, trueValue);
-        processor.execute(ingestDocument, (result, e) -> {});
+        processor.execute(ingestDocument);
         assertThat(ingestDocument.getSourceAndMetadata().get(conditionalField), is(trueValue));
         assertThat(ingestDocument.getSourceAndMetadata().get("foo"), is("bar"));
         assertStats(processor, 1, 0, 1);
@@ -121,9 +121,7 @@ public class ConditionalProcessorTests extends ESTestCase {
         ingestDocument.setFieldValue(conditionalField, trueValue);
         ingestDocument.setFieldValue("error", true);
         IngestDocument finalIngestDocument = ingestDocument;
-        Exception holder[] = new Exception[1];
-        processor.execute(finalIngestDocument, (result, e) -> {holder[0] = e;});
-        assertThat(holder[0], instanceOf(RuntimeException.class));
+        expectThrows(RuntimeException.class, () -> processor.execute(finalIngestDocument));
         assertStats(processor, 2, 1, 2);
     }
 
@@ -179,7 +177,7 @@ public class ConditionalProcessorTests extends ESTestCase {
                 }, relativeTimeProvider);
 
         IngestDocument ingestDocument = RandomDocumentPicks.randomIngestDocument(random(), Collections.emptyMap());
-        processor.execute(ingestDocument, (result, e) -> {});
+        processor.execute(ingestDocument);
         assertWarnings("[types removal] Looking up doc types [_type] in scripts is deprecated.");
     }
 
@@ -215,7 +213,7 @@ public class ConditionalProcessorTests extends ESTestCase {
         );
         IngestDocument ingestDocument = RandomDocumentPicks.randomIngestDocument(random(), document);
         ingestDocument.setFieldValue("listField", new ArrayList<>());
-        processor.execute(ingestDocument, (result, e) -> {});
+        processor.execute(ingestDocument);
         Exception e = expectedException.get();
         assertThat(e, instanceOf(UnsupportedOperationException.class));
         assertEquals("Mutating ingest documents in conditionals is not supported", e.getMessage());

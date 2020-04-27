@@ -43,7 +43,7 @@ import java.util.function.LongSupplier;
 
 public class TransportMultiSearchAction extends HandledTransportAction<MultiSearchRequest, MultiSearchResponse> {
 
-    private final int allocatedProcessors;
+    private final int availableProcessors;
     private final ThreadPool threadPool;
     private final ClusterService clusterService;
     private final LongSupplier relativeTimeProvider;
@@ -55,18 +55,18 @@ public class TransportMultiSearchAction extends HandledTransportAction<MultiSear
         super(MultiSearchAction.NAME, transportService, actionFilters, (Writeable.Reader<MultiSearchRequest>) MultiSearchRequest::new);
         this.threadPool = threadPool;
         this.clusterService = clusterService;
-        this.allocatedProcessors = EsExecutors.allocatedProcessors(settings);
+        this.availableProcessors = EsExecutors.numberOfProcessors(settings);
         this.relativeTimeProvider = System::nanoTime;
         this.client = client;
     }
 
     TransportMultiSearchAction(ThreadPool threadPool, ActionFilters actionFilters, TransportService transportService,
-                               ClusterService clusterService, int allocatedProcessors,
+                               ClusterService clusterService, int availableProcessors,
                                LongSupplier relativeTimeProvider, NodeClient client) {
         super(MultiSearchAction.NAME, transportService, actionFilters, (Writeable.Reader<MultiSearchRequest>) MultiSearchRequest::new);
         this.threadPool = threadPool;
         this.clusterService = clusterService;
-        this.allocatedProcessors = allocatedProcessors;
+        this.availableProcessors = availableProcessors;
         this.relativeTimeProvider = relativeTimeProvider;
         this.client = client;
     }
@@ -80,7 +80,7 @@ public class TransportMultiSearchAction extends HandledTransportAction<MultiSear
 
         int maxConcurrentSearches = request.maxConcurrentSearchRequests();
         if (maxConcurrentSearches == MultiSearchRequest.MAX_CONCURRENT_SEARCH_REQUESTS_DEFAULT) {
-            maxConcurrentSearches = defaultMaxConcurrentSearches(allocatedProcessors, clusterState);
+            maxConcurrentSearches = defaultMaxConcurrentSearches(availableProcessors, clusterState);
         }
 
         Queue<SearchRequestSlot> searchRequestSlots = new ConcurrentLinkedQueue<>();
@@ -104,10 +104,11 @@ public class TransportMultiSearchAction extends HandledTransportAction<MultiSear
      * that shard of the indices the search requests go to are more or less evenly distributed across all nodes in the cluster. But I think
      * it is a good enough default for most cases, if not then the default should be overwritten in the request itself.
      */
-    static int defaultMaxConcurrentSearches(final int allocatedProcessors, final ClusterState state) {
+    static int defaultMaxConcurrentSearches(int availableProcessors, ClusterState state) {
         int numDateNodes = state.getNodes().getDataNodes().size();
-        // we bound the default concurrency to preserve some search thread pool capacity for other searches
-        final int defaultSearchThreadPoolSize = Math.min(ThreadPool.searchThreadPoolSize(allocatedProcessors), 10);
+        // availableProcessors will never be larger than 32, so max defaultMaxConcurrentSearches will never be larger than 49,
+        // but we don't know about about other search requests that are being executed so lets cap at 10 per node
+        int defaultSearchThreadPoolSize = Math.min(ThreadPool.searchThreadPoolSize(availableProcessors), 10);
         return Math.max(1, numDateNodes * defaultSearchThreadPoolSize);
     }
 

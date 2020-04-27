@@ -44,11 +44,11 @@ public class PostStartBasicResponse extends AcknowledgedResponse implements Stat
             this.restStatus = restStatus;
         }
 
-        public boolean isBasicStarted() {
+        boolean isBasicStarted() {
             return isBasicStarted;
         }
 
-        public String getErrorMessage() {
+        String getErrorMessage() {
             return errorMessage;
         }
 
@@ -132,14 +132,6 @@ public class PostStartBasicResponse extends AcknowledgedResponse implements Stat
     @Override
     public RestStatus status() {
         return status.restStatus;
-    }
-
-    public String getAcknowledgeMessage() {
-        return acknowledgeMessage;
-    }
-
-    public Map<String, String[]> getAcknowledgeMessages() {
-        return acknowledgeMessages;
     }
 
     @Override

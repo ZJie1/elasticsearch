@@ -30,12 +30,12 @@ dependencies {
   compile "org.hamcrest:hamcrest:${versions.hamcrest}"
 }
 
-tasks.named('forbiddenApisMain').configure {
+forbiddenApisMain {
   //client does not depend on core, so only jdk signatures should be checked
   replaceSignatureFiles 'jdk-signatures'
 }
 
-tasks.named('forbiddenApisTest').configure {
+forbiddenApisTest {
   //we are using jdk-internal instead of jdk-non-portable to allow for com.sun.net.httpserver.* usage
   bundledSignatures -= 'jdk-non-portable'
   bundledSignatures += 'jdk-internal'
@@ -45,7 +45,7 @@ tasks.named('forbiddenApisTest').configure {
 
 // JarHell is part of es server, which we don't want to pull in
 // TODO: Not anymore. Now in :libs:elasticsearch-core
-jarHell.enabled = false
+jarHell.enabled=false
 
 // TODO: should we have licenses for our test deps?
 dependencyLicenses.enabled = false

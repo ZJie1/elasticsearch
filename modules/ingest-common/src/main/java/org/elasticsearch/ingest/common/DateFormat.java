@@ -45,9 +45,7 @@ enum DateFormat {
     Iso8601 {
         @Override
         Function<String, ZonedDateTime> getFunction(String format, ZoneId timezone, Locale locale) {
-            return (date) -> DateFormatters.from(DateFormatter.forPattern("iso8601").parse(date), timezone)
-                                            .withZoneSameInstant(timezone);
-
+            return (date) -> DateFormatters.from(DateFormatter.forPattern("iso8601").parse(date)).withZoneSameInstant(timezone);
         }
     },
     Unix {
@@ -100,9 +98,9 @@ enum DateFormat {
             final DateFormatter formatter = dateFormatter;
             return text -> {
                 TemporalAccessor accessor = formatter.parse(text);
-                // if there is no year nor year-of-era, we fall back to the current one and
+                // if there is no year, we fall back to the current one and
                 // fill the rest of the date up with the parsed date
-                if (accessor.isSupported(ChronoField.YEAR) == false && accessor.isSupported(ChronoField.YEAR_OF_ERA) == false ) {
+                if (accessor.isSupported(ChronoField.YEAR) == false) {
                     int year = LocalDate.now(ZoneOffset.UTC).getYear();
                     ZonedDateTime newTime = Instant.EPOCH.atZone(ZoneOffset.UTC).withYear(year);
                     for (ChronoField field : FIELDS) {

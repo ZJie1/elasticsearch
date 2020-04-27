@@ -34,7 +34,6 @@ import java.util.Set;
  * In case you compare this with the original ISODateTimeFormat, make sure you use a diff
  * call, that ignores whitespaces/tabs/indentations like 'diff -b'
  */
-
 /**
  * Factory that creates instances of DateTimeFormatter based on the ISO8601 standard.
  * <p>
@@ -1721,8 +1720,7 @@ public class StrictISODateTimeFormat {
         private static DateTimeFormatter basicWeekDate() {
             if (bwd == null) {
                 return new DateTimeFormatterBuilder()
-                        // ES change, was .appendWeekyear(4, 4)
-                        .appendFixedSignedDecimal(DateTimeFieldType.weekyear(), 4)
+                        .appendFixedSignedDecimal(DateTimeFieldType.weekyear(), 4) // ES change, was .appendWeekyear(4, 4)
                         .appendLiteral('W')
                         .appendFixedDecimal(DateTimeFieldType.weekOfWeekyear(), 2)
                         .appendFixedDecimal(DateTimeFieldType.dayOfWeek(), 1)
@@ -1899,8 +1897,7 @@ public class StrictISODateTimeFormat {
         private static DateTimeFormatter yearElement() {
             if (ye == null) {
                 return new DateTimeFormatterBuilder()
-                        // ES change, was .appendYear(4, 9)
-                        .appendFixedSignedDecimal(DateTimeFieldType.year(), 4)
+                        .appendFixedSignedDecimal(DateTimeFieldType.year(), 4) // ES change, was .appendYear(4, 9)
                         .toFormatter();
             }
             return ye;
@@ -1910,8 +1907,7 @@ public class StrictISODateTimeFormat {
             if (mye == null) {
                 return new DateTimeFormatterBuilder()
                         .appendLiteral('-')
-                        // ES change, was .appendMonthOfYear(2)
-                        .appendFixedSignedDecimal(DateTimeFieldType.monthOfYear(), 2)
+                        .appendFixedSignedDecimal(DateTimeFieldType.monthOfYear(), 2) // ES change, was .appendMonthOfYear(2)
                         .toFormatter();
             }
             return mye;
@@ -1921,8 +1917,7 @@ public class StrictISODateTimeFormat {
             if (dme == null) {
                 return new DateTimeFormatterBuilder()
                         .appendLiteral('-')
-                        // ES change, was .appendDayOfMonth(2)
-                        .appendFixedSignedDecimal(DateTimeFieldType.dayOfMonth(), 2)
+                        .appendFixedSignedDecimal(DateTimeFieldType.dayOfMonth(), 2) // ES change, was .appendDayOfMonth(2)
                         .toFormatter();
             }
             return dme;
@@ -1931,8 +1926,7 @@ public class StrictISODateTimeFormat {
         private static DateTimeFormatter weekyearElement() {
             if (we == null) {
                 return new DateTimeFormatterBuilder()
-                        // ES change, was .appendWeekyear(4, 9)
-                        .appendFixedSignedDecimal(DateTimeFieldType.weekyear(), 4)
+                        .appendFixedSignedDecimal(DateTimeFieldType.weekyear(), 4) // ES change, was .appendWeekyear(4, 9)
                         .toFormatter();
             }
             return we;
@@ -1942,8 +1936,7 @@ public class StrictISODateTimeFormat {
             if (wwe == null) {
                 return new DateTimeFormatterBuilder()
                         .appendLiteral("-W")
-                        // ES change, was .appendWeekOfWeekyear(2)
-                        .appendFixedSignedDecimal(DateTimeFieldType.weekOfWeekyear(), 2)
+                        .appendFixedSignedDecimal(DateTimeFieldType.weekOfWeekyear(), 2) // ES change, was .appendWeekOfWeekyear(2)
                         .toFormatter();
             }
             return wwe;
@@ -1963,8 +1956,7 @@ public class StrictISODateTimeFormat {
             if (dye == null) {
                 return new DateTimeFormatterBuilder()
                         .appendLiteral('-')
-                        // ES change, was .appendDayOfYear(3)
-                        .appendFixedSignedDecimal(DateTimeFieldType.dayOfYear(), 3)
+                        .appendFixedSignedDecimal(DateTimeFieldType.dayOfYear(), 3) // ES change, was .appendDayOfYear(3)
                         .toFormatter();
             }
             return dye;
@@ -1982,8 +1974,7 @@ public class StrictISODateTimeFormat {
         private static DateTimeFormatter hourElement() {
             if (hde == null) {
                 return new DateTimeFormatterBuilder()
-                        // ES change, was .appendHourOfDay(2)
-                        .appendFixedSignedDecimal(DateTimeFieldType.hourOfDay(), 2)
+                        .appendFixedSignedDecimal(DateTimeFieldType.hourOfDay(), 2) // ES change, was .appendHourOfDay(2)
                         .toFormatter();
             }
             return hde;
@@ -1993,8 +1984,7 @@ public class StrictISODateTimeFormat {
             if (mhe == null) {
                 return new DateTimeFormatterBuilder()
                         .appendLiteral(':')
-                        // ES change, was .appendMinuteOfHour(2)
-                        .appendFixedSignedDecimal(DateTimeFieldType.minuteOfHour(), 2)
+                        .appendFixedSignedDecimal(DateTimeFieldType.minuteOfHour(), 2) // ES change, was .appendMinuteOfHour(2)
                         .toFormatter();
             }
             return mhe;
@@ -2004,8 +1994,7 @@ public class StrictISODateTimeFormat {
             if (sme == null) {
                 return new DateTimeFormatterBuilder()
                         .appendLiteral(':')
-                        // ES change, was .appendSecondOfMinute(2)
-                        .appendFixedSignedDecimal(DateTimeFieldType.secondOfMinute(), 2)
+                        .appendFixedSignedDecimal(DateTimeFieldType.secondOfMinute(), 2) // ES change, was .appendSecondOfMinute(2)
                         .toFormatter();
             }
             return sme;

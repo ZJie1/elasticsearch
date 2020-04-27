@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.sql.expression.function.scalar.string;
 
-import static org.elasticsearch.common.Strings.hasLength;
-
 abstract class StringFunctionUtils {
 
     /**
@@ -22,13 +20,11 @@ abstract class StringFunctionUtils {
             return s;
         }
         
-        if (start < 0) {
+        if (start < 0)
             start = 0;
-        }
         
-        if (start + 1 > s.length() || length < 0) {
+        if (start + 1 > s.length() || length < 0)
             return "";
-        }
         
         return (start + length > s.length()) ? s.substring(start) : s.substring(start, start + length);
     }
@@ -70,4 +66,10 @@ abstract class StringFunctionUtils {
         }
         return sb.toString();
     }
+
+    private static boolean hasLength(String s) {
+        return (s != null && s.length() > 0);
+    }
+    
+
 }

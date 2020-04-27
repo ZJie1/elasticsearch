@@ -20,7 +20,7 @@ Retrieves configuration information for calendars.
 
 * If the {es} {security-features} are enabled, you must have `monitor_ml`,
 `monitor`, `manage_ml`, or `manage` cluster privileges to use this API. See
-<<security-privileges>>.
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ml-get-calendar-desc]]
 ==== {api-description-title}
@@ -29,50 +29,54 @@ You can get information for a single calendar or for all calendars by using
 `_all`.
 
 For more information, see 
-{ml-docs}/ml-calendars.html[Calendars and scheduled events].
+{stack-ov}/ml-calendars.html[Calendars and scheduled events].
 
 [[ml-get-calendar-path-parms]]
 ==== {api-path-parms-title}
 
 `<calendar_id>`::
-(Required, string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=calendar-id]
+  (Required, string) Identifier for the calendar.
 
 [[ml-get-calendar-request-body]]
 ==== {api-request-body-title}
 
-`page`.`from`::
+`page`::
+`from`:::
     (Optional, integer) Skips the specified number of calendars.
 
-`page`.`size`::
+`size`:::
     (Optional, integer) Specifies the maximum number of calendars to obtain.
 
 [[ml-get-calendar-results]]
 ==== {api-response-body-title}
 
-The API returns an array of calendar resources, which have the following
-properties:
+The API returns the following information:
 
-`calendar_id`::
-(string)
-include::{docdir}/ml/ml-shared.asciidoc[tag=calendar-id]
+`calendars`::
+  (array) An array of calendar resources. A calendar resource has the following
+  properties:
+  `calendar_id`:::
+    (string) A numerical character string that uniquely identifies the calendar.
 
-`job_ids`::
-(array) An array of {anomaly-job} identifiers. For example:
-`["total-requests"]`.
+  `job_ids`:::
+    (array) An array of {anomaly-job} identifiers. For example:
+    `["total-requests"]`.
 
 [[ml-get-calendar-example]]
 ==== {api-examples-title}
 
-[source,console]
+The following example gets configuration information for the `planned-outages`
+calendar:
+
+[source,js]
 --------------------------------------------------
 GET _ml/calendars/planned-outages
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:setup:calendar_outages_addjob]
 
 The API returns the following results:
-
-[source,console-result]
+[source,js]
 ----
 {
   "count": 1,
@@ -86,3 +90,4 @@ The API returns the following results:
   ]
 }
 ----
+// TESTRESPONSE

@@ -1,7 +1,4 @@
 [[analysis-phonetic-tokenfilter]]
-=== Phonetic token filter
-++++
-<titleabbrev>Phonetic</titleabbrev>
-++++
+=== Phonetic Token Filter
 
 The `phonetic` token filter is provided as the {plugins}/analysis-phonetic.html[`analysis-phonetic`] plugin.

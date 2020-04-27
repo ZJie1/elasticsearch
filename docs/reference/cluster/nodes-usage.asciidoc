@@ -1,8 +1,5 @@
 [[cluster-nodes-usage]]
-=== Nodes feature usage API
-++++
-<titleabbrev>Nodes feature usage</titleabbrev>
-++++
+=== Nodes Feature Usage
 
 Returns information on the usage of features.
 
@@ -57,15 +54,16 @@ include::{docdir}/rest-api/common-parms.asciidoc[tag=timeoutparms]
 
 Rest action example:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET _nodes/usage
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:node]
 
 The API returns the following response:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "_nodes": {

@@ -19,7 +19,6 @@
 
 package org.elasticsearch.transport;
 
-import org.elasticsearch.Version;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
@@ -37,51 +36,51 @@ import java.util.Objects;
  * {@code _remote/info} requests.
  */
 public final class RemoteConnectionInfo implements ToXContentFragment, Writeable {
-
-    final ModeInfo modeInfo;
+    final List<String> seedNodes;
+    final int connectionsPerCluster;
     final TimeValue initialConnectionTimeout;
+    final int numNodesConnected;
     final String clusterAlias;
     final boolean skipUnavailable;
 
-    public RemoteConnectionInfo(String clusterAlias, ModeInfo modeInfo, TimeValue initialConnectionTimeout, boolean skipUnavailable) {
+    RemoteConnectionInfo(String clusterAlias, List<String> seedNodes,
+                         int connectionsPerCluster, int numNodesConnected,
+                         TimeValue initialConnectionTimeout, boolean skipUnavailable) {
         this.clusterAlias = clusterAlias;
-        this.modeInfo = modeInfo;
+        this.seedNodes = seedNodes;
+        this.connectionsPerCluster = connectionsPerCluster;
+        this.numNodesConnected = numNodesConnected;
         this.initialConnectionTimeout = initialConnectionTimeout;
         this.skipUnavailable = skipUnavailable;
     }
 
     public RemoteConnectionInfo(StreamInput input) throws IOException {
-        if (input.getVersion().onOrAfter(Version.V_7_6_0)) {
-            RemoteConnectionStrategy.ConnectionStrategy mode = input.readEnum(RemoteConnectionStrategy.ConnectionStrategy.class);
-            modeInfo = mode.getReader().read(input);
-            initialConnectionTimeout = input.readTimeValue();
-            clusterAlias = input.readString();
-            skipUnavailable = input.readBoolean();
-        } else {
-            List<String> seedNodes = Arrays.asList(input.readStringArray());
-            int connectionsPerCluster = input.readVInt();
-            initialConnectionTimeout = input.readTimeValue();
-            int numNodesConnected = input.readVInt();
-            clusterAlias = input.readString();
-            skipUnavailable = input.readBoolean();
-            modeInfo = new SniffConnectionStrategy.SniffModeInfo(seedNodes, connectionsPerCluster, numNodesConnected);
-        }
+        seedNodes = Arrays.asList(input.readStringArray());
+        connectionsPerCluster = input.readVInt();
+        initialConnectionTimeout = input.readTimeValue();
+        numNodesConnected = input.readVInt();
+        clusterAlias = input.readString();
+        skipUnavailable = input.readBoolean();
     }
 
-    public boolean isConnected() {
-        return modeInfo.isConnected();
+    public List<String> getSeedNodes() {
+        return seedNodes;
     }
 
-    public String getClusterAlias() {
-        return clusterAlias;
-    }
-
-    public ModeInfo getModeInfo() {
-        return modeInfo;
+    public int getConnectionsPerCluster() {
+        return connectionsPerCluster;
     }
 
     public TimeValue getInitialConnectionTimeout() {
         return initialConnectionTimeout;
+    }
+
+    public int getNumNodesConnected() {
+        return numNodesConnected;
+    }
+
+    public String getClusterAlias() {
+        return clusterAlias;
     }
 
     public boolean isSkipUnavailable() {
@@ -90,24 +89,10 @@ public final class RemoteConnectionInfo implements ToXContentFragment, Writeable
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        if (out.getVersion().onOrAfter(Version.V_7_6_0)) {
-            out.writeEnum(modeInfo.modeType());
-            modeInfo.writeTo(out);
-            out.writeTimeValue(initialConnectionTimeout);
-        } else {
-            if (modeInfo.modeType() == RemoteConnectionStrategy.ConnectionStrategy.SNIFF) {
-                SniffConnectionStrategy.SniffModeInfo sniffInfo = (SniffConnectionStrategy.SniffModeInfo) this.modeInfo;
-                out.writeStringArray(sniffInfo.seedNodes.toArray(new String[0]));
-                out.writeVInt(sniffInfo.maxConnectionsPerCluster);
-                out.writeTimeValue(initialConnectionTimeout);
-                out.writeVInt(sniffInfo.numNodesConnected);
-            } else {
-                out.writeStringArray(new String[0]);
-                out.writeVInt(0);
-                out.writeTimeValue(initialConnectionTimeout);
-                out.writeVInt(0);
-            }
-        }
+        out.writeStringArray(seedNodes.toArray(new String[0]));
+        out.writeVInt(connectionsPerCluster);
+        out.writeTimeValue(initialConnectionTimeout);
+        out.writeVInt(numNodesConnected);
         out.writeString(clusterAlias);
         out.writeBoolean(skipUnavailable);
     }
@@ -116,9 +101,14 @@ public final class RemoteConnectionInfo implements ToXContentFragment, Writeable
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject(clusterAlias);
         {
-            builder.field("connected", modeInfo.isConnected());
-            builder.field("mode", modeInfo.modeName());
-            modeInfo.toXContent(builder, params);
+            builder.startArray("seeds");
+            for (String addr : seedNodes) {
+                builder.value(addr);
+            }
+            builder.endArray();
+            builder.field("connected", numNodesConnected > 0);
+            builder.field("num_nodes_connected", numNodesConnected);
+            builder.field("max_connections_per_cluster", connectionsPerCluster);
             builder.field("initial_connect_timeout", initialConnectionTimeout);
             builder.field("skip_unavailable", skipUnavailable);
         }
@@ -131,23 +121,18 @@ public final class RemoteConnectionInfo implements ToXContentFragment, Writeable
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         RemoteConnectionInfo that = (RemoteConnectionInfo) o;
-        return skipUnavailable == that.skipUnavailable &&
-            Objects.equals(modeInfo, that.modeInfo) &&
+        return connectionsPerCluster == that.connectionsPerCluster &&
+            numNodesConnected == that.numNodesConnected &&
+            Objects.equals(seedNodes, that.seedNodes) &&
             Objects.equals(initialConnectionTimeout, that.initialConnectionTimeout) &&
-            Objects.equals(clusterAlias, that.clusterAlias);
+            Objects.equals(clusterAlias, that.clusterAlias) &&
+            skipUnavailable == that.skipUnavailable;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(modeInfo, initialConnectionTimeout, clusterAlias, skipUnavailable);
+        return Objects.hash(seedNodes, connectionsPerCluster, initialConnectionTimeout,
+                numNodesConnected, clusterAlias, skipUnavailable);
     }
 
-    public interface ModeInfo extends ToXContentFragment, Writeable {
-
-        boolean isConnected();
-
-        String modeName();
-
-        RemoteConnectionStrategy.ConnectionStrategy modeType();
-    }
 }

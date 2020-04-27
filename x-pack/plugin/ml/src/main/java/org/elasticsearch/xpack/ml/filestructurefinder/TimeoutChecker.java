@@ -6,17 +6,15 @@
 package org.elasticsearch.xpack.ml.filestructurefinder;
 
 import org.elasticsearch.ElasticsearchTimeoutException;
+import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.FutureUtils;
 import org.elasticsearch.grok.Grok;
-import org.elasticsearch.grok.MatcherWatchdog;
-import org.joni.Matcher;
+import org.elasticsearch.grok.ThreadWatchdog;
 
 import java.io.Closeable;
-import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TimeoutChecker implements Closeable {
 
     private static final TimeoutCheckerWatchdog timeoutCheckerWatchdog = new TimeoutCheckerWatchdog();
-    public static final MatcherWatchdog watchdog = timeoutCheckerWatchdog;
+    public static final ThreadWatchdog watchdog = timeoutCheckerWatchdog;
 
     private final String operation;
     private final TimeValue timeout;
@@ -124,68 +122,51 @@ public class TimeoutChecker implements Closeable {
     /**
      * An implementation of the type of watchdog used by the {@link Grok} class to interrupt
      * matching operations that take too long.  Rather than have a timeout per match operation
-     * like the {@link MatcherWatchdog.Default} implementation, the interruption is governed by
+     * like the {@link ThreadWatchdog.Default} implementation, the interruption is governed by
      * a {@link TimeoutChecker} associated with the thread doing the matching.
      */
-    static class TimeoutCheckerWatchdog implements MatcherWatchdog {
+    static class TimeoutCheckerWatchdog implements ThreadWatchdog {
 
-        final ConcurrentHashMap<Thread, WatchDogEntry> registry = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<Thread, Tuple<AtomicBoolean, TimeValue>> registry = new ConcurrentHashMap<>();
 
         void add(Thread thread, TimeValue timeout) {
-            WatchDogEntry previousValue = registry.put(thread, new WatchDogEntry(timeout));
+            Tuple<AtomicBoolean, TimeValue> previousValue = registry.put(thread, new Tuple<>(new AtomicBoolean(false), timeout));
             assert previousValue == null;
         }
 
         @Override
-        public void register(Matcher matcher) {
-            WatchDogEntry value = registry.get(Thread.currentThread());
+        public void register() {
+            Tuple<AtomicBoolean, TimeValue> value = registry.get(Thread.currentThread());
             if (value != null) {
-                boolean wasFalse = value.registered.compareAndSet(false, true);
+                boolean wasFalse = value.v1().compareAndSet(false, true);
                 assert wasFalse;
-                value.matchers.add(matcher);
             }
         }
 
         @Override
         public long maxExecutionTimeInMillis() {
-            WatchDogEntry value = registry.get(Thread.currentThread());
-            return value != null ? value.timeout.getMillis() : Long.MAX_VALUE;
+            Tuple<AtomicBoolean, TimeValue> value = registry.get(Thread.currentThread());
+            return value != null ? value.v2().getMillis() : Long.MAX_VALUE;
         }
 
         @Override
-        public void unregister(Matcher matcher) {
-            WatchDogEntry value = registry.get(Thread.currentThread());
+        public void unregister() {
+            Tuple<AtomicBoolean, TimeValue> value = registry.get(Thread.currentThread());
             if (value != null) {
-                boolean wasTrue = value.registered.compareAndSet(true, false);
+                boolean wasTrue = value.v1().compareAndSet(true, false);
                 assert wasTrue;
-                value.matchers.remove(matcher);
             }
         }
 
         void remove(Thread thread) {
-            WatchDogEntry previousValue = registry.remove(thread);
+            Tuple<AtomicBoolean, TimeValue> previousValue = registry.remove(thread);
             assert previousValue != null;
         }
 
         void interruptLongRunningThreadIfRegistered(Thread thread) {
-            WatchDogEntry value = registry.get(thread);
-            if (value.registered.get()) {
-                for (Matcher matcher : value.matchers) {
-                    matcher.interrupt();
-                }
-            }
-        }
-
-        static class WatchDogEntry {
-
-            final TimeValue timeout;
-            final AtomicBoolean registered;
-            final Collection<Matcher> matchers;
-
-            WatchDogEntry(TimeValue timeout) {
-                this.timeout = timeout;
-                this.registered = new AtomicBoolean(false);
-                this.matchers = new CopyOnWriteArrayList<>();
+            Tuple<AtomicBoolean, TimeValue> value = registry.get(thread);
+            if (value.v1().get()) {
+                thread.interrupt();
             }
         }
     }

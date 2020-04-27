@@ -36,10 +36,11 @@ be removed or changed in the next major version.
 To see the list of offenders in your cluster, submit a GET request to the
 `_migration/deprecations` endpoint:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_migration/deprecations
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:cannot assert tests have certain deprecations]
 
 Example response:
@@ -114,8 +115,9 @@ warnings can be found under the `ml_settings` key.
 The following example request shows only index-level deprecations of all
 `logstash-*` indices:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /logstash-*/_migration/deprecations
 --------------------------------------------------
+// CONSOLE
 // TEST[skip:cannot assert tests have certain deprecations]

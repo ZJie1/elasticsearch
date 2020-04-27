@@ -3,7 +3,6 @@
 :request: CloseJobRequest
 :response: CloseJobResponse
 --
-[role="xpack"]
 [id="{upid}-{api}"]
 === Close {anomaly-job} API
 

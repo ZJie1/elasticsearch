@@ -32,17 +32,18 @@ https://www.elastic.co/subscriptions.
 
 You must have `manage` cluster privileges to use this API.
 For more information, see
-<<security-privileges>>.
+{xpack-ref}/security-privileges.html[Security Privileges].
 
 [float]
 ==== Examples
 
 The following example starts a basic license if you do not currently have a license:
 
-[source,console]
+[source,js]
 ------------------------------------------------------------
 POST /_license/start_basic
 ------------------------------------------------------------
+// CONSOLE
 // TEST[skip:license testing issues]
 
 Example response:
@@ -59,10 +60,11 @@ The following example starts a basic license if you currently have a license wit
 features than a basic license. As you are losing features, you must pass the acknowledge
 parameter:
 
-[source,console]
+[source,js]
 ------------------------------------------------------------
 POST /_license/start_basic?acknowledge=true
 ------------------------------------------------------------
+// CONSOLE
 // TEST[skip:license testing issues]
 
 Example response:

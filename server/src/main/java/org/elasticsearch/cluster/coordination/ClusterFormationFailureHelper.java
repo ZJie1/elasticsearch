@@ -21,7 +21,7 @@ package org.elasticsearch.cluster.coordination;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.coordination.CoordinationMetadata.VotingConfiguration;
+import org.elasticsearch.cluster.coordination.CoordinationMetaData.VotingConfiguration;
 import org.elasticsearch.cluster.coordination.CoordinationState.VoteCollection;
 import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.common.Nullable;
@@ -30,7 +30,6 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.AbstractRunnable;
-import org.elasticsearch.gateway.GatewayMetaState;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.threadpool.ThreadPool.Names;
 
@@ -157,6 +156,7 @@ public class ClusterFormationFailureHelper {
                 if (INITIAL_MASTER_NODES_SETTING.get(Settings.EMPTY).equals(INITIAL_MASTER_NODES_SETTING.get(settings))) {
                     bootstrappingDescription = "[" + INITIAL_MASTER_NODES_SETTING.getKey() + "] is empty on this node";
                 } else {
+                    // TODO update this when we can bootstrap on only a quorum of the initial nodes
                     bootstrappingDescription = String.format(Locale.ROOT,
                         "this node must discover master-eligible nodes %s to bootstrap a cluster",
                         INITIAL_MASTER_NODES_SETTING.get(settings));
@@ -206,12 +206,7 @@ public class ClusterFormationFailureHelper {
             assert requiredNodes <= realNodeIds.size() : nodeIds;
 
             if (nodeIds.size() == 1) {
-                if (nodeIds.contains(GatewayMetaState.STALE_STATE_CONFIG_NODE_ID)) {
-                    return "one or more nodes that have already participated as master-eligible nodes in the cluster but this node was " +
-                        "not master-eligible the last time it joined the cluster";
-                } else {
-                    return "a node with id " + realNodeIds;
-                }
+                return "a node with id " + realNodeIds;
             } else if (nodeIds.size() == 2) {
                 return "two nodes with ids " + realNodeIds;
             } else {

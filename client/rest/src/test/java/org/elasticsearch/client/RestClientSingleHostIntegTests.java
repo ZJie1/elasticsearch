@@ -105,7 +105,7 @@ public class RestClientSingleHostIntegTests extends RestClientTestCase {
         return httpServer;
     }
 
-    private static class WaitForCancelHandler implements HttpHandler {
+    private class WaitForCancelHandler implements HttpHandler {
 
         private final CountDownLatch cancelHandlerLatch = new CountDownLatch(1);
 
@@ -259,8 +259,6 @@ public class RestClientSingleHostIntegTests extends RestClientTestCase {
     /**
      * This test verifies some assumptions that we rely upon around the way the async http client works when reusing the same request
      * throughout multiple retries, and the use of the {@link HttpRequestBase#abort()} method.
-     * In fact the low-level REST client reuses the same request instance throughout multiple retries, and relies on the http client
-     * to set the future ref to the request properly so that when abort is called, the proper future gets cancelled.
      */
     public void testRequestResetAndAbort() throws Exception {
         try (CloseableHttpAsyncClient client = HttpAsyncClientBuilder.create().build()) {
@@ -275,15 +273,10 @@ public class RestClientSingleHostIntegTests extends RestClientTestCase {
             {
                 httpGet.reset();
                 assertFalse(httpGet.isAborted());
-                httpGet.abort();
+                httpGet.abort();//this has no effect on the next call (although isAborted will return true until the next reset)
                 Future<HttpResponse> future = client.execute(httpHost, httpGet, null);
-                try {
-                    future.get();
-                    fail("expected cancellation exception");
-                } catch(CancellationException e) {
-                    //expected
-                }
-                assertTrue(future.isCancelled());
+                assertEquals(200, future.get().getStatusLine().getStatusCode());
+                assertFalse(future.isCancelled());
             }
             {
                 httpGet.reset();

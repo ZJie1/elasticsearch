@@ -19,13 +19,9 @@
 
 package org.elasticsearch.repositories.s3;
 
-import com.amazonaws.Request;
-import com.amazonaws.Response;
-import com.amazonaws.metrics.RequestMetricCollector;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.StorageClass;
-import com.amazonaws.util.AWSRequestMetrics;
-import org.elasticsearch.cluster.metadata.RepositoryMetadata;
+import org.elasticsearch.cluster.metadata.RepositoryMetaData;
 import org.elasticsearch.common.blobstore.BlobContainer;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.BlobStore;
@@ -33,10 +29,7 @@ import org.elasticsearch.common.blobstore.BlobStoreException;
 import org.elasticsearch.common.unit.ByteSizeValue;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 class S3BlobStore implements BlobStore {
 
@@ -52,44 +45,18 @@ class S3BlobStore implements BlobStore {
 
     private final StorageClass storageClass;
 
-    private final RepositoryMetadata repositoryMetadata;
-
-    private final Stats stats = new Stats();
-
-    final RequestMetricCollector getMetricCollector;
-    final RequestMetricCollector listMetricCollector;
-
+    private final RepositoryMetaData repositoryMetaData;
 
     S3BlobStore(S3Service service, String bucket, boolean serverSideEncryption,
                 ByteSizeValue bufferSize, String cannedACL, String storageClass,
-                RepositoryMetadata repositoryMetadata) {
+                RepositoryMetaData repositoryMetaData) {
         this.service = service;
         this.bucket = bucket;
         this.serverSideEncryption = serverSideEncryption;
         this.bufferSize = bufferSize;
         this.cannedACL = initCannedACL(cannedACL);
         this.storageClass = initStorageClass(storageClass);
-        this.repositoryMetadata = repositoryMetadata;
-        this.getMetricCollector = new RequestMetricCollector() {
-            @Override
-            public void collectMetrics(Request<?> request, Response<?> response) {
-                assert request.getHttpMethod().name().equals("GET");
-                final Number requestCount = request.getAWSRequestMetrics().getTimingInfo()
-                    .getCounter(AWSRequestMetrics.Field.RequestCount.name());
-                assert requestCount != null;
-                stats.getCount.addAndGet(requestCount.longValue());
-            }
-        };
-        this.listMetricCollector = new RequestMetricCollector() {
-            @Override
-            public void collectMetrics(Request<?> request, Response<?> response) {
-                assert request.getHttpMethod().name().equals("GET");
-                final Number requestCount = request.getAWSRequestMetrics().getTimingInfo()
-                    .getCounter(AWSRequestMetrics.Field.RequestCount.name());
-                assert requestCount != null;
-                stats.listCount.addAndGet(requestCount.longValue());
-            }
-        };
+        this.repositoryMetaData = repositoryMetaData;
     }
 
     @Override
@@ -98,11 +65,7 @@ class S3BlobStore implements BlobStore {
     }
 
     public AmazonS3Reference clientReference() {
-        return service.client(repositoryMetadata);
-    }
-
-    int getMaxRetries() {
-        return service.settings(repositoryMetadata).maxRetries;
+        return service.client(repositoryMetaData);
     }
 
     public String bucket() {
@@ -125,11 +88,6 @@ class S3BlobStore implements BlobStore {
     @Override
     public void close() throws IOException {
         this.service.close();
-    }
-
-    @Override
-    public Map<String, Long> stats() {
-        return stats.toMap();
     }
 
     public CannedAccessControlList getCannedACL() {
@@ -172,19 +130,5 @@ class S3BlobStore implements BlobStore {
         }
 
         throw new BlobStoreException("cannedACL is not valid: [" + cannedACL + "]");
-    }
-
-    static class Stats {
-
-        final AtomicLong listCount = new AtomicLong();
-
-        final AtomicLong getCount = new AtomicLong();
-
-        Map<String, Long> toMap() {
-            final Map<String, Long> results = new HashMap<>();
-            results.put("GET", getCount.get());
-            results.put("LIST", listCount.get());
-            return results;
-        }
     }
 }

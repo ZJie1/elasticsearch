@@ -26,8 +26,7 @@ public class ConnectionBuilderTests extends ESTestCase {
     public void testDefaultConnection() throws Exception {
         CliTerminal testTerminal = mock(CliTerminal.class);
         ConnectionBuilder connectionBuilder = new ConnectionBuilder(testTerminal);
-        boolean binaryCommunication = randomBoolean();
-        ConnectionConfiguration con = connectionBuilder.buildConnection(null, null, binaryCommunication);
+        ConnectionConfiguration con = connectionBuilder.buildConnection(null, null);
         assertNull(con.authUser());
         assertNull(con.authPass());
         assertEquals("http://localhost:9200/", con.connectionString());
@@ -37,14 +36,13 @@ public class ConnectionBuilderTests extends ESTestCase {
         assertEquals(45000, con.pageTimeout());
         assertEquals(90000, con.queryTimeout());
         assertEquals(1000, con.pageSize());
-        assertEquals(binaryCommunication, con.binaryCommunication());
         verifyNoMoreInteractions(testTerminal);
     }
 
     public void testBasicConnection() throws Exception {
         CliTerminal testTerminal = mock(CliTerminal.class);
         ConnectionBuilder connectionBuilder = new ConnectionBuilder(testTerminal);
-        ConnectionConfiguration con = buildConnection(connectionBuilder, "http://foobar:9242/", null);
+        ConnectionConfiguration con = connectionBuilder.buildConnection("http://foobar:9242/", null);
         assertNull(con.authUser());
         assertNull(con.authPass());
         assertEquals("http://foobar:9242/", con.connectionString());
@@ -55,7 +53,7 @@ public class ConnectionBuilderTests extends ESTestCase {
     public void testUserAndPasswordConnection() throws Exception {
         CliTerminal testTerminal = mock(CliTerminal.class);
         ConnectionBuilder connectionBuilder = new ConnectionBuilder(testTerminal);
-        ConnectionConfiguration con = buildConnection(connectionBuilder, "http://user:pass@foobar:9242/", null);
+        ConnectionConfiguration con = connectionBuilder.buildConnection("http://user:pass@foobar:9242/", null);
         assertEquals("user", con.authUser());
         assertEquals("pass", con.authPass());
         assertEquals("http://user:pass@foobar:9242/", con.connectionString());
@@ -67,7 +65,7 @@ public class ConnectionBuilderTests extends ESTestCase {
         CliTerminal testTerminal = mock(CliTerminal.class);
         when(testTerminal.readPassword("password: ")).thenReturn("password");
         ConnectionBuilder connectionBuilder = new ConnectionBuilder(testTerminal);
-        ConnectionConfiguration con = buildConnection(connectionBuilder, "http://user@foobar:9242/", null);
+        ConnectionConfiguration con = connectionBuilder.buildConnection("http://user@foobar:9242/", null);
         assertEquals("user", con.authUser());
         assertEquals("password", con.authPass());
         assertEquals("http://user@foobar:9242/", con.connectionString());
@@ -101,7 +99,7 @@ public class ConnectionBuilderTests extends ESTestCase {
                 return null;
             }
         };
-        assertNull(buildConnection(connectionBuilder, "https://user@foobar:9242/", "keystore_location"));
+        assertNull(connectionBuilder.buildConnection("https://user@foobar:9242/", "keystore_location"));
         assertTrue(called.get());
         verify(testTerminal, times(2)).readPassword(any());
         verifyNoMoreInteractions(testTerminal);
@@ -113,7 +111,7 @@ public class ConnectionBuilderTests extends ESTestCase {
         when(testTerminal.readPassword("password: ")).thenThrow(ue);
         ConnectionBuilder connectionBuilder = new ConnectionBuilder(testTerminal);
         UserException actual = expectThrows(UserException.class, () ->
-            buildConnection(connectionBuilder, "http://user@foobar:9242/", null));
+            connectionBuilder.buildConnection("http://user@foobar:9242/", null));
         assertSame(actual, ue);
     }
 
@@ -129,12 +127,7 @@ public class ConnectionBuilderTests extends ESTestCase {
             }
         };
         UserException actual = expectThrows(UserException.class, () ->
-            buildConnection(connectionBuilder, "https://user@foobar:9242/", "keystore_location"));
+            connectionBuilder.buildConnection("https://user@foobar:9242/", "keystore_location"));
         assertSame(actual, ue);
-    }
-    
-    private ConnectionConfiguration buildConnection(ConnectionBuilder builder, String connectionStringArg,
-                                                    String keystoreLocation) throws UserException {
-        return builder.buildConnection(connectionStringArg, keystoreLocation, randomBoolean());
     }
 }

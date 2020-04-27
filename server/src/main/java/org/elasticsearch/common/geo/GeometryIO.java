@@ -21,7 +21,6 @@ package org.elasticsearch.common.geo;
 
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
-import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.geometry.Circle;
 import org.elasticsearch.geometry.Geometry;
 import org.elasticsearch.geometry.GeometryCollection;
@@ -50,10 +49,7 @@ public final class GeometryIO {
         geometry.visit(new GeometryVisitor<Void, IOException>() {
             @Override
             public Void visit(Circle circle) throws IOException {
-                writeCoordinate(circle.getLat(), circle.getLon(), circle.getAlt());
-                out.writeDouble(circle.getRadiusMeters());
-                DistanceUnit.METERS.writeTo(out);
-                return null;
+                throw new UnsupportedOperationException("circle is not supported");
             }
 
             @Override
@@ -165,8 +161,6 @@ public final class GeometryIO {
                 return readMultiPolygon(in);
             case "envelope":
                 return readRectangle(in);
-            case "circle":
-                return readCircle(in);
             default:
                 throw new UnsupportedOperationException("unsupported shape type " + type);
         }
@@ -309,14 +303,5 @@ public final class GeometryIO {
         } else {
             return alt;
         }
-    }
-
-    private static Circle readCircle(StreamInput in) throws IOException {
-        double lon = in.readDouble();
-        double lat = in.readDouble();
-        double alt = readAlt(in);
-        double radius = in.readDouble();
-        DistanceUnit distanceUnit = DistanceUnit.readFromStream(in);
-        return new Circle(lon, lat, alt, distanceUnit.toMeters(radius));
     }
 }

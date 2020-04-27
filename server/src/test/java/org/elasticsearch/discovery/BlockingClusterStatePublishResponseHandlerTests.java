@@ -66,7 +66,7 @@ public class BlockingClusterStatePublishResponseHandlerTests extends ESTestCase 
         protected void doRun() throws Exception {
             barrier.await();
             if (fail) {
-                handler.onFailure(node);
+                handler.onFailure(node, new Exception("bla"));
             } else {
                 handler.onResponse(node);
             }

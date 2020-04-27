@@ -22,6 +22,7 @@ package org.elasticsearch.index.engine;
 import org.apache.logging.log4j.Logger;
 import org.apache.lucene.codecs.blocktree.BlockTreeTermsReader;
 import org.apache.lucene.codecs.blocktree.BlockTreeTermsReader.FSTLoadMode;
+import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.index.DirectoryReader;
@@ -35,11 +36,8 @@ import org.apache.lucene.index.LiveIndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.SegmentCommitInfo;
 import org.apache.lucene.index.SegmentInfos;
-import org.apache.lucene.index.ShuffleForcedMergePolicy;
 import org.apache.lucene.index.SoftDeletesRetentionMergePolicy;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -58,14 +56,12 @@ import org.apache.lucene.util.InfoStream;
 import org.elasticsearch.Assertions;
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.common.Booleans;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.SuppressForbidden;
 import org.elasticsearch.common.lease.Releasable;
 import org.elasticsearch.common.lucene.LoggerInfoStream;
 import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.common.lucene.index.ElasticsearchDirectoryReader;
-import org.elasticsearch.common.lucene.search.Queries;
 import org.elasticsearch.common.lucene.uid.Versions;
 import org.elasticsearch.common.lucene.uid.VersionsAndSeqNoResolver;
 import org.elasticsearch.common.lucene.uid.VersionsAndSeqNoResolver.DocIdAndSeqNo;
@@ -92,18 +88,18 @@ import org.elasticsearch.index.seqno.SequenceNumbers;
 import org.elasticsearch.index.shard.ElasticsearchMergePolicy;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.index.store.FsDirectoryFactory;
+import org.elasticsearch.index.store.Store;
 import org.elasticsearch.index.translog.Translog;
 import org.elasticsearch.index.translog.TranslogConfig;
 import org.elasticsearch.index.translog.TranslogCorruptedException;
 import org.elasticsearch.index.translog.TranslogDeletionPolicy;
 import org.elasticsearch.index.translog.TranslogStats;
-import org.elasticsearch.search.suggest.completion.CompletionStats;
 import org.elasticsearch.threadpool.ThreadPool;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -172,10 +168,9 @@ public class InternalEngine extends Engine {
     private final CounterMetric numDocAppends = new CounterMetric();
     private final CounterMetric numDocUpdates = new CounterMetric();
     private final NumericDocValuesField softDeletesField = Lucene.newSoftDeletesField();
+    private final boolean softDeleteEnabled;
     private final SoftDeletesPolicy softDeletesPolicy;
     private final LastRefreshedCheckpointListener lastRefreshedCheckpointListener;
-
-    private final CompletionStatsCache completionStatsCache;
 
     private final AtomicBoolean trackTranslogLocation = new AtomicBoolean(false);
     private final KeyedLock<Long> noOpKeyedLock = new KeyedLock<>();
@@ -183,12 +178,6 @@ public class InternalEngine extends Engine {
 
     @Nullable
     private final String historyUUID;
-
-    /**
-     * UUID value that is updated every time the engine is force merged.
-     */
-    @Nullable
-    private volatile String forceMergeUUID;
 
     public InternalEngine(EngineConfig engineConfig) {
         this(engineConfig, LocalCheckpointTracker::new);
@@ -198,7 +187,10 @@ public class InternalEngine extends Engine {
             final EngineConfig engineConfig,
             final BiFunction<Long, Long, LocalCheckpointTracker> localCheckpointTrackerSupplier) {
         super(engineConfig);
-        final TranslogDeletionPolicy translogDeletionPolicy = new TranslogDeletionPolicy();
+        final TranslogDeletionPolicy translogDeletionPolicy = new TranslogDeletionPolicy(
+                engineConfig.getIndexSettings().getTranslogRetentionSize().getBytes(),
+                engineConfig.getIndexSettings().getTranslogRetentionAge().getMillis()
+        );
         store.incRef();
         IndexWriter writer = null;
         Translog translog = null;
@@ -211,7 +203,7 @@ public class InternalEngine extends Engine {
             mergeScheduler = scheduler = new EngineMergeScheduler(engineConfig.getShardId(), engineConfig.getIndexSettings());
             throttle = new IndexThrottle();
             try {
-                store.trimUnsafeCommits(config().getTranslogConfig().getTranslogPath());
+                trimUnsafeCommits(engineConfig);
                 translog = openTranslog(engineConfig, translogDeletionPolicy, engineConfig.getGlobalCheckpointSupplier(),
                     seqNo -> {
                         final LocalCheckpointTracker tracker = getLocalCheckpointTracker();
@@ -222,15 +214,14 @@ public class InternalEngine extends Engine {
                     });
                 assert translog.getGeneration() != null;
                 this.translog = translog;
+                this.softDeleteEnabled = engineConfig.getIndexSettings().isSoftDeleteEnabled();
                 this.softDeletesPolicy = newSoftDeletesPolicy();
                 this.combinedDeletionPolicy =
                     new CombinedDeletionPolicy(logger, translogDeletionPolicy, softDeletesPolicy, translog::getLastSyncedGlobalCheckpoint);
                 this.localCheckpointTracker = createLocalCheckpointTracker(localCheckpointTrackerSupplier);
                 writer = createWriter();
                 bootstrapAppendOnlyInfoFromWriter(writer);
-                final Map<String, String> commitData = commitDataAsMap(writer);
-                historyUUID = loadHistoryUUID(commitData);
-                forceMergeUUID = commitData.get(FORCE_MERGE_UUID_KEY);
+                historyUUID = loadHistoryUUID(writer);
                 indexWriter = writer;
             } catch (IOException | TranslogCorruptedException e) {
                 throw new EngineCreationFailureException(shardId, "failed to create engine", e);
@@ -260,7 +251,7 @@ public class InternalEngine extends Engine {
             this.lastRefreshedCheckpointListener = new LastRefreshedCheckpointListener(localCheckpointTracker.getProcessedCheckpoint());
             this.internalReaderManager.addListener(lastRefreshedCheckpointListener);
             maxSeqNoOfUpdatesOrDeletes = new AtomicLong(SequenceNumbers.max(localCheckpointTracker.getMaxSeqNo(), translog.getMaxSeqNo()));
-            if (localCheckpointTracker.getPersistedCheckpoint() < localCheckpointTracker.getMaxSeqNo()) {
+            if (softDeleteEnabled && localCheckpointTracker.getPersistedCheckpoint() < localCheckpointTracker.getMaxSeqNo()) {
                 try (Searcher searcher =
                          acquireSearcher("restore_version_map_and_checkpoint_tracker", SearcherScope.INTERNAL)) {
                     restoreVersionMapAndCheckpointTracker(Lucene.wrapAllDocsLive(searcher.getDirectoryReader()));
@@ -269,8 +260,6 @@ public class InternalEngine extends Engine {
                         "failed to restore version map and local checkpoint tracker", e);
                 }
             }
-            completionStatsCache = new CompletionStatsCache(() -> acquireSearcher("completion_stats"));
-            this.externalReaderManager.addListener(completionStatsCache);
             success = true;
         } finally {
             if (success == false) {
@@ -311,11 +300,6 @@ public class InternalEngine extends Engine {
                 engineConfig.retentionLeasesSupplier());
     }
 
-    @Override
-    public CompletionStats completionStats(String... fieldNamePatterns) {
-        return completionStatsCache.get(fieldNamePatterns);
-    }
-
     /**
      * This reference manager delegates all it's refresh calls to another (internal) ReaderManager
      * The main purpose for this is that if we have external refreshes happening we don't issue extra
@@ -331,13 +315,18 @@ public class InternalEngine extends Engine {
     private static final class ExternalReaderManager extends ReferenceManager<ElasticsearchDirectoryReader> {
         private final BiConsumer<ElasticsearchDirectoryReader, ElasticsearchDirectoryReader> refreshListener;
         private final ElasticsearchReaderManager internalReaderManager;
-        private boolean isWarmedUp; //guarded by refreshLock
 
         ExternalReaderManager(ElasticsearchReaderManager internalReaderManager,
                               BiConsumer<ElasticsearchDirectoryReader, ElasticsearchDirectoryReader> refreshListener) throws IOException {
             this.refreshListener = refreshListener;
             this.internalReaderManager = internalReaderManager;
-            this.current = internalReaderManager.acquire(); // steal the reference without warming up
+            ElasticsearchDirectoryReader acquire = internalReaderManager.acquire();
+            try {
+                incrementAndNotify(acquire, null);
+                current = acquire;
+            } finally {
+                internalReaderManager.release(acquire);
+            }
         }
 
         @Override
@@ -346,25 +335,26 @@ public class InternalEngine extends Engine {
             // it's a save operation since we acquire the reader which incs it's reference but then down the road
             // steal it by calling incRef on the "stolen" reader
             internalReaderManager.maybeRefreshBlocking();
-            final ElasticsearchDirectoryReader newReader = internalReaderManager.acquire();
-            if (isWarmedUp == false || newReader != referenceToRefresh) {
-                boolean success = false;
-                try {
-                    refreshListener.accept(newReader, isWarmedUp ? referenceToRefresh : null);
-                    isWarmedUp = true;
-                    success = true;
-                } finally {
-                    if (success == false) {
-                        internalReaderManager.release(newReader);
-                    }
+            ElasticsearchDirectoryReader acquire = internalReaderManager.acquire();
+            try {
+                if (acquire == referenceToRefresh) {
+                    // nothing has changed - both ref managers share the same instance so we can use reference equality
+                    return null;
+                } else {
+                    incrementAndNotify(acquire, referenceToRefresh);
+                    return acquire;
                 }
+            } finally {
+                internalReaderManager.release(acquire);
             }
-            // nothing has changed - both ref managers share the same instance so we can use reference equality
-            if (referenceToRefresh == newReader) {
-                internalReaderManager.release(newReader);
-                return null;
-            } else {
-                return newReader; // steal the reference
+        }
+
+        private void incrementAndNotify(ElasticsearchDirectoryReader reader,
+                                            ElasticsearchDirectoryReader previousReader) throws IOException {
+            reader.incRef(); // steal the reference
+            try (Closeable c = reader::decRef) {
+                refreshListener.accept(reader, previousReader);
+                reader.incRef(); // double inc-ref if we were successful
             }
         }
 
@@ -379,24 +369,7 @@ public class InternalEngine extends Engine {
         }
 
         @Override
-        protected void decRef(ElasticsearchDirectoryReader reference) throws IOException {
-            reference.decRef();
-        }
-    }
-
-    @Override
-    final boolean assertSearcherIsWarmedUp(String source, SearcherScope scope) {
-        if (scope == SearcherScope.EXTERNAL) {
-            switch (source) {
-                // we can access segment_stats while a shard is still in the recovering state.
-                case "segments":
-                case "segments_stats":
-                    break;
-                default:
-                    assert externalReaderManager.isWarmedUp : "searcher was not warmed up yet for source[" + source + "]";
-            }
-        }
-        return true;
+        protected void decRef(ElasticsearchDirectoryReader reference) throws IOException { reference.decRef(); }
     }
 
     @Override
@@ -404,7 +377,7 @@ public class InternalEngine extends Engine {
         try (ReleasableLock ignored = readLock.acquire()) {
             ensureOpen();
             final long localCheckpoint = localCheckpointTracker.getProcessedCheckpoint();
-            try (Translog.Snapshot snapshot = getTranslog().newSnapshot(localCheckpoint + 1, Long.MAX_VALUE)) {
+            try (Translog.Snapshot snapshot = getTranslog().newSnapshotFromMinSeqNo(localCheckpoint + 1)) {
                 return translogRecoveryRunner.run(this, snapshot);
             }
         }
@@ -477,25 +450,24 @@ public class InternalEngine extends Engine {
     }
 
     private void recoverFromTranslogInternal(TranslogRecoveryRunner translogRecoveryRunner, long recoverUpToSeqNo) throws IOException {
+        Translog.TranslogGeneration translogGeneration = translog.getGeneration();
         final int opsRecovered;
-        final long localCheckpoint = getProcessedLocalCheckpoint();
-        if (localCheckpoint < recoverUpToSeqNo) {
-            try (Translog.Snapshot snapshot = translog.newSnapshot(localCheckpoint + 1, recoverUpToSeqNo)) {
-                opsRecovered = translogRecoveryRunner.run(this, snapshot);
-            } catch (Exception e) {
-                throw new EngineException(shardId, "failed to recover from translog", e);
-            }
-        } else {
-            opsRecovered = 0;
+        final long translogFileGen = Long.parseLong(lastCommittedSegmentInfos.getUserData().get(Translog.TRANSLOG_GENERATION_KEY));
+        try (Translog.Snapshot snapshot = translog.newSnapshotFromGen(
+            new Translog.TranslogGeneration(translog.getTranslogUUID(), translogFileGen), recoverUpToSeqNo)) {
+            opsRecovered = translogRecoveryRunner.run(this, snapshot);
+        } catch (Exception e) {
+            throw new EngineException(shardId, "failed to recover from translog", e);
         }
         // flush if we recovered something or if we have references to older translogs
         // note: if opsRecovered == 0 and we have older translogs it means they are corrupted or 0 length.
         assert pendingTranslogRecovery.get() : "translogRecovery is not pending but should be";
         pendingTranslogRecovery.set(false); // we are good - now we can commit
         if (opsRecovered > 0) {
-            logger.trace("flushing post recovery from translog: ops recovered [{}], current translog generation [{}]",
-                opsRecovered, translog.currentFileGeneration());
-            commitIndexWriter(indexWriter, translog);
+            logger.trace("flushing post recovery from translog. ops recovered [{}]. committed translog id [{}]. current id [{}]",
+                opsRecovered, translogGeneration == null ? null :
+                    translogGeneration.translogFileGeneration, translog.currentFileGeneration());
+            commitIndexWriter(indexWriter, translog, null);
             refreshLastCommittedSegmentInfos();
             refresh("translog_recovery");
         }
@@ -506,8 +478,7 @@ public class InternalEngine extends Engine {
                                   LongSupplier globalCheckpointSupplier, LongConsumer persistedSequenceNumberConsumer) throws IOException {
 
         final TranslogConfig translogConfig = engineConfig.getTranslogConfig();
-        final Map<String, String> userData = store.readLastCommittedSegmentsInfo().getUserData();
-        final String translogUUID = Objects.requireNonNull(userData.get(Translog.TRANSLOG_UUID_KEY));
+        final String translogUUID = loadTranslogUUIDFromLastCommit();
         // We expect that this shard already exists, so it must already have an existing translog else something is badly wrong!
         return new Translog(translogConfig, translogUUID, translogDeletionPolicy, globalCheckpointSupplier,
             engineConfig.getPrimaryTermSupplier(), persistedSequenceNumberConsumer);
@@ -544,6 +515,34 @@ public class InternalEngine extends Engine {
         revisitIndexDeletionPolicyOnTranslogSynced();
     }
 
+    /**
+     * Creates a new history snapshot for reading operations since the provided seqno.
+     * The returned snapshot can be retrieved from either Lucene index or translog files.
+     */
+    @Override
+    public Translog.Snapshot readHistoryOperations(String source, MapperService mapperService, long startingSeqNo) throws IOException {
+        if (engineConfig.getIndexSettings().isSoftDeleteEnabled()) {
+            return newChangesSnapshot(source, mapperService, Math.max(0, startingSeqNo), Long.MAX_VALUE, false);
+        }
+
+        return getTranslog().newSnapshotFromMinSeqNo(startingSeqNo);
+    }
+
+    /**
+     * Returns the estimated number of history operations whose seq# at least the provided seq# in this engine.
+     */
+    @Override
+    public int estimateNumberOfHistoryOperations(String source, MapperService mapperService, long startingSeqNo) throws IOException {
+        if (engineConfig.getIndexSettings().isSoftDeleteEnabled()) {
+            try (Translog.Snapshot snapshot = newChangesSnapshot(source, mapperService, Math.max(0, startingSeqNo),
+                Long.MAX_VALUE, false)) {
+                return snapshot.totalOperations();
+            }
+        }
+
+        return getTranslog().estimateTotalOperationsFromMinSeq(startingSeqNo);
+    }
+
     @Override
     public TranslogStats getTranslogStats() {
         return getTranslog().stats();
@@ -557,19 +556,13 @@ public class InternalEngine extends Engine {
     private void revisitIndexDeletionPolicyOnTranslogSynced() throws IOException {
         if (combinedDeletionPolicy.hasUnreferencedCommits()) {
             indexWriter.deleteUnusedFiles();
+            translog.trimUnreferencedReaders();
         }
-        translog.trimUnreferencedReaders();
     }
 
     @Override
     public String getHistoryUUID() {
         return historyUUID;
-    }
-
-    /** returns the force merge uuid for the engine */
-    @Nullable
-    public String getForceMergeUUID() {
-        return forceMergeUUID;
     }
 
     /** Returns how many bytes we are currently moving from indexing buffer to segments on disk */
@@ -579,10 +572,22 @@ public class InternalEngine extends Engine {
     }
 
     /**
+     * Reads the current stored translog ID from the last commit data.
+     */
+    @Nullable
+    private String loadTranslogUUIDFromLastCommit() throws IOException {
+        final Map<String, String> commitUserData = store.readLastCommittedSegmentsInfo().getUserData();
+        if (commitUserData.containsKey(Translog.TRANSLOG_GENERATION_KEY) == false) {
+            throw new IllegalStateException("commit doesn't contain translog generation id");
+        }
+        return commitUserData.get(Translog.TRANSLOG_UUID_KEY);
+    }
+
+    /**
      * Reads the current stored history ID from the IW commit data.
      */
-    private String loadHistoryUUID(Map<String, String> commitData) {
-        final String uuid = commitData.get(HISTORY_UUID_KEY);
+    private String loadHistoryUUID(final IndexWriter writer) {
+        final String uuid = commitDataAsMap(writer).get(HISTORY_UUID_KEY);
         if (uuid == null) {
             throw new IllegalStateException("commit doesn't contain history uuid");
         }
@@ -657,7 +662,7 @@ public class InternalEngine extends Engine {
                                     return new GetResult(new Engine.Searcher("realtime_get", reader,
                                         IndexSearcher.getDefaultSimilarity(), null, IndexSearcher.getDefaultQueryCachingPolicy(), reader),
                                         new VersionsAndSeqNoResolver.DocIdAndVersion(0, index.version(), index.seqNo(), index.primaryTerm(),
-                                            reader, 0), true);
+                                            reader, 0));
                                 }
                             } catch (IOException e) {
                                 maybeFailEngine("realtime_get", e); // lets check if the translog has failed with a tragic event
@@ -667,8 +672,7 @@ public class InternalEngine extends Engine {
                             trackTranslogLocation.set(true);
                         }
                     }
-                    assert versionValue.seqNo >= 0 : versionValue;
-                    refreshIfNeeded("realtime_get", versionValue.seqNo);
+                    refresh("realtime_get", SearcherScope.INTERNAL, true);
                 }
                 scope = SearcherScope.INTERNAL;
             } else {
@@ -724,7 +728,7 @@ public class InternalEngine extends Engine {
                 } else if (op.seqNo() > docAndSeqNo.seqNo) {
                     status = OpVsLuceneDocStatus.OP_NEWER;
                 } else if (op.seqNo() == docAndSeqNo.seqNo) {
-                    assert localCheckpointTracker.hasProcessed(op.seqNo()) :
+                    assert localCheckpointTracker.hasProcessed(op.seqNo()) || softDeleteEnabled == false :
                         "local checkpoint tracker is not updated seq_no=" + op.seqNo() + " id=" + op.id();
                     status = OpVsLuceneDocStatus.OP_STALE_OR_EQUAL;
                 } else {
@@ -795,8 +799,7 @@ public class InternalEngine extends Engine {
     }
 
     protected boolean assertPrimaryCanOptimizeAddDocument(final Index index) {
-        assert (index.version() == Versions.MATCH_DELETED || index.version() == Versions.MATCH_ANY) &&
-            index.versionType() == VersionType.INTERNAL
+        assert (index.version() == Versions.MATCH_ANY && index.versionType() == VersionType.INTERNAL)
             : "version: " + index.version() + " type: " + index.versionType();
         return true;
     }
@@ -976,7 +979,7 @@ public class InternalEngine extends Engine {
             versionMap.enforceSafeAccess();
             final OpVsLuceneDocStatus opVsLucene = compareOpToLuceneDocBasedOnSeqNo(index);
             if (opVsLucene == OpVsLuceneDocStatus.OP_STALE_OR_EQUAL) {
-                plan = IndexingStrategy.processAsStaleOp(index.version());
+                plan = IndexingStrategy.processAsStaleOp(softDeleteEnabled, index.version());
             } else {
                 plan = IndexingStrategy.processNormally(opVsLucene == OpVsLuceneDocStatus.LUCENE_DOC_NOT_FOUND, index.version());
             }
@@ -997,9 +1000,13 @@ public class InternalEngine extends Engine {
         assert index.origin() == Operation.Origin.PRIMARY : "planing as primary but origin isn't. got " + index.origin();
         final IndexingStrategy plan;
         // resolve an external operation into an internal one which is safe to replay
-        final boolean canOptimizeAddDocument = canOptimizeAddDocument(index);
-        if (canOptimizeAddDocument && mayHaveBeenIndexedBefore(index) == false) {
-            plan = IndexingStrategy.optimizedAppendOnly(1L);
+        if (canOptimizeAddDocument(index)) {
+            if (mayHaveBeenIndexedBefore(index)) {
+                plan = IndexingStrategy.overrideExistingAsIfNotThere();
+                versionMap.enforceSafeAccess();
+            } else {
+                plan = IndexingStrategy.optimizedAppendOnly(1L);
+            }
         } else {
             versionMap.enforceSafeAccess();
             // resolves incoming version
@@ -1014,7 +1021,7 @@ public class InternalEngine extends Engine {
                 currentVersion = versionValue.version;
                 currentNotFoundOrDeleted = versionValue.isDelete();
             }
-            if (index.getIfSeqNo() != SequenceNumbers.UNASSIGNED_SEQ_NO && currentNotFoundOrDeleted) {
+            if (index.getIfSeqNo() != SequenceNumbers.UNASSIGNED_SEQ_NO && versionValue == null) {
                 final VersionConflictEngineException e = new VersionConflictEngineException(shardId, index.id(),
                     index.getIfSeqNo(), index.getIfPrimaryTerm(), SequenceNumbers.UNASSIGNED_SEQ_NO,
                     SequenceNumbers.UNASSIGNED_PRIMARY_TERM);
@@ -1032,7 +1039,7 @@ public class InternalEngine extends Engine {
                 plan = IndexingStrategy.skipDueToVersionConflict(e, currentNotFoundOrDeleted, currentVersion);
             } else {
                 plan = IndexingStrategy.processNormally(currentNotFoundOrDeleted,
-                    canOptimizeAddDocument ? 1L : index.versionType().updateVersion(currentVersion, index.version())
+                    index.versionType().updateVersion(currentVersion, index.version())
                 );
             }
         }
@@ -1128,6 +1135,7 @@ public class InternalEngine extends Engine {
     }
 
     private void addStaleDocs(final List<ParseContext.Document> docs, final IndexWriter indexWriter) throws IOException {
+        assert softDeleteEnabled : "Add history documents but soft-deletes is disabled";
         for (ParseContext.Document doc : docs) {
             doc.add(softDeletesField); // soft-deleted every document before adding to Lucene
         }
@@ -1183,13 +1191,19 @@ public class InternalEngine extends Engine {
                 true, false, versionForIndexing, null);
         }
 
+        static IndexingStrategy overrideExistingAsIfNotThere() {
+            return new IndexingStrategy(true, true, true,
+                false, 1L, null);
+        }
+
         public static IndexingStrategy processButSkipLucene(boolean currentNotFoundOrDeleted, long versionForIndexing) {
             return new IndexingStrategy(currentNotFoundOrDeleted, false, false,
                 false, versionForIndexing, null);
         }
 
-        static IndexingStrategy processAsStaleOp(long versionForIndexing) {
-            return new IndexingStrategy(false, false, false, true, versionForIndexing, null);
+        static IndexingStrategy processAsStaleOp(boolean addStaleOpToLucene, long versionForIndexing) {
+            return new IndexingStrategy(false, false, false,
+                addStaleOpToLucene, versionForIndexing, null);
         }
     }
 
@@ -1202,14 +1216,14 @@ public class InternalEngine extends Engine {
         final VersionValue versionValue = versionMap.getVersionForAssert(index.uid().bytes());
         if (versionValue != null) {
             if (versionValue.isDelete() == false || allowDeleted == false) {
-                throw new AssertionError("doc [" + index.id() + "] exists in version map (version " +
+                throw new AssertionError("doc [" + index.type() + "][" + index.id() + "] exists in version map (version " +
                     versionValue + ")");
             }
         } else {
             try (Searcher searcher = acquireSearcher("assert doc doesn't exist", SearcherScope.INTERNAL)) {
                 final long docsWithId = searcher.count(new TermQuery(index.uid()));
                 if (docsWithId > 0) {
-                    throw new AssertionError("doc [" + index.id() + "] exists [" + docsWithId +
+                    throw new AssertionError("doc [" + index.type() + "][" + index.id() + "] exists [" + docsWithId +
                         "] times in index");
                 }
             }
@@ -1218,10 +1232,18 @@ public class InternalEngine extends Engine {
     }
 
     private void updateDocs(final Term uid, final List<ParseContext.Document> docs, final IndexWriter indexWriter) throws IOException {
-        if (docs.size() > 1) {
-            indexWriter.softUpdateDocuments(uid, docs, softDeletesField);
+        if (softDeleteEnabled) {
+            if (docs.size() > 1) {
+                indexWriter.softUpdateDocuments(uid, docs, softDeletesField);
+            } else {
+                indexWriter.softUpdateDocument(uid, docs.get(0), softDeletesField);
+            }
         } else {
-            indexWriter.softUpdateDocument(uid, docs.get(0), softDeletesField);
+            if (docs.size() > 1) {
+                indexWriter.updateDocuments(uid, docs);
+            } else {
+                indexWriter.updateDocument(uid, docs.get(0));
+            }
         }
         numDocUpdates.inc(docs.size());
     }
@@ -1243,7 +1265,7 @@ public class InternalEngine extends Engine {
             } else {
                 // generate or register sequence number
                 if (delete.origin() == Operation.Origin.PRIMARY) {
-                    delete = new Delete(delete.id(), delete.uid(), generateSeqNoForOperationOnPrimary(delete),
+                    delete = new Delete(delete.type(), delete.id(), delete.uid(), generateSeqNoForOperationOnPrimary(delete),
                         delete.primaryTerm(), delete.version(), delete.versionType(), delete.origin(), delete.startTime(),
                         delete.getIfSeqNo(), delete.getIfPrimaryTerm());
 
@@ -1259,12 +1281,6 @@ public class InternalEngine extends Engine {
                 } else {
                     deleteResult = new DeleteResult(
                         plan.versionOfDeletion, delete.primaryTerm(), delete.seqNo(), plan.currentlyDeleted == false);
-                }
-                if (plan.deleteFromLucene) {
-                    numDocDeletes.inc();
-                    versionMap.putDeleteUnderLock(delete.uid().bytes(),
-                        new DeleteVersionValue(plan.versionOfDeletion, delete.seqNo(), delete.primaryTerm(),
-                            engineConfig.getThreadPool().relativeTimeInMillis()));
                 }
             }
             if (delete.origin().isFromTranslog() == false && deleteResult.getResultType() == Result.Type.SUCCESS) {
@@ -1315,7 +1331,7 @@ public class InternalEngine extends Engine {
         } else {
             final OpVsLuceneDocStatus opVsLucene = compareOpToLuceneDocBasedOnSeqNo(delete);
             if (opVsLucene == OpVsLuceneDocStatus.OP_STALE_OR_EQUAL) {
-                plan = DeletionStrategy.processAsStaleOp(delete.version());
+                plan = DeletionStrategy.processAsStaleOp(softDeleteEnabled, delete.version());
             } else {
                 plan = DeletionStrategy.processNormally(opVsLucene == OpVsLuceneDocStatus.LUCENE_DOC_NOT_FOUND, delete.version());
             }
@@ -1343,7 +1359,7 @@ public class InternalEngine extends Engine {
             currentlyDeleted = versionValue.isDelete();
         }
         final DeletionStrategy plan;
-        if (delete.getIfSeqNo() != SequenceNumbers.UNASSIGNED_SEQ_NO && currentlyDeleted) {
+        if (delete.getIfSeqNo() != SequenceNumbers.UNASSIGNED_SEQ_NO && versionValue == null) {
             final VersionConflictEngineException e = new VersionConflictEngineException(shardId, delete.id(),
                 delete.getIfSeqNo(), delete.getIfPrimaryTerm(), SequenceNumbers.UNASSIGNED_SEQ_NO, SequenceNumbers.UNASSIGNED_PRIMARY_TERM);
             plan = DeletionStrategy.skipDueToVersionConflict(e, currentVersion, true);
@@ -1365,18 +1381,30 @@ public class InternalEngine extends Engine {
     private DeleteResult deleteInLucene(Delete delete, DeletionStrategy plan) throws IOException {
         assert assertMaxSeqNoOfUpdatesIsAdvanced(delete.uid(), delete.seqNo(), false, false);
         try {
-            final ParsedDocument tombstone = engineConfig.getTombstoneDocSupplier().newDeleteTombstoneDoc(delete.id());
-            assert tombstone.docs().size() == 1 : "Tombstone doc should have single doc [" + tombstone + "]";
-            tombstone.updateSeqID(delete.seqNo(), delete.primaryTerm());
-            tombstone.version().setLongValue(plan.versionOfDeletion);
-            final ParseContext.Document doc = tombstone.docs().get(0);
-            assert doc.getField(SeqNoFieldMapper.TOMBSTONE_NAME) != null :
-                "Delete tombstone document but _tombstone field is not set [" + doc + " ]";
-            doc.add(softDeletesField);
-            if (plan.addStaleOpToLucene || plan.currentlyDeleted) {
-                indexWriter.addDocument(doc);
-            } else {
-                indexWriter.softUpdateDocument(delete.uid(), doc, softDeletesField);
+            if (softDeleteEnabled) {
+                final ParsedDocument tombstone = engineConfig.getTombstoneDocSupplier().newDeleteTombstoneDoc(delete.type(), delete.id());
+                assert tombstone.docs().size() == 1 : "Tombstone doc should have single doc [" + tombstone + "]";
+                tombstone.updateSeqID(delete.seqNo(), delete.primaryTerm());
+                tombstone.version().setLongValue(plan.versionOfDeletion);
+                final ParseContext.Document doc = tombstone.docs().get(0);
+                assert doc.getField(SeqNoFieldMapper.TOMBSTONE_NAME) != null :
+                    "Delete tombstone document but _tombstone field is not set [" + doc + " ]";
+                doc.add(softDeletesField);
+                if (plan.addStaleOpToLucene || plan.currentlyDeleted) {
+                    indexWriter.addDocument(doc);
+                } else {
+                    indexWriter.softUpdateDocument(delete.uid(), doc, softDeletesField);
+                }
+            } else if (plan.currentlyDeleted == false) {
+                // any exception that comes from this is a either an ACE or a fatal exception there
+                // can't be any document failures  coming from this
+                indexWriter.deleteDocuments(delete.uid());
+            }
+            if (plan.deleteFromLucene) {
+                numDocDeletes.inc();
+                versionMap.putDeleteUnderLock(delete.uid().bytes(),
+                    new DeleteVersionValue(plan.versionOfDeletion, delete.seqNo(), delete.primaryTerm(),
+                        engineConfig.getThreadPool().relativeTimeInMillis()));
             }
             return new DeleteResult(
                 plan.versionOfDeletion, delete.primaryTerm(), delete.seqNo(), plan.currentlyDeleted == false);
@@ -1436,8 +1464,8 @@ public class InternalEngine extends Engine {
             return new DeletionStrategy(false, false, currentlyDeleted, versionOfDeletion, null);
         }
 
-        static DeletionStrategy processAsStaleOp(long versionOfDeletion) {
-            return new DeletionStrategy(false, true, false, versionOfDeletion, null);
+        static DeletionStrategy processAsStaleOp(boolean addStaleOpToLucene, long versionOfDeletion) {
+            return new DeletionStrategy(false, addStaleOpToLucene, false, versionOfDeletion, null);
         }
     }
 
@@ -1480,7 +1508,7 @@ public class InternalEngine extends Engine {
                     SequenceNumbers.UNASSIGNED_SEQ_NO, preFlightError.get());
             } else {
                 markSeqNoAsSeen(noOp.seqNo());
-                if (hasBeenProcessedBefore(noOp) == false) {
+                if (softDeleteEnabled && hasBeenProcessedBefore(noOp) == false) {
                     try {
                         final ParsedDocument tombstone = engineConfig.getTombstoneDocSupplier().newNoopTombstoneDoc(noOp.reason());
                         tombstone.updateSeqID(noOp.seqNo(), noOp.primaryTerm());
@@ -1543,12 +1571,14 @@ public class InternalEngine extends Engine {
     }
 
     final boolean refresh(String source, SearcherScope scope, boolean block) throws EngineException {
+        // we obtain a read lock here, since we don't want a flush to happen while we are refreshing
+        // since it flushes the index as well (though, in terms of concurrency, we are allowed to do it)
         // both refresh types will result in an internal refresh but only the external will also
         // pass the new reader reference to the external reader manager.
         final long localCheckpointBeforeRefresh = localCheckpointTracker.getProcessedCheckpoint();
         boolean refreshed;
-        try {
-            // refresh does not need to hold readLock as ReferenceManager can handle correctly if the engine is closed in mid-way.
+        try (ReleasableLock lock = readLock.acquire()) {
+            ensureOpen();
             if (store.tryIncRef()) {
                 // increment the ref just to ensure nobody closes the store during a refresh
                 try {
@@ -1594,7 +1624,72 @@ public class InternalEngine extends Engine {
 
     @Override
     public void writeIndexingBuffer() throws EngineException {
-        refresh("write indexing buffer", SearcherScope.INTERNAL, false);
+        // we obtain a read lock here, since we don't want a flush to happen while we are writing
+        // since it flushes the index as well (though, in terms of concurrency, we are allowed to do it)
+        refresh("write indexing buffer", SearcherScope.INTERNAL, true);
+    }
+
+    @Override
+    public SyncedFlushResult syncFlush(String syncId, CommitId expectedCommitId) throws EngineException {
+        // best effort attempt before we acquire locks
+        ensureOpen();
+        if (indexWriter.hasUncommittedChanges()) {
+            logger.trace("can't sync commit [{}]. have pending changes", syncId);
+            return SyncedFlushResult.PENDING_OPERATIONS;
+        }
+        if (expectedCommitId.idsEqual(lastCommittedSegmentInfos.getId()) == false) {
+            logger.trace("can't sync commit [{}]. current commit id is not equal to expected.", syncId);
+            return SyncedFlushResult.COMMIT_MISMATCH;
+        }
+        try (ReleasableLock lock = writeLock.acquire()) {
+            ensureOpen();
+            ensureCanFlush();
+            // lets do a refresh to make sure we shrink the version map. This refresh will be either a no-op (just shrink the version map)
+            // or we also have uncommitted changes and that causes this syncFlush to fail.
+            refresh("sync_flush", SearcherScope.INTERNAL, true);
+            if (indexWriter.hasUncommittedChanges()) {
+                logger.trace("can't sync commit [{}]. have pending changes", syncId);
+                return SyncedFlushResult.PENDING_OPERATIONS;
+            }
+            if (expectedCommitId.idsEqual(lastCommittedSegmentInfos.getId()) == false) {
+                logger.trace("can't sync commit [{}]. current commit id is not equal to expected.", syncId);
+                return SyncedFlushResult.COMMIT_MISMATCH;
+            }
+            logger.trace("starting sync commit [{}]", syncId);
+            commitIndexWriter(indexWriter, translog, syncId);
+            logger.debug("successfully sync committed. sync id [{}].", syncId);
+            lastCommittedSegmentInfos = store.readLastCommittedSegmentsInfo();
+            return SyncedFlushResult.SUCCESS;
+        } catch (IOException ex) {
+            maybeFailEngine("sync commit", ex);
+            throw new EngineException(shardId, "failed to sync commit", ex);
+        }
+    }
+
+    final boolean tryRenewSyncCommit() {
+        boolean renewed = false;
+        try (ReleasableLock lock = writeLock.acquire()) {
+            ensureOpen();
+            ensureCanFlush();
+            String syncId = lastCommittedSegmentInfos.getUserData().get(SYNC_COMMIT_ID);
+            long translogGenOfLastCommit = Long.parseLong(lastCommittedSegmentInfos.userData.get(Translog.TRANSLOG_GENERATION_KEY));
+            if (syncId != null && indexWriter.hasUncommittedChanges() && translog.totalOperationsByMinGen(translogGenOfLastCommit) == 0) {
+                logger.trace("start renewing sync commit [{}]", syncId);
+                commitIndexWriter(indexWriter, translog, syncId);
+                logger.debug("successfully sync committed. sync id [{}].", syncId);
+                lastCommittedSegmentInfos = store.readLastCommittedSegmentsInfo();
+                renewed = true;
+            }
+        } catch (IOException ex) {
+            maybeFailEngine("renew sync commit", ex);
+            throw new EngineException(shardId, "failed to renew sync commit", ex);
+        }
+        if (renewed) {
+            // refresh outside of the write lock
+            // we have to refresh internal reader here to ensure we release unreferenced segments.
+            refresh("renew sync commit", SearcherScope.INTERNAL, true);
+        }
+        return renewed;
     }
 
     @Override
@@ -1603,10 +1698,8 @@ public class InternalEngine extends Engine {
         if (shouldPeriodicallyFlushAfterBigMerge.get()) {
             return true;
         }
-        final long localCheckpointOfLastCommit =
-            Long.parseLong(lastCommittedSegmentInfos.userData.get(SequenceNumbers.LOCAL_CHECKPOINT_KEY));
         final long translogGenerationOfLastCommit =
-            translog.getMinGenerationForSeqNo(localCheckpointOfLastCommit + 1).translogFileGeneration;
+            Long.parseLong(lastCommittedSegmentInfos.userData.get(Translog.TRANSLOG_GENERATION_KEY));
         final long flushThreshold = config().getIndexSettings().getFlushThresholdSize().getBytes();
         if (translog.sizeInBytesByMinGen(translogGenerationOfLastCommit) < flushThreshold) {
             return false;
@@ -1633,13 +1726,14 @@ public class InternalEngine extends Engine {
     }
 
     @Override
-    public void flush(boolean force, boolean waitIfOngoing) throws EngineException {
+    public CommitId flush(boolean force, boolean waitIfOngoing) throws EngineException {
         ensureOpen();
         if (force && waitIfOngoing == false) {
             assert false : "wait_if_ongoing must be true for a force flush: force=" + force + " wait_if_ongoing=" + waitIfOngoing;
             throw new IllegalArgumentException(
                 "wait_if_ongoing must be true for a force flush: force=" + force + " wait_if_ongoing=" + waitIfOngoing);
         }
+        final byte[] newCommitId;
         /*
          * Unfortunately the lock order is important here. We have to acquire the readlock first otherwise
          * if we are flushing at the end of the recovery while holding the write lock we can deadlock if:
@@ -1650,12 +1744,13 @@ public class InternalEngine extends Engine {
             ensureOpen();
             if (flushLock.tryLock() == false) {
                 // if we can't get the lock right away we block if needed otherwise barf
-                if (waitIfOngoing == false) {
-                    return;
+                if (waitIfOngoing) {
+                    logger.trace("waiting for in-flight flush to finish");
+                    flushLock.lock();
+                    logger.trace("acquired flush lock after blocking");
+                } else {
+                    return new CommitId(lastCommittedSegmentInfos.getId());
                 }
-                logger.trace("waiting for in-flight flush to finish");
-                flushLock.lock();
-                logger.trace("acquired flush lock after blocking");
             } else {
                 logger.trace("acquired flush lock immediately");
             }
@@ -1669,7 +1764,7 @@ public class InternalEngine extends Engine {
                     try {
                         translog.rollGeneration();
                         logger.trace("starting commit for flush; commitTranslog=true");
-                        commitIndexWriter(indexWriter, translog);
+                        commitIndexWriter(indexWriter, translog, null);
                         logger.trace("finished commit for flush");
 
                         // a temporary debugging to investigate test failure - issue#32827. Remove when the issue is resolved
@@ -1687,6 +1782,7 @@ public class InternalEngine extends Engine {
                     refreshLastCommittedSegmentInfos();
 
                 }
+                newCommitId = lastCommittedSegmentInfos.getId();
             } catch (FlushFailedEngineException ex) {
                 maybeFailEngine("flush", ex);
                 throw ex;
@@ -1699,6 +1795,7 @@ public class InternalEngine extends Engine {
         if (engineConfig.isEnableGcDeletes()) {
             pruneDeletedTombstones();
         }
+        return new CommitId(newCommitId);
     }
 
     private void refreshLastCommittedSegmentInfos() {
@@ -1829,8 +1926,7 @@ public class InternalEngine extends Engine {
 
     @Override
     public void forceMerge(final boolean flush, int maxNumSegments, boolean onlyExpungeDeletes,
-                           final boolean upgrade, final boolean upgradeOnlyAncientSegments,
-                           final String forceMergeUUID) throws EngineException, IOException {
+                           final boolean upgrade, final boolean upgradeOnlyAncientSegments) throws EngineException, IOException {
         if (onlyExpungeDeletes && maxNumSegments >= 0) {
             throw new IllegalArgumentException("only_expunge_deletes and max_num_segments are mutually exclusive");
         }
@@ -1865,10 +1961,11 @@ public class InternalEngine extends Engine {
                     indexWriter.maybeMerge();
                 } else {
                     indexWriter.forceMerge(maxNumSegments, true /* blocks and waits for merges*/);
-                    this.forceMergeUUID = forceMergeUUID;
                 }
                 if (flush) {
-                    flush(false, true);
+                    if (tryRenewSyncCommit() == false) {
+                        flush(false, true);
+                    }
                 }
                 if (upgrade) {
                     logger.info("finished segment upgrade");
@@ -2101,24 +2198,21 @@ public class InternalEngine extends Engine {
         }
     }
 
-    static Map<String, String> getReaderAttributes(Directory directory, IndexSettings indexSettings) {
+    static Map<String, String> getReaderAttributes(Directory directory) {
         Directory unwrap = FilterDirectory.unwrap(directory);
         boolean defaultOffHeap = FsDirectoryFactory.isHybridFs(unwrap) || unwrap instanceof MMapDirectory;
-        Map<String, String> attributes = new HashMap<>();
-        attributes.put(BlockTreeTermsReader.FST_MODE_KEY, defaultOffHeap ? FSTLoadMode.OFF_HEAP.name() : FSTLoadMode.ON_HEAP.name());
-        if (IndexSettings.ON_HEAP_ID_TERMS_INDEX.exists(indexSettings.getSettings())) {
-            final boolean idOffHeap = IndexSettings.ON_HEAP_ID_TERMS_INDEX.get(indexSettings.getSettings()) == false;
-            attributes.put(BlockTreeTermsReader.FST_MODE_KEY + "." + IdFieldMapper.NAME,
-                    idOffHeap ? FSTLoadMode.OFF_HEAP.name() : FSTLoadMode.ON_HEAP.name());
-        }
-        return Collections.unmodifiableMap(attributes);
+        return Map.of(
+            BlockTreeTermsReader.FST_MODE_KEY, // if we are using MMAP for term dics we force all off heap unless it's the ID field
+            defaultOffHeap ? FSTLoadMode.OFF_HEAP.name() : FSTLoadMode.ON_HEAP.name()
+            , BlockTreeTermsReader.FST_MODE_KEY + "." + IdFieldMapper.NAME, // always force ID field on-heap for fast updates
+            FSTLoadMode.ON_HEAP.name());
     }
 
     private IndexWriterConfig getIndexWriterConfig() {
         final IndexWriterConfig iwc = new IndexWriterConfig(engineConfig.getAnalyzer());
         iwc.setCommitOnClose(false); // we by default don't commit on close
         iwc.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
-        iwc.setReaderAttributes(getReaderAttributes(store.directory(), engineConfig.getIndexSettings()));
+        iwc.setReaderAttributes(getReaderAttributes(store.directory()));
         iwc.setIndexDeletionPolicy(combinedDeletionPolicy);
         // with tests.verbose, lucene sets this up: plumb to align with filesystem stream
         boolean verbose = false;
@@ -2133,15 +2227,10 @@ public class InternalEngine extends Engine {
         MergePolicy mergePolicy = config().getMergePolicy();
         // always configure soft-deletes field so an engine with soft-deletes disabled can open a Lucene index with soft-deletes.
         iwc.setSoftDeletesField(Lucene.SOFT_DELETES_FIELD);
-        mergePolicy = new RecoverySourcePruneMergePolicy(SourceFieldMapper.RECOVERY_SOURCE_NAME, softDeletesPolicy::getRetentionQuery,
-            new SoftDeletesRetentionMergePolicy(Lucene.SOFT_DELETES_FIELD, softDeletesPolicy::getRetentionQuery,
-                new PrunePostingsMergePolicy(mergePolicy, IdFieldMapper.NAME)));
-        boolean shuffleForcedMerge = Booleans.parseBoolean(System.getProperty("es.shuffle_forced_merge", Boolean.TRUE.toString()));
-        if (shuffleForcedMerge) {
-            // We wrap the merge policy for all indices even though it is mostly useful for time-based indices
-            // but there should be no overhead for other type of indices so it's simpler than adding a setting
-            // to enable it.
-            mergePolicy = new ShuffleForcedMergePolicy(mergePolicy);
+        if (softDeleteEnabled) {
+            mergePolicy = new RecoverySourcePruneMergePolicy(SourceFieldMapper.RECOVERY_SOURCE_NAME, softDeletesPolicy::getRetentionQuery,
+                new SoftDeletesRetentionMergePolicy(Lucene.SOFT_DELETES_FIELD, softDeletesPolicy::getRetentionQuery,
+                    new PrunePostingsMergePolicy(mergePolicy, IdFieldMapper.NAME)));
         }
         iwc.setMergePolicy(new ElasticsearchMergePolicy(mergePolicy));
         iwc.setSimilarity(engineConfig.getSimilarity());
@@ -2259,9 +2348,15 @@ public class InternalEngine extends Engine {
 
                     @Override
                     protected void doRun() {
-                        // if we have no pending merges and we are supposed to flush once merges have finished to
+                        // if we have no pending merges and we are supposed to flush once merges have finished
+                        // we try to renew a sync commit which is the case when we are having a big merge after we
+                        // are inactive. If that didn't work we go and do a real flush which is ok since it only doesn't work
+                        // if we either have records in the translog or if we don't have a sync ID at all...
+                        // maybe even more important, we flush after all merges finish and we are inactive indexing-wise to
                         // free up transient disk usage of the (presumably biggish) segments that were just merged
-                        flush();
+                        if (tryRenewSyncCommit() == false) {
+                            flush();
+                        }
                     }
                 });
             } else if (merge.getTotalBytesSize() >= engineConfig.getIndexSettings().getFlushAfterMergeThresholdSize().getBytes()) {
@@ -2298,11 +2393,18 @@ public class InternalEngine extends Engine {
      *
      * @param writer   the index writer to commit
      * @param translog the translog
+     * @param syncId   the sync flush ID ({@code null} if not committing a synced flush)
+     * @throws IOException if an I/O exception occurs committing the specfied writer
      */
-    protected void commitIndexWriter(final IndexWriter writer, final Translog translog) throws IOException {
+    protected void commitIndexWriter(final IndexWriter writer, final Translog translog, @Nullable final String syncId) throws IOException {
         ensureCanFlush();
         try {
             final long localCheckpoint = localCheckpointTracker.getProcessedCheckpoint();
+            final Translog.TranslogGeneration translogGeneration = translog.getMinGenerationForSeqNo(localCheckpoint + 1);
+            final String translogFileGeneration = Long.toString(translogGeneration.translogFileGeneration);
+            final String translogUUID = translogGeneration.translogUUID;
+            final String localCheckpointValue = Long.toString(localCheckpoint);
+
             writer.setLiveCommitData(() -> {
                 /*
                  * The user data captured above (e.g. local checkpoint) contains data that must be evaluated *before* Lucene flushes
@@ -2313,17 +2415,19 @@ public class InternalEngine extends Engine {
                  * {@link IndexWriter#commit()} call flushes all documents, we defer computation of the maximum sequence number to the time
                  * of invocation of the commit data iterator (which occurs after all documents have been flushed to Lucene).
                  */
-                final Map<String, String> commitData = new HashMap<>(7);
-                commitData.put(Translog.TRANSLOG_UUID_KEY, translog.getTranslogUUID());
-                commitData.put(SequenceNumbers.LOCAL_CHECKPOINT_KEY, Long.toString(localCheckpoint));
+                final Map<String, String> commitData = new HashMap<>(8);
+                commitData.put(Translog.TRANSLOG_GENERATION_KEY, translogFileGeneration);
+                commitData.put(Translog.TRANSLOG_UUID_KEY, translogUUID);
+                commitData.put(SequenceNumbers.LOCAL_CHECKPOINT_KEY, localCheckpointValue);
+                if (syncId != null) {
+                    commitData.put(Engine.SYNC_COMMIT_ID, syncId);
+                }
                 commitData.put(SequenceNumbers.MAX_SEQ_NO, Long.toString(localCheckpointTracker.getMaxSeqNo()));
                 commitData.put(MAX_UNSAFE_AUTO_ID_TIMESTAMP_COMMIT_ID, Long.toString(maxUnsafeAutoIdTimestamp.get()));
                 commitData.put(HISTORY_UUID_KEY, historyUUID);
-                final String currentForceMergeUUID = forceMergeUUID;
-                if (currentForceMergeUUID != null) {
-                    commitData.put(FORCE_MERGE_UUID_KEY, currentForceMergeUUID);
+                if (softDeleteEnabled) {
+                    commitData.put(Engine.MIN_RETAINED_SEQNO, Long.toString(softDeletesPolicy.getMinRetainedSeqNo()));
                 }
-                commitData.put(Engine.MIN_RETAINED_SEQNO, Long.toString(softDeletesPolicy.getMinRetainedSeqNo()));
                 logger.trace("committing writer with commit data [{}]", commitData);
                 return commitData.entrySet().iterator();
             });
@@ -2355,22 +2459,25 @@ public class InternalEngine extends Engine {
         }
     }
 
-    final void ensureCanFlush() {
-        // translog recovery happens after the engine is fully constructed.
-        // If we are in this stage we have to prevent flushes from this
+    private void ensureCanFlush() {
+        // translog recover happens after the engine is fully constructed
+        // if we are in this stage we have to prevent flushes from this
         // engine otherwise we might loose documents if the flush succeeds
-        // and the translog recovery fails when we "commit" the translog on flush.
+        // and the translog recover fails we we "commit" the translog on flush.
         if (pendingTranslogRecovery.get()) {
             throw new IllegalStateException(shardId.toString() + " flushes are disabled - pending translog recovery");
         }
     }
 
-    @Override
     public void onSettingsChanged() {
         mergeScheduler.refreshConfig();
         // config().isEnableGcDeletes() or config.getGcDeletesInMillis() may have changed:
         maybePruneDeletes();
-        softDeletesPolicy.setRetentionOperations(config().getIndexSettings().getSoftDeleteRetentionOperations());
+        final TranslogDeletionPolicy translogDeletionPolicy = translog.getDeletionPolicy();
+        final IndexSettings indexSettings = engineConfig.getIndexSettings();
+        translogDeletionPolicy.setRetentionAgeInMillis(indexSettings.getTranslogRetentionAge().getMillis());
+        translogDeletionPolicy.setRetentionSizeInBytes(indexSettings.getTranslogRetentionSize().getBytes());
+        softDeletesPolicy.setRetentionOperations(indexSettings.getSoftDeleteRetentionOperations());
     }
 
     public MergeStats getMergeStats() {
@@ -2480,6 +2587,9 @@ public class InternalEngine extends Engine {
     @Override
     public Translog.Snapshot newChangesSnapshot(String source, MapperService mapperService,
                                                 long fromSeqNo, long toSeqNo, boolean requiredFullRange) throws IOException {
+        if (softDeleteEnabled == false) {
+            throw new IllegalStateException("accessing changes snapshot requires soft-deletes enabled");
+        }
         ensureOpen();
         refreshIfNeeded(source, toSeqNo);
         Searcher searcher = acquireSearcher(source, SearcherScope.INTERNAL);
@@ -2501,8 +2611,26 @@ public class InternalEngine extends Engine {
     }
 
     @Override
-    public boolean hasCompleteOperationHistory(String reason, long startingSeqNo) {
-        return getMinRetainedSeqNo() <= startingSeqNo;
+    public boolean hasCompleteOperationHistory(String source, MapperService mapperService, long startingSeqNo) throws IOException {
+        if (engineConfig.getIndexSettings().isSoftDeleteEnabled()) {
+            return getMinRetainedSeqNo() <= startingSeqNo;
+        }
+
+        final long currentLocalCheckpoint = localCheckpointTracker.getProcessedCheckpoint();
+        // avoid scanning translog if not necessary
+        if (startingSeqNo > currentLocalCheckpoint) {
+            return true;
+        }
+        final LocalCheckpointTracker tracker = new LocalCheckpointTracker(startingSeqNo, startingSeqNo - 1);
+        try (Translog.Snapshot snapshot = getTranslog().newSnapshotFromMinSeqNo(startingSeqNo)) {
+            Translog.Operation operation;
+            while ((operation = snapshot.next()) != null) {
+                if (operation.seqNo() != SequenceNumbers.UNASSIGNED_SEQ_NO) {
+                    tracker.markSeqNoAsProcessed(operation.seqNo());
+                }
+            }
+        }
+        return tracker.getProcessedCheckpoint() >= currentLocalCheckpoint;
     }
 
     /**
@@ -2510,12 +2638,22 @@ public class InternalEngine extends Engine {
      * Operations whose seq# are at least this value should exist in the Lucene index.
      */
     public final long getMinRetainedSeqNo() {
+        assert softDeleteEnabled : Thread.currentThread().getName();
         return softDeletesPolicy.getMinRetainedSeqNo();
     }
 
     @Override
-    public Closeable acquireHistoryRetentionLock() {
-        return softDeletesPolicy.acquireRetentionLock();
+    public Closeable acquireRetentionLock() {
+        if (softDeleteEnabled) {
+            return softDeletesPolicy.acquireRetentionLock();
+        } else {
+            return translog.acquireRetentionLock();
+        }
+    }
+
+    @Override
+    public boolean isRecovering() {
+        return pendingTranslogRecovery.get();
     }
 
     /**
@@ -2529,29 +2667,40 @@ public class InternalEngine extends Engine {
         return commitData;
     }
 
-    private static class AssertingIndexWriter extends IndexWriter {
+    private final class AssertingIndexWriter extends IndexWriter {
         AssertingIndexWriter(Directory d, IndexWriterConfig conf) throws IOException {
             super(d, conf);
         }
-
         @Override
-        public long updateDocument(Term term, Iterable<? extends IndexableField> doc) {
-            throw new AssertionError("must not hard update document");
+        public long updateDocument(Term term, Iterable<? extends IndexableField> doc) throws IOException {
+            assert softDeleteEnabled == false : "Call #updateDocument but soft-deletes is enabled";
+            return super.updateDocument(term, doc);
         }
-
         @Override
-        public long updateDocuments(Term delTerm, Iterable<? extends Iterable<? extends IndexableField>> docs) {
-            throw new AssertionError("must not hard update documents");
+        public long updateDocuments(Term delTerm, Iterable<? extends Iterable<? extends IndexableField>> docs) throws IOException {
+            assert softDeleteEnabled == false : "Call #updateDocuments but soft-deletes is enabled";
+            return super.updateDocuments(delTerm, docs);
         }
-
         @Override
-        public long deleteDocuments(Term... terms) {
-            throw new AssertionError("must not hard delete documents");
+        public long deleteDocuments(Term... terms) throws IOException {
+            assert softDeleteEnabled == false : "Call #deleteDocuments but soft-deletes is enabled";
+            return super.deleteDocuments(terms);
         }
-
+        @Override
+        public long softUpdateDocument(Term term, Iterable<? extends IndexableField> doc, Field... softDeletes) throws IOException {
+            assert softDeleteEnabled : "Call #softUpdateDocument but soft-deletes is disabled";
+            return super.softUpdateDocument(term, doc, softDeletes);
+        }
+        @Override
+        public long softUpdateDocuments(Term term, Iterable<? extends Iterable<? extends IndexableField>> docs,
+                                            Field... softDeletes) throws IOException {
+            assert softDeleteEnabled : "Call #softUpdateDocuments but soft-deletes is disabled";
+            return super.softUpdateDocuments(term, docs, softDeletes);
+        }
         @Override
         public long tryDeleteDocument(IndexReader readerIn, int docID) {
-            throw new AssertionError("tryDeleteDocument is not supported. See Lucene#DirectoryReaderWithAllLiveDocs");
+            assert false : "#tryDeleteDocument is not supported. See Lucene#DirectoryReaderWithAllLiveDocs";
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -2657,6 +2806,15 @@ public class InternalEngine extends Engine {
         return true;
     }
 
+    private static void trimUnsafeCommits(EngineConfig engineConfig) throws IOException {
+        final Store store = engineConfig.getStore();
+        final String translogUUID = store.readLastCommittedSegmentsInfo().getUserData().get(Translog.TRANSLOG_UUID_KEY);
+        final Path translogPath = engineConfig.getTranslogConfig().getTranslogPath();
+        final long globalCheckpoint = Translog.readGlobalCheckpoint(translogPath, translogUUID);
+        final long minRetainedTranslogGen = Translog.readMinTranslogGeneration(translogPath, translogUUID);
+        store.trimUnsafeCommits(globalCheckpoint, minRetainedTranslogGen, engineConfig.getIndexSettings().getIndexVersionCreated());
+    }
+
     /**
      * Restores the live version map and local checkpoint of this engine using documents (including soft-deleted)
      * after the local checkpoint in the safe commit. This step ensures the live version map and checkpoint tracker
@@ -2665,12 +2823,8 @@ public class InternalEngine extends Engine {
     private void restoreVersionMapAndCheckpointTracker(DirectoryReader directoryReader) throws IOException {
         final IndexSearcher searcher = new IndexSearcher(directoryReader);
         searcher.setQueryCache(null);
-        final Query query = new BooleanQuery.Builder()
-            .add(LongPoint.newRangeQuery(
-                    SeqNoFieldMapper.NAME, getPersistedLocalCheckpoint() + 1, Long.MAX_VALUE), BooleanClause.Occur.MUST)
-            .add(Queries.newNonNestedFilter(), BooleanClause.Occur.MUST) // exclude non-root nested documents
-            .build();
-        final Weight weight = searcher.createWeight(searcher.rewrite(query), ScoreMode.COMPLETE_NO_SCORES, 1.0f);
+        final Query query = LongPoint.newRangeQuery(SeqNoFieldMapper.NAME, getPersistedLocalCheckpoint() + 1, Long.MAX_VALUE);
+        final Weight weight = searcher.createWeight(query, ScoreMode.COMPLETE_NO_SCORES, 1.0f);
         for (LeafReaderContext leaf : directoryReader.leaves()) {
             final Scorer scorer = weight.scorer(leaf);
             if (scorer == null) {
@@ -2682,6 +2836,9 @@ public class InternalEngine extends Engine {
             int docId;
             while ((docId = iterator.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
                 final long primaryTerm = dv.docPrimaryTerm(docId);
+                if (primaryTerm == -1L) {
+                    continue; // skip children docs which do not have primary term
+                }
                 final long seqNo = dv.docSeqNo(docId);
                 localCheckpointTracker.markSeqNoAsProcessed(seqNo);
                 localCheckpointTracker.markSeqNoAsPersisted(seqNo);

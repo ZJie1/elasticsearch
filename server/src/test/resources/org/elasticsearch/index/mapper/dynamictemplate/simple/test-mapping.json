@@ -1,5 +1,5 @@
 {
-    "_doc":{
+    "person":{
         "dynamic_templates":[
             {
                 "template_1":{

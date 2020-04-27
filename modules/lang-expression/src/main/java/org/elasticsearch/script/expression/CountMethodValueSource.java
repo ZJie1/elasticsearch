@@ -19,36 +19,44 @@
 
 package org.elasticsearch.script.expression;
 
+import java.io.IOException;
+import java.util.Map;
+import java.util.Objects;
+
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.DoubleValues;
-import org.elasticsearch.index.fielddata.LeafNumericFieldData;
+import org.apache.lucene.queries.function.FunctionValues;
+import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.queries.function.docvalues.DoubleDocValues;
+import org.elasticsearch.index.fielddata.AtomicNumericFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
-
-import java.io.IOException;
 
 /**
  * A ValueSource to create FunctionValues to get the count of the number of values in a field for a document.
  */
-final class CountMethodValueSource extends FieldDataBasedDoubleValuesSource {
+final class CountMethodValueSource extends ValueSource {
+    IndexFieldData<?> fieldData;
 
     CountMethodValueSource(IndexFieldData<?> fieldData) {
-        super(fieldData);
+        Objects.requireNonNull(fieldData);
+
+        this.fieldData = fieldData;
     }
 
     @Override
-    public DoubleValues getValues(LeafReaderContext ctx, DoubleValues scores) {
-        LeafNumericFieldData leafData = (LeafNumericFieldData) fieldData.load(ctx);
+    @SuppressWarnings("rawtypes") // ValueSource uses a rawtype
+    public FunctionValues getValues(Map context, LeafReaderContext leaf) throws IOException {
+        AtomicNumericFieldData leafData = (AtomicNumericFieldData) fieldData.load(leaf);
         final SortedNumericDoubleValues values = leafData.getDoubleValues();
-        return new DoubleValues() {
-            @Override
-            public double doubleValue() {
-                return values.docValueCount();
-            }
 
+        return new DoubleDocValues(this) {
             @Override
-            public boolean advanceExact(int doc) throws IOException {
-                return values.advanceExact(doc);
+            public double doubleVal(int doc) throws IOException {
+                if (values.advanceExact(doc)) {
+                    return values.docValueCount();
+                } else {
+                    return 0;
+                }
             }
         };
     }
@@ -57,13 +65,10 @@ final class CountMethodValueSource extends FieldDataBasedDoubleValuesSource {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        CountMethodValueSource that = (CountMethodValueSource) o;
-        return fieldData.equals(that.fieldData);
-    }
 
-    @Override
-    public String toString() {
-        return "count: field(" + fieldData.getFieldName() + ")";
+        FieldDataValueSource that = (FieldDataValueSource) o;
+
+        return fieldData.equals(that.fieldData);
     }
 
     @Override
@@ -71,4 +76,8 @@ final class CountMethodValueSource extends FieldDataBasedDoubleValuesSource {
         return 31 * getClass().hashCode() + fieldData.hashCode();
     }
 
+    @Override
+    public String description() {
+        return "count: field(" + fieldData.getFieldName() + ")";
+    }
 }

@@ -29,12 +29,14 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.index.search.MatchQuery.ZeroTermsQuery;
+import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.test.AbstractQueryTestCase;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.elasticsearch.test.AbstractBuilderTestCase.STRING_ALIAS_FIELD_NAME;
 import static org.hamcrest.CoreMatchers.either;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.Matchers.containsString;
@@ -44,7 +46,7 @@ import static org.hamcrest.Matchers.notNullValue;
 public class MatchPhraseQueryBuilderTests extends AbstractQueryTestCase<MatchPhraseQueryBuilder> {
     @Override
     protected MatchPhraseQueryBuilder doCreateTestQueryBuilder() {
-        String fieldName = randomFrom(TEXT_FIELD_NAME, TEXT_ALIAS_FIELD_NAME, BOOLEAN_FIELD_NAME, INT_FIELD_NAME,
+        String fieldName = randomFrom(STRING_FIELD_NAME, STRING_ALIAS_FIELD_NAME, BOOLEAN_FIELD_NAME, INT_FIELD_NAME,
                 DOUBLE_FIELD_NAME, DATE_FIELD_NAME);
         Object value;
         if (isTextField(fieldName)) {
@@ -90,7 +92,7 @@ public class MatchPhraseQueryBuilderTests extends AbstractQueryTestCase<MatchPhr
     }
 
     @Override
-    protected void doAssertLuceneQuery(MatchPhraseQueryBuilder queryBuilder, Query query, QueryShardContext context) throws IOException {
+    protected void doAssertLuceneQuery(MatchPhraseQueryBuilder queryBuilder, Query query, SearchContext context) throws IOException {
         assertThat(query, notNullValue());
 
         if (query instanceof MatchAllDocsQuery) {

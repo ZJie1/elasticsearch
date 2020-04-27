@@ -64,7 +64,6 @@ public class ClientScrollableHitSource extends ScrollableHitSource {
         super(logger, backoffPolicy, threadPool, countSearchRetry, onResponse, fail);
         this.client = client;
         this.firstSearchRequest = firstSearchRequest;
-        firstSearchRequest.allowPartialSearchResults(false);
     }
 
     @Override
@@ -168,6 +167,11 @@ public class ClientScrollableHitSource extends ScrollableHitSource {
         @Override
         public String getIndex() {
             return delegate.getIndex();
+        }
+
+        @Override
+        public String getType() {
+            return delegate.getType();
         }
 
         @Override

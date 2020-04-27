@@ -7,7 +7,7 @@ what if a user wants to search for `skiing` specifically? The typical way to do
 this would be to use a <<multi-fields,multi-field>> in order to have the same
 content indexed in two different ways:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT index
 {
@@ -51,10 +51,11 @@ PUT index/_doc/2
 
 POST index/_refresh
 --------------------------------------------------
+// CONSOLE
 
 With such a setup, searching for `ski` on `body` would return both documents:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET index/_search
 {
@@ -66,9 +67,10 @@ GET index/_search
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "took": 2,
@@ -88,6 +90,7 @@ GET index/_search
     "hits": [
       {
         "_index": "index",
+        "_type": "_doc",
         "_id": "1",
         "_score": 0.18232156,
         "_source": {
@@ -96,6 +99,7 @@ GET index/_search
       },
       {
         "_index": "index",
+        "_type": "_doc",
         "_id": "2",
         "_score": 0.18232156,
         "_source": {
@@ -112,7 +116,7 @@ On the other hand, searching for `ski` on `body.exact` would only return
 document `1` since the analysis chain of `body.exact` does not perform
 stemming.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET index/_search
 {
@@ -124,9 +128,10 @@ GET index/_search
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "took": 1,
@@ -146,6 +151,7 @@ GET index/_search
     "hits": [
       {
         "_index": "index",
+        "_type": "_doc",
         "_id": "1",
         "_score": 0.8025915,
         "_source": {
@@ -169,7 +175,7 @@ that solves this exact problem: `quote_field_suffix`. This tells Elasticsearch
 that the words that appear in between quotes are to be redirected to a different
 field, see below:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET index/_search
 {
@@ -182,9 +188,10 @@ GET index/_search
   }
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "took": 2,
@@ -204,6 +211,7 @@ GET index/_search
     "hits": [
       {
         "_index": "index",
+        "_type": "_doc",
         "_id": "1",
         "_score": 0.8025915,
         "_source": {

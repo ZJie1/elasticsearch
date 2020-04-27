@@ -29,15 +29,11 @@ import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.BytesRef;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.fielddata.AbstractSortedDocValues;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.SortedBinaryDocValues;
-import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.MultiValueMode;
-import org.elasticsearch.search.sort.BucketedSort;
-import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 
@@ -137,12 +133,6 @@ public class BytesRefFieldComparatorSource extends IndexFieldData.XFieldComparat
             }
 
         };
-    }
-
-    @Override
-    public BucketedSort newBucketedSort(BigArrays bigArrays, SortOrder sortOrder, DocValueFormat format,
-            int bucketSize, BucketedSort.ExtraData extra) {
-        throw new IllegalArgumentException("only supported on numeric fields");
     }
 
     /**

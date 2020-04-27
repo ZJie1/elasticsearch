@@ -74,7 +74,7 @@ import java.util.Objects;
  * @deprecated use {@link GeoShapeFieldMapper}
  */
 @Deprecated
-public class LegacyGeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<ShapeBuilder<?, ?, ?>, Shape> {
+public class LegacyGeoShapeFieldMapper extends AbstractGeometryFieldMapper<ShapeBuilder<?, ?, ?>, Shape> {
 
     public static final String CONTENT_TYPE = "geo_shape";
 
@@ -170,15 +170,15 @@ public class LegacyGeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<
                 throw new ElasticsearchParseException("Field parameter [{}] is not supported for [{}] field type",
                     fieldName, CONTENT_TYPE);
             }
-            DEPRECATION_LOGGER.deprecatedAndMaybeLog("geo_mapper_field_parameter",
-                "Field parameter [{}] is deprecated and will be removed in a future version.", fieldName);
+            DEPRECATION_LOGGER.deprecated("Field parameter [{}] is deprecated and will be removed in a future version.",
+                fieldName);
         }
     }
 
     private static final Logger logger = LogManager.getLogger(LegacyGeoShapeFieldMapper.class);
     private static final DeprecationLogger DEPRECATION_LOGGER = new DeprecationLogger(logger);
 
-    public static class Builder extends AbstractShapeGeometryFieldMapper.Builder<AbstractShapeGeometryFieldMapper.Builder,
+    public static class Builder extends AbstractGeometryFieldMapper.Builder<AbstractGeometryFieldMapper.Builder,
         LegacyGeoShapeFieldMapper> {
 
         DeprecatedParameters deprecatedParameters;
@@ -297,7 +297,7 @@ public class LegacyGeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<
         }
     }
 
-    public static final class GeoShapeFieldType extends AbstractShapeGeometryFieldType {
+    public static final class GeoShapeFieldType extends AbstractGeometryFieldType {
 
         private String tree = DeprecatedParameters.Defaults.TREE;
         private SpatialStrategy strategy = DeprecatedParameters.Defaults.STRATEGY;
@@ -472,7 +472,7 @@ public class LegacyGeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<
                                Explicit<Boolean> ignoreMalformed, Explicit<Boolean> coerce, Explicit<Orientation> orientation,
                                Explicit<Boolean> ignoreZValue, Settings indexSettings,
                                MultiFields multiFields, CopyTo copyTo) {
-        super(simpleName, fieldType, defaultFieldType, ignoreMalformed, coerce, ignoreZValue, orientation, indexSettings,
+        super(simpleName, fieldType, defaultFieldType, ignoreMalformed, coerce, ignoreZValue, indexSettings,
             multiFields, copyTo);
     }
 
@@ -531,17 +531,6 @@ public class LegacyGeoShapeFieldMapper extends AbstractShapeGeometryFieldMapper<
                 builder.field(DeprecatedParameters.Names.POINTS_ONLY.getPreferredName(), fieldType().pointsOnly());
             }
         }
-    }
-
-    @Override
-    protected void doMerge(Mapper mergeWith) {
-        if (mergeWith instanceof GeoShapeFieldMapper) {
-            GeoShapeFieldMapper fieldMapper = (GeoShapeFieldMapper) mergeWith;
-            throw new IllegalArgumentException("[" + fieldType().name() + "] with field mapper [" + fieldType().typeName() + "] " +
-                "using [" + fieldType().strategy() + "] strategy cannot be merged with " + "[" + fieldMapper.typeName() +
-                "] with [BKD] strategy");
-        }
-        super.doMerge(mergeWith);
     }
 
     @Override

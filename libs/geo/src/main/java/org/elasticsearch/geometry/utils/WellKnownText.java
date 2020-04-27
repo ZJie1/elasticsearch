@@ -482,7 +482,7 @@ public class WellKnownText {
         double lat = nextNumber(stream);
         double radius = nextNumber(stream);
         double alt = Double.NaN;
-        if (isNumberNext(stream)) {
+        if (isNumberNext(stream) == true) {
             alt = nextNumber(stream);
         }
         Circle circle = new Circle(lon, lat, alt, radius);
@@ -560,7 +560,7 @@ public class WellKnownText {
     }
 
     private String nextComma(StreamTokenizer stream) throws IOException, ParseException {
-        if (nextWord(stream).equals(COMMA)) {
+        if (nextWord(stream).equals(COMMA) == true) {
             return COMMA;
         }
         throw new ParseException("expected " + COMMA + " but found: " + tokenString(stream), stream.lineno());
@@ -586,17 +586,17 @@ public class WellKnownText {
         return geometry.visit(new GeometryVisitor<String, RuntimeException>() {
             @Override
             public String visit(Circle circle) {
-                return "CIRCLE";
+                return "circle";
             }
 
             @Override
             public String visit(GeometryCollection<?> collection) {
-                return "GEOMETRYCOLLECTION";
+                return "geometrycollection";
             }
 
             @Override
             public String visit(Line line) {
-                return "LINESTRING";
+                return "linestring";
             }
 
             @Override
@@ -606,32 +606,32 @@ public class WellKnownText {
 
             @Override
             public String visit(MultiLine multiLine) {
-                return "MULTILINESTRING";
+                return "multilinestring";
             }
 
             @Override
             public String visit(MultiPoint multiPoint) {
-                return "MULTIPOINT";
+                return "multipoint";
             }
 
             @Override
             public String visit(MultiPolygon multiPolygon) {
-                return "MULTIPOLYGON";
+                return "multipolygon";
             }
 
             @Override
             public String visit(Point point) {
-                return "POINT";
+                return "point";
             }
 
             @Override
             public String visit(Polygon polygon) {
-                return "POLYGON";
+                return "polygon";
             }
 
             @Override
             public String visit(Rectangle rectangle) {
-                return "BBOX";
+                return "bbox";
             }
         });
     }

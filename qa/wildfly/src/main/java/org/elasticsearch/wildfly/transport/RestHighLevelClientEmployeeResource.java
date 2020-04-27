@@ -64,8 +64,7 @@ public class RestHighLevelClientEmployeeResource {
             employee.setLastName((String) source.get("last_name"));
             employee.setAge((Integer) source.get("age"));
             employee.setAbout((String) source.get("about"));
-            @SuppressWarnings("unchecked")
-            final List<String> interests = (List<String>) source.get("interests");
+            @SuppressWarnings("unchecked") final List<String> interests = (List<String>) source.get("interests");
             employee.setInterests(interests);
             return Response.ok(employee).build();
         } else {

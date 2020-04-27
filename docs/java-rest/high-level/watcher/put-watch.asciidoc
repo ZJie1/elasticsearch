@@ -1,6 +1,5 @@
-[role="xpack"]
 [[java-rest-high-x-pack-watcher-put-watch]]
-=== Put watch API
+=== Put Watch API
 
 [[java-rest-high-x-pack-watcher-put-watch-execution]]
 ==== Execution
@@ -29,7 +28,7 @@ include-tagged::{doc-tests}/WatcherDocumentationIT.java[x-pack-put-watch-respons
 <3> `_version` returns the newly created version
 
 [[java-rest-high-x-pack-watcher-put-watch-async]]
-==== Asynchronous execution
+==== Asynchronous Execution
 
 This request can be executed asynchronously:
 

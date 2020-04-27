@@ -60,35 +60,32 @@ import static org.objectweb.asm.Opcodes.H_NEWINVOKESPECIAL;
  * {@link java.lang.invoke.LambdaMetafactory} since the Painless casting model
  * cannot be fully supported through this class.
  *
- * <p>For each lambda function/method reference used within a Painless script
+ * For each lambda function/method reference used within a Painless script
  * a class will be generated at link-time using the
  * {@link LambdaBootstrap#lambdaBootstrap} method that contains the following:
- *
- * <ol>
- * <li>member fields for any captured variables
- * <li>a constructor that will take in captured variables and assign them to
+ * 1. member fields for any captured variables
+ * 2. a constructor that will take in captured variables and assign them to
  * their respective member fields
- * <li>a static ctor delegation method, if the lambda function is a ctor.
- * <li>a method that will load the member fields representing captured variables
+ * 3. a static ctor delegation method, if the lambda function is a ctor.
+ * 4. a method that will load the member fields representing captured variables
  * and take in any other necessary values based on the arguments passed into the
  * lambda function/reference method; it will then make a delegated call to the
- * actual lambda function/reference method.
- * </ol>
+ * actual lambda function/reference method
  *
- * <p>Take for example the following Painless script:
+ * Take for example the following Painless script:
  *
- * <pre>{@code
+ * {@code
  * List list1 = new ArrayList(); "
  * list1.add(2); "
  * List list2 = new ArrayList(); "
  * list1.forEach(x -> list2.add(x));"
  * return list[0]"
- * }</pre>
+ * }
  *
- * <p>The script contains a lambda function with a captured variable.
+ * The script contains a lambda function with a captured variable.
  * The following Lambda class would be generated:
  *
- * <pre>{@code
+ * {@code
  *     public static final class $$Lambda0 implements Consumer {
  *         private List arg$0;
  *
@@ -112,9 +109,9 @@ import static org.objectweb.asm.Opcodes.H_NEWINVOKESPECIAL;
  *         }
  *         ...
  *     }
- * }</pre>
+ * }
  *
- * <p>Also the accept method actually uses an invokedynamic
+ * Also the accept method actually uses an invokedynamic
  * instruction to call the lambda$0 method so that
  * {@link MethodHandle#asType} can be used to do the necessary
  * conversions between argument types without having to hard
@@ -123,7 +120,7 @@ import static org.objectweb.asm.Opcodes.H_NEWINVOKESPECIAL;
  * calls the constructor. This method is used by the
  * invokedynamic call to initialize the instance.
  *
- * <p>When the {@link CallSite} is linked the linked method depends
+ * When the {@link CallSite} is linked the linked method depends
  * on whether or not there are captures.  If there are no captures
  * the same instance of the generated lambda class will be
  * returned each time by the factory method as there are no

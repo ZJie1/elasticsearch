@@ -40,8 +40,16 @@ public class UpdateRequestBuilder extends InstanceShardOperationRequestBuilder<U
         super(client, action, new UpdateRequest());
     }
 
-    public UpdateRequestBuilder(ElasticsearchClient client, UpdateAction action, String index, String id) {
-        super(client, action, new UpdateRequest(index, id));
+    public UpdateRequestBuilder(ElasticsearchClient client, UpdateAction action, String index, String type, String id) {
+        super(client, action, new UpdateRequest(index, type, id));
+    }
+
+    /**
+     * Sets the type of the indexed document.
+     */
+    public UpdateRequestBuilder setType(String type) {
+        request.type(type);
+        return this;
     }
 
     /**

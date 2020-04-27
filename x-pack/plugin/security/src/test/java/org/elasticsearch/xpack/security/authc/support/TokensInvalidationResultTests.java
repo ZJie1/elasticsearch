@@ -11,7 +11,6 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
-import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.xpack.core.security.authc.support.TokensInvalidationResult;
 
@@ -26,8 +25,7 @@ public class TokensInvalidationResultTests extends ESTestCase {
         TokensInvalidationResult result = new TokensInvalidationResult(Arrays.asList("token1", "token2"),
             Arrays.asList("token3", "token4"),
             Arrays.asList(new ElasticsearchException("foo", new IllegalStateException("bar")),
-                new ElasticsearchException("boo", new IllegalStateException("far"))),
-            RestStatus.OK);
+                new ElasticsearchException("boo", new IllegalStateException("far"))));
 
         try (XContentBuilder builder = JsonXContent.contentBuilder()) {
             result.toXContent(builder, ToXContent.EMPTY_PARAMS);
@@ -58,7 +56,7 @@ public class TokensInvalidationResultTests extends ESTestCase {
 
     public void testToXcontentWithNoErrors() throws Exception{
         TokensInvalidationResult result = new TokensInvalidationResult(Arrays.asList("token1", "token2"), Collections.emptyList(),
-            Collections.emptyList(), RestStatus.OK);
+            Collections.emptyList());
         try (XContentBuilder builder = JsonXContent.contentBuilder()) {
             result.toXContent(builder, ToXContent.EMPTY_PARAMS);
             assertThat(Strings.toString(builder),

@@ -24,7 +24,7 @@ In this example we have a product which has an average rating of
 3 stars. Let's look at its ratings' median absolute deviation to determine
 how much they vary
 
-[source,console]
+[source,js]
 ---------------------------------------------------------
 GET reviews/_search
 {
@@ -43,6 +43,7 @@ GET reviews/_search
   }
 }
 ---------------------------------------------------------
+// CONSOLE
 // TEST[setup:reviews]
 <1> `rating` must be a numeric field
 
@@ -50,7 +51,7 @@ The resulting median absolute deviation of `2` tells us that there is a fair
 amount of variability in the ratings. Reviewers must have diverse opinions about
 this product.
 
-[source,console-result]
+[source,js]
 ---------------------------------------------------------
 {
   ...
@@ -83,7 +84,7 @@ cost of higher memory usage. For more about the characteristics of the TDigest
 `compression` parameter see
 <<search-aggregations-metrics-percentile-aggregation-compression>>.
 
-[source,console]
+[source,js]
 ---------------------------------------------------------
 GET reviews/_search
 {
@@ -98,6 +99,7 @@ GET reviews/_search
   }
 }
 ---------------------------------------------------------
+// CONSOLE
 // TEST[setup:reviews]
 
 The default `compression` value for this aggregation is `1000`. At this
@@ -112,7 +114,7 @@ of one to ten, we can using scripting.
 
 To provide an inline script:
 
-[source,console]
+[source,js]
 ---------------------------------------------------------
 GET reviews/_search
 {
@@ -132,11 +134,12 @@ GET reviews/_search
   }
 }
 ---------------------------------------------------------
+// CONSOLE
 // TEST[setup:reviews]
 
 To provide a stored script:
 
-[source,console]
+[source,js]
 ---------------------------------------------------------
 GET reviews/_search
 {
@@ -155,6 +158,7 @@ GET reviews/_search
   }
 }
 ---------------------------------------------------------
+// CONSOLE
 // TEST[setup:reviews,stored_example_script]
 
 ==== Missing value
@@ -166,7 +170,7 @@ as if they had a value.
 Let's be optimistic and assume some reviewers loved the product so much that
 they forgot to give it a rating. We'll assign them five stars
 
-[source,console]
+[source,js]
 ---------------------------------------------------------
 GET reviews/_search
 {
@@ -181,4 +185,5 @@ GET reviews/_search
   }
 }
 ---------------------------------------------------------
+// CONSOLE
 // TEST[setup:reviews]

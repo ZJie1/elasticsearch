@@ -103,7 +103,7 @@ public abstract class TermsSetQueryScript {
     /**
      * A factory to construct stateful {@link TermsSetQueryScript} factories for a specific index.
      */
-    public interface Factory extends ScriptFactory {
+    public interface Factory {
         LeafFactory newFactory(Map<String, Object> params, SearchLookup lookup);
     }
 }

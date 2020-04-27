@@ -21,13 +21,15 @@ package org.elasticsearch.monitor.process;
 
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.xcontent.ToXContent.Params;
+import org.elasticsearch.common.xcontent.ToXContentFragment;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.node.ReportingService;
 
 import java.io.IOException;
 
-public class ProcessInfo implements ReportingService.Info {
+public class ProcessInfo implements Writeable, ToXContentFragment {
 
     private final long refreshInterval;
     private final long id;

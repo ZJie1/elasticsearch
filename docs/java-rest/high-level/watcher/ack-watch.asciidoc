@@ -4,14 +4,13 @@
 :response: AckWatchResponse
 --
 
-[role="xpack"]
 [id="{upid}-{api}"]
-=== Ack watch API
+=== Ack Watch API
 
 [id="{upid}-{api}-request"]
 ==== Execution
 
-{ref}/actions.html#actions-ack-throttle[Acknowledging a watch] enables you
+{xpack-ref}/actions.html#actions-ack-throttle[Acknowledging a watch] enables you
 to manually throttle execution of a watch's actions. A watch can be acknowledged
 through the following request:
 

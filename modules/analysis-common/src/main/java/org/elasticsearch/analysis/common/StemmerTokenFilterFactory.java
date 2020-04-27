@@ -65,7 +65,6 @@ import org.tartarus.snowball.ext.CatalanStemmer;
 import org.tartarus.snowball.ext.DanishStemmer;
 import org.tartarus.snowball.ext.DutchStemmer;
 import org.tartarus.snowball.ext.EnglishStemmer;
-import org.tartarus.snowball.ext.EstonianStemmer;
 import org.tartarus.snowball.ext.FinnishStemmer;
 import org.tartarus.snowball.ext.FrenchStemmer;
 import org.tartarus.snowball.ext.German2Stemmer;
@@ -142,9 +141,6 @@ public class StemmerTokenFilterFactory extends AbstractTokenFilterFactory {
             return new EnglishMinimalStemFilter(tokenStream);
         } else if ("possessive_english".equalsIgnoreCase(language) || "possessiveEnglish".equalsIgnoreCase(language)) {
             return new EnglishPossessiveFilter(tokenStream);
-
-        } else if ("estonian".equalsIgnoreCase(language)) {
-            return new SnowballFilter(tokenStream, new EstonianStemmer());
 
             // Finnish stemmers
         } else if ("finnish".equalsIgnoreCase(language)) {

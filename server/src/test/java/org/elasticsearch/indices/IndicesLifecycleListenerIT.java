@@ -21,12 +21,11 @@ package org.elasticsearch.indices;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.cluster.routing.ShardRoutingState;
 import org.elasticsearch.cluster.routing.allocation.command.MoveAllocationCommand;
 import org.elasticsearch.cluster.routing.allocation.decider.EnableAllocationDecider;
-import org.elasticsearch.common.CheckedRunnable;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
@@ -51,9 +50,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_REPLICAS;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_SHARDS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_REPLICAS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_SHARDS;
 import static org.elasticsearch.index.shard.IndexShardState.CLOSED;
 import static org.elasticsearch.index.shard.IndexShardState.CREATED;
 import static org.elasticsearch.index.shard.IndexShardState.POST_RECOVERY;
@@ -100,8 +100,8 @@ public class IndicesLifecycleListenerIT extends ESIntegTestCase {
         internalCluster().getInstance(MockIndexEventListener.TestEventListener.class, node3).setNewDelegate(listener);
 
         client().admin().indices().prepareCreate("test")
-                .setSettings(Settings.builder().put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 3)
-                    .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 1)).get();
+                .setSettings(Settings.builder().put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, 3)
+                    .put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, 1)).get();
         ensureGreen("test");
         assertThat("beforeIndexAddedToCluster called only once", beforeAddedCount.get(), equalTo(1));
         assertThat("beforeIndexCreated called on each data node", allCreatedCount.get(), greaterThanOrEqualTo(3));
@@ -218,23 +218,25 @@ public class IndicesLifecycleListenerIT extends ESIntegTestCase {
     private static void assertShardStatesMatch(final IndexShardStateChangeListener stateChangeListener,
                                                final int numShards,
                                                final IndexShardState... shardStates)
-            throws Exception {
-        CheckedRunnable<Exception> waitPredicate = () -> {
-            assertEquals(stateChangeListener.shardStates.size(), numShards);
+            throws InterruptedException {
 
+        BooleanSupplier waitPredicate = () -> {
+            if (stateChangeListener.shardStates.size() != numShards) {
+                return false;
+            }
             for (List<IndexShardState> indexShardStates : stateChangeListener.shardStates.values()) {
-                assertNotNull(indexShardStates);
-                assertThat(indexShardStates.size(), equalTo(shardStates.length));
-
+                if (indexShardStates == null || indexShardStates.size() != shardStates.length) {
+                    return false;
+                }
                 for (int i = 0; i < shardStates.length; i++) {
-                    assertThat(indexShardStates.get(i), equalTo(shardStates[i]));
+                    if (indexShardStates.get(i) != shardStates[i]) {
+                        return false;
+                    }
                 }
             }
+            return true;
         };
-
-        try {
-            assertBusy(waitPredicate, 1, TimeUnit.MINUTES);
-        } catch (AssertionError ae) {
+        if (!awaitBusy(waitPredicate, 1, TimeUnit.MINUTES)) {
             fail("failed to observe expect shard states\n" +
                     "expected: [" + numShards + "] shards with states: " + Strings.arrayToCommaDelimitedString(shardStates) + "\n" +
                     "observed:\n" + stateChangeListener);

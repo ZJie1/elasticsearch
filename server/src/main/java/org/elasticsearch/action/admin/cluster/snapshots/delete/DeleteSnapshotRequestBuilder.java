@@ -39,8 +39,8 @@ public class DeleteSnapshotRequestBuilder extends MasterNodeOperationRequestBuil
     /**
      * Constructs delete snapshot request builder with specified repository and snapshot names
      */
-    public DeleteSnapshotRequestBuilder(ElasticsearchClient client, DeleteSnapshotAction action, String repository, String... snapshots) {
-        super(client, action, new DeleteSnapshotRequest(repository, snapshots));
+    public DeleteSnapshotRequestBuilder(ElasticsearchClient client, DeleteSnapshotAction action, String repository, String snapshot) {
+        super(client, action, new DeleteSnapshotRequest(repository, snapshot));
     }
 
     /**
@@ -57,11 +57,11 @@ public class DeleteSnapshotRequestBuilder extends MasterNodeOperationRequestBuil
     /**
      * Sets the snapshot name
      *
-     * @param snapshots snapshot names
+     * @param snapshot snapshot name
      * @return this builder
      */
-    public DeleteSnapshotRequestBuilder setSnapshots(String... snapshots) {
-        request.snapshots(snapshots);
+    public DeleteSnapshotRequestBuilder setSnapshot(String snapshot) {
+        request.snapshot(snapshot);
         return this;
     }
 }

@@ -19,9 +19,7 @@
 
 package org.elasticsearch.join.aggregations;
 
-import org.elasticsearch.action.index.IndexRequestBuilder;
-import org.elasticsearch.join.query.ParentChildTestCase;
-import org.junit.Before;
+import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,7 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
+import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.join.query.ParentChildTestCase;
+import org.junit.Before;
 
 /**
  * Small base test-class which combines stuff used for Children and Parent aggregation tests
@@ -43,7 +43,7 @@ public abstract class AbstractParentChildTestCase extends ParentChildTestCase {
     public void setupCluster() throws Exception {
         assertAcked(
             prepareCreate("test")
-                .setMapping(
+                .addMapping("doc",
                     addFieldMappings(buildParentJoinFieldMappingFromSimplifiedDef("join_field", true, "article", "comment"),
                         "commenter", "keyword", "category", "keyword"))
         );

@@ -10,7 +10,6 @@ import io.netty.util.concurrent.GlobalEventExecutor;
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.admin.cluster.node.info.NodeInfo;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoResponse;
-import org.elasticsearch.action.admin.cluster.node.info.PluginsAndModules;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
@@ -20,7 +19,6 @@ import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.core.internal.io.IOUtils;
-import org.elasticsearch.http.HttpInfo;
 import org.elasticsearch.license.LicenseService;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.plugins.PluginInfo;
@@ -42,7 +40,7 @@ import java.util.stream.Collectors;
 
 import static org.elasticsearch.test.SecuritySettingsSourceField.TEST_PASSWORD_SECURE_STRING;
 import static org.elasticsearch.xpack.core.security.authc.support.UsernamePasswordToken.basicAuthHeaderValue;
-import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.core.IsCollectionContaining.hasItem;
 
 /**
  * A test that starts a single node with security enabled. This test case allows for customization
@@ -153,10 +151,9 @@ public abstract class SecuritySingleNodeTestCase extends ESSingleNodeTestCase {
         NodesInfoResponse nodeInfos = client().admin().cluster().prepareNodesInfo().clear().setPlugins(true).get();
         for (NodeInfo nodeInfo : nodeInfos.getNodes()) {
             // TODO: disable this assertion for now, due to random runs with mock plugins. perhaps run without mock plugins?
-            // assertThat(nodeInfo.getInfo(PluginsAndModules.class).getInfos(), hasSize(2));
-            Collection<String> pluginNames = nodeInfo.getInfo(PluginsAndModules.class).getPluginInfos().stream()
-                .map(PluginInfo::getClassname)
-                .collect(Collectors.toList());
+            // assertThat(nodeInfo.getPlugins().getInfos(), hasSize(2));
+            Collection<String> pluginNames =
+                    nodeInfo.getPlugins().getPluginInfos().stream().map(PluginInfo::getClassname).collect(Collectors.toList());
             assertThat("plugin [" + LocalStateSecurity.class.getName() + "] not found in [" + pluginNames + "]", pluginNames,
                     hasItem(LocalStateSecurity.class.getName()));
         }
@@ -303,8 +300,8 @@ public abstract class SecuritySingleNodeTestCase extends ESSingleNodeTestCase {
         assertFalse(nodesInfoResponse.hasFailures());
         assertEquals(nodesInfoResponse.getNodes().size(), 1);
         NodeInfo node = nodesInfoResponse.getNodes().get(0);
-        assertNotNull(node.getInfo(HttpInfo.class));
-        TransportAddress publishAddress = node.getInfo(HttpInfo.class).address().publishAddress();
+        assertNotNull(node.getHttp());
+        TransportAddress publishAddress = node.getHttp().address().publishAddress();
         InetSocketAddress address = publishAddress.address();
         final HttpHost host = new HttpHost(NetworkAddress.format(address.getAddress()), address.getPort(), protocol);
         RestClientBuilder builder = RestClient.builder(host);

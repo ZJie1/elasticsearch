@@ -22,7 +22,7 @@ which are not configurable.
 The `polish` analyzer could be reimplemented as a `custom` analyzer that can
 then be extended and configured differently as follows:
 
-[source,console]
+[source,js]
 ----------------------------------------------------
 PUT /stempel_example
 {
@@ -42,6 +42,7 @@ PUT /stempel_example
   }
 }
 ----------------------------------------------------
+// CONSOLE
 // TEST[s/\n$/\nstartyaml\n  - compare_analyzers: {index: stempel_example, first: polish, second: rebuilt_stempel}\nendyaml\n/]
 
 [[analysis-polish-stop]]
@@ -53,7 +54,7 @@ the predefined `_polish_` stopwords list.  If you want to use a different
 predefined list, then use the
 {ref}/analysis-stop-tokenfilter.html[`stop` token filter] instead.
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /polish_stop_example
 {
@@ -89,10 +90,11 @@ GET polish_stop_example/_analyze
   "text": "Gdzie kucharek sześć, tam nie ma co jeść."
 }
 --------------------------------------------------
+// CONSOLE
 
 The above request returns:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "tokens" : [
@@ -113,3 +115,4 @@ The above request returns:
   ]
 }
 --------------------------------------------------
+// TESTRESPONSE

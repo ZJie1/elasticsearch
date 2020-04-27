@@ -21,6 +21,8 @@ package org.elasticsearch.search.aggregations.pipeline;
 
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.collect.EvictingQueue;
+import org.elasticsearch.common.io.stream.StreamInput;
+import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregation.ReduceContext;
@@ -30,6 +32,7 @@ import org.elasticsearch.search.aggregations.bucket.MultiBucketsAggregation.Buck
 import org.elasticsearch.search.aggregations.bucket.histogram.HistogramFactory;
 import org.elasticsearch.search.aggregations.pipeline.BucketHelpers.GapPolicy;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,28 @@ public class SerialDiffPipelineAggregator extends PipelineAggregator {
         this.formatter = formatter;
         this.gapPolicy = gapPolicy;
         this.lag = lag;
+    }
+
+    /**
+     * Read from a stream.
+     */
+    public SerialDiffPipelineAggregator(StreamInput in) throws IOException {
+        super(in);
+        formatter = in.readNamedWriteable(DocValueFormat.class);
+        gapPolicy = GapPolicy.readFrom(in);
+        lag = in.readVInt();
+    }
+
+    @Override
+    public void doWriteTo(StreamOutput out) throws IOException {
+        out.writeNamedWriteable(formatter);
+        gapPolicy.writeTo(out);
+        out.writeVInt(lag);
+    }
+
+    @Override
+    public String getWriteableName() {
+        return SerialDiffPipelineAggregationBuilder.NAME;
     }
 
     @Override
@@ -88,7 +113,7 @@ public class SerialDiffPipelineAggregator extends PipelineAggregator {
 
                 List<InternalAggregation> aggs = StreamSupport.stream(bucket.getAggregations().spliterator(), false).map(
                         (p) -> (InternalAggregation) p).collect(Collectors.toList());
-                aggs.add(new InternalSimpleValue(name(), diff, formatter, metadata()));
+                aggs.add(new InternalSimpleValue(name(), diff, formatter, new ArrayList<>(), metaData()));
                 newBucket = factory.createBucket(factory.getKey(bucket), bucket.getDocCount(), new InternalAggregations(aggs));
             }
 

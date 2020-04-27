@@ -12,7 +12,6 @@ import org.elasticsearch.xpack.core.security.SecurityContext;
 import org.elasticsearch.xpack.core.security.authc.Authentication;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationField;
 import org.elasticsearch.xpack.core.security.support.Automatons;
-import org.elasticsearch.xpack.core.security.user.AsyncSearchUser;
 import org.elasticsearch.xpack.core.security.user.XPackSecurityUser;
 import org.elasticsearch.xpack.core.security.user.XPackUser;
 
@@ -20,10 +19,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import static org.elasticsearch.action.admin.cluster.node.tasks.get.GetTaskAction.TASKS_ORIGIN;
-import static org.elasticsearch.xpack.core.ClientHelper.ASYNC_SEARCH_ORIGIN;
-import static org.elasticsearch.xpack.core.ClientHelper.ENRICH_ORIGIN;
-import static org.elasticsearch.xpack.core.ClientHelper.IDP_ORIGIN;
-import static org.elasticsearch.xpack.core.ClientHelper.TRANSFORM_ORIGIN;
+import static org.elasticsearch.xpack.core.ClientHelper.DATA_FRAME_ORIGIN;
 import static org.elasticsearch.xpack.core.ClientHelper.DEPRECATION_ORIGIN;
 import static org.elasticsearch.xpack.core.ClientHelper.INDEX_LIFECYCLE_ORIGIN;
 import static org.elasticsearch.xpack.core.ClientHelper.ML_ORIGIN;
@@ -110,18 +106,13 @@ public final class AuthorizationUtils {
             case WATCHER_ORIGIN:
             case ML_ORIGIN:
             case MONITORING_ORIGIN:
-            case TRANSFORM_ORIGIN:
+            case DATA_FRAME_ORIGIN:
             case DEPRECATION_ORIGIN:
             case PERSISTENT_TASK_ORIGIN:
             case ROLLUP_ORIGIN:
             case INDEX_LIFECYCLE_ORIGIN:
-            case ENRICH_ORIGIN:
-            case IDP_ORIGIN:
             case TASKS_ORIGIN:   // TODO use a more limited user for tasks
                 securityContext.executeAsUser(XPackUser.INSTANCE, consumer, Version.CURRENT);
-                break;
-            case ASYNC_SEARCH_ORIGIN:
-                securityContext.executeAsUser(AsyncSearchUser.INSTANCE, consumer, Version.CURRENT);
                 break;
             default:
                 assert false : "action.origin [" + actionOrigin + "] is unknown!";

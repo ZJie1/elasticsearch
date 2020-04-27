@@ -5,14 +5,13 @@
  */
 package org.elasticsearch.xpack.core;
 
+import org.elasticsearch.common.io.stream.NamedWriteable;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
-import org.elasticsearch.common.io.stream.VersionedNamedWriteable;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 
 import java.io.IOException;
-import java.util.Objects;
 
 public interface XPackFeatureSet {
 
@@ -22,7 +21,7 @@ public interface XPackFeatureSet {
 
     boolean enabled();
 
-    abstract class Usage implements ToXContentObject, VersionedNamedWriteable {
+    abstract class Usage implements ToXContentObject, NamedWriteable {
 
         private static final String AVAILABLE_XFIELD = "available";
         private static final String ENABLED_XFIELD = "enabled";
@@ -36,7 +35,6 @@ public interface XPackFeatureSet {
         }
 
         public Usage(String name, boolean available, boolean enabled) {
-            Objects.requireNonNull(name);
             this.name = name;
             this.available = available;
             this.enabled = enabled;

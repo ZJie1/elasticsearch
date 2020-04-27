@@ -143,6 +143,7 @@ public class RatedRequestsTests extends ESTestCase {
                 exception = exception.getCause();
             }
             assertThat(exception.getMessage(), containsString("unknown field"));
+            assertThat(exception.getMessage(), containsString("parser not found"));
         }
     }
 

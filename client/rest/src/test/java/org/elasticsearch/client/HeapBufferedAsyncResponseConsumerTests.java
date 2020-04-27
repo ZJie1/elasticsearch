@@ -135,7 +135,7 @@ public class HeapBufferedAsyncResponseConsumerTests extends RestClientTestCase {
                 return contentLength.get();
             }
         };
-        contentLength.set(randomLongBetween(0L, bufferLimit));
+        contentLength.set(randomLong(bufferLimit));
         consumer.onEntityEnclosed(entity, ContentType.APPLICATION_JSON);
 
         contentLength.set(randomLongBetween(bufferLimit + 1, MAX_TEST_BUFFER_SIZE));

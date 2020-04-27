@@ -7,7 +7,6 @@ package org.elasticsearch.xpack.ml.datafeed;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.ElasticsearchStatusException;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.cluster.ClusterState;
@@ -15,7 +14,7 @@ import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
 import org.elasticsearch.cluster.routing.IndexRoutingTable;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.license.RemoteClusterLicenseChecker;
-import org.elasticsearch.persistent.PersistentTasksCustomMetadata;
+import org.elasticsearch.persistent.PersistentTasksCustomMetaData;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.xpack.core.ml.MlMetadata;
 import org.elasticsearch.xpack.core.ml.MlTasks;
@@ -32,27 +31,22 @@ public class DatafeedNodeSelector {
 
     private static final Logger LOGGER = LogManager.getLogger(DatafeedNodeSelector.class);
 
-    public static final PersistentTasksCustomMetadata.Assignment AWAITING_JOB_ASSIGNMENT =
-        new PersistentTasksCustomMetadata.Assignment(null, "datafeed awaiting job assignment.");
-
     private final String datafeedId;
     private final String jobId;
     private final List<String> datafeedIndices;
-    private final PersistentTasksCustomMetadata.PersistentTask<?> jobTask;
+    private final PersistentTasksCustomMetaData.PersistentTask<?> jobTask;
     private final ClusterState clusterState;
     private final IndexNameExpressionResolver resolver;
-    private final IndicesOptions indicesOptions;
 
     public DatafeedNodeSelector(ClusterState clusterState, IndexNameExpressionResolver resolver, String datafeedId,
-                                String jobId, List<String> datafeedIndices, IndicesOptions indicesOptions) {
-        PersistentTasksCustomMetadata tasks = clusterState.getMetadata().custom(PersistentTasksCustomMetadata.TYPE);
+                                String jobId, List<String> datafeedIndices) {
+        PersistentTasksCustomMetaData tasks = clusterState.getMetaData().custom(PersistentTasksCustomMetaData.TYPE);
         this.datafeedId = datafeedId;
         this.jobId = jobId;
         this.datafeedIndices = datafeedIndices;
         this.jobTask = MlTasks.getJobTask(jobId, tasks);
         this.clusterState = Objects.requireNonNull(clusterState);
         this.resolver = Objects.requireNonNull(resolver);
-        this.indicesOptions = Objects.requireNonNull(indicesOptions);
     }
 
     public void checkDatafeedTaskCanBeCreated() {
@@ -72,22 +66,17 @@ public class DatafeedNodeSelector {
         }
     }
 
-    public PersistentTasksCustomMetadata.Assignment selectNode() {
+    public PersistentTasksCustomMetaData.Assignment selectNode() {
         if (MlMetadata.getMlMetadata(clusterState).isUpgradeMode()) {
             return AWAITING_UPGRADE;
         }
 
         AssignmentFailure assignmentFailure = checkAssignment();
         if (assignmentFailure == null) {
-            String jobNode = jobTask.getExecutorNode();
-            if (jobNode == null) {
-                return AWAITING_JOB_ASSIGNMENT;
-            }
-            return new PersistentTasksCustomMetadata.Assignment(jobNode, "");
+            return new PersistentTasksCustomMetaData.Assignment(jobTask.getExecutorNode(), "");
         }
         LOGGER.debug(assignmentFailure.reason);
-        assert assignmentFailure.reason.isEmpty() == false;
-        return new PersistentTasksCustomMetadata.Assignment(null, assignmentFailure.reason);
+        return new PersistentTasksCustomMetaData.Assignment(null, assignmentFailure.reason);
     }
 
     @Nullable
@@ -128,28 +117,25 @@ public class DatafeedNodeSelector {
             }
 
             String[] concreteIndices;
+            String reason = "cannot start datafeed [" + datafeedId + "] because index ["
+                    + index + "] does not exist, is closed, or is still initializing.";
 
             try {
-                concreteIndices = resolver.concreteIndexNames(clusterState, indicesOptions, index);
+                concreteIndices = resolver.concreteIndexNames(clusterState, IndicesOptions.lenientExpandOpen(), index);
                 if (concreteIndices.length == 0) {
-                    return new AssignmentFailure("cannot start datafeed [" + datafeedId + "] because index ["
-                        + index + "] does not exist, is closed, or is still initializing.", true);
+                    return new AssignmentFailure(reason, true);
                 }
             } catch (Exception e) {
-                String msg = new ParameterizedMessage("failed resolving indices given [{}] and indices_options [{}]",
-                    index,
-                    indicesOptions).getFormattedMessage();
-                LOGGER.debug("[" + datafeedId + "] " + msg, e);
-                return new AssignmentFailure(
-                    "cannot start datafeed [" + datafeedId + "] because it " + msg + " with exception [" + e.getMessage() + "]",
-                    true);
+                LOGGER.debug(reason, e);
+                return new AssignmentFailure(reason, true);
             }
 
             for (String concreteIndex : concreteIndices) {
                 IndexRoutingTable routingTable = clusterState.getRoutingTable().index(concreteIndex);
                 if (routingTable == null || !routingTable.allPrimaryShardsActive()) {
-                    return new AssignmentFailure("cannot start datafeed [" + datafeedId + "] because index ["
-                        + concreteIndex + "] does not have all primary shards active yet.", false);
+                    reason = "cannot start datafeed [" + datafeedId + "] because index ["
+                            + concreteIndex + "] does not have all primary shards active yet.";
+                    return new AssignmentFailure(reason, false);
                 }
             }
         }

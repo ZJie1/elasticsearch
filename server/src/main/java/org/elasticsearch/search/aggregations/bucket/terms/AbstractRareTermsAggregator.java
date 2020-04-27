@@ -29,10 +29,12 @@ import org.elasticsearch.search.aggregations.bucket.DeferableBucketAggregator;
 import org.elasticsearch.search.aggregations.bucket.DeferringBucketCollector;
 import org.elasticsearch.search.aggregations.bucket.MergingBucketsDeferringCollector;
 import org.elasticsearch.search.aggregations.bucket.nested.NestedAggregator;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -48,12 +50,14 @@ public abstract class AbstractRareTermsAggregator<T extends ValuesSource,
     protected final U includeExclude;
 
     MergingBucketsDeferringCollector deferringCollector;
+    LeafBucketCollector subCollectors;
     final SetBackedScalingCuckooFilter filter;
 
     AbstractRareTermsAggregator(String name, AggregatorFactories factories, SearchContext context,
-                                Aggregator parent, Map<String, Object> metadata, long maxDocCount, double precision,
+                                Aggregator parent, List<PipelineAggregator> pipelineAggregators,
+                                Map<String, Object> metaData, long maxDocCount, double precision,
                                 DocValueFormat format, T valuesSource, U includeExclude) throws IOException {
-        super(name, factories, context, parent, metadata);
+        super(name, factories, context, parent, pipelineAggregators, metaData);
 
         // We seed the rng with the ShardID so results are deterministic and don't change randomly
         this.filter = new SetBackedScalingCuckooFilter(10000, new Random(context.indexShard().shardId().hashCode()), precision);
@@ -111,14 +115,14 @@ public abstract class AbstractRareTermsAggregator<T extends ValuesSource,
         return null;
     }
 
-    protected void doCollect(LeafBucketCollector subCollector, V val, int docId) throws IOException {
+    protected void doCollect(V val, int docId) throws IOException {
         long bucketOrdinal = addValueToOrds(val);
 
         if (bucketOrdinal < 0) { // already seen
             bucketOrdinal = -1 - bucketOrdinal;
-            collectExistingBucket(subCollector, docId, bucketOrdinal);
+            collectExistingBucket(subCollectors, docId, bucketOrdinal);
         } else {
-            collectBucket(subCollector, docId, bucketOrdinal);
+            collectBucket(subCollectors, docId, bucketOrdinal);
         }
     }
 

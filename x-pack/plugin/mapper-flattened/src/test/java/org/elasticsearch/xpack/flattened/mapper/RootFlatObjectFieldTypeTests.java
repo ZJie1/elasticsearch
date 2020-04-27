@@ -16,7 +16,6 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TermRangeQuery;
 import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.util.BytesRef;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.index.mapper.FieldNamesFieldMapper;
 import org.elasticsearch.index.mapper.FieldTypeTestCase;
@@ -79,14 +78,8 @@ public class RootFlatObjectFieldTypeTests extends FieldTypeTestCase {
         ft.setName("field");
 
         Query expected = new FuzzyQuery(new Term("field", "value"), 2, 1, 50, true);
-        Query actual = ft.fuzzyQuery("value", Fuzziness.fromEdits(2), 1, 50, true, MOCK_QSC);
+        Query actual = ft.fuzzyQuery("value", Fuzziness.fromEdits(2), 1, 50, true);
         assertEquals(expected, actual);
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.fuzzyQuery("value", Fuzziness.AUTO, randomInt(10) + 1, randomInt(10) + 1,
-                        randomBoolean(), MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[fuzzy] queries cannot be executed when 'search.allow_expensive_queries' is set to false.",
-                ee.getMessage());
     }
 
     public void testRangeQuery() {
@@ -96,17 +89,12 @@ public class RootFlatObjectFieldTypeTests extends FieldTypeTestCase {
         TermRangeQuery expected = new TermRangeQuery("field",
             new BytesRef("lower"),
             new BytesRef("upper"), false, false);
-        assertEquals(expected, ft.rangeQuery("lower", "upper", false, false, MOCK_QSC));
+        assertEquals(expected, ft.rangeQuery("lower", "upper", false, false, null));
 
         expected = new TermRangeQuery("field",
             new BytesRef("lower"),
             new BytesRef("upper"), true, true);
-        assertEquals(expected, ft.rangeQuery("lower", "upper", true, true, MOCK_QSC));
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.rangeQuery("lower", "upper", true, true, MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[range] queries on [text] or [keyword] fields cannot be executed when " +
-                "'search.allow_expensive_queries' is set to false.", ee.getMessage());
+        assertEquals(expected, ft.rangeQuery("lower", "upper", true, true, null));
     }
 
     public void testRegexpQuery() {
@@ -114,13 +102,8 @@ public class RootFlatObjectFieldTypeTests extends FieldTypeTestCase {
         ft.setName("field");
 
         Query expected = new RegexpQuery(new Term("field", "val.*"));
-        Query actual = ft.regexpQuery("val.*", 0, 10, null, MOCK_QSC);
+        Query actual = ft.regexpQuery("val.*", 0, 10, null, null);
         assertEquals(expected, actual);
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.regexpQuery("val.*", randomInt(10), randomInt(10) + 1, null, MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[regexp] queries cannot be executed when 'search.allow_expensive_queries' is set to false.",
-                ee.getMessage());
     }
 
     public void testWildcardQuery() {
@@ -128,11 +111,6 @@ public class RootFlatObjectFieldTypeTests extends FieldTypeTestCase {
         ft.setName("field");
 
         Query expected = new WildcardQuery(new Term("field", new BytesRef("valu*")));
-        assertEquals(expected, ft.wildcardQuery("valu*", null, MOCK_QSC));
-
-        ElasticsearchException ee = expectThrows(ElasticsearchException.class,
-                () -> ft.wildcardQuery("valu*", null, MOCK_QSC_DISALLOW_EXPENSIVE));
-        assertEquals("[wildcard] queries cannot be executed when 'search.allow_expensive_queries' is set to false.",
-                ee.getMessage());
+        assertEquals(expected, ft.wildcardQuery("valu*", null, null));
     }
 }

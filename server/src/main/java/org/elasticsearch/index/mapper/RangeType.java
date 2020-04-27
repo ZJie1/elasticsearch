@@ -232,14 +232,12 @@ public enum RangeType {
 
             DateMathParser dateMathParser = (parser == null) ?
                 DateFieldMapper.DEFAULT_DATE_TIME_FORMATTER.toDateMathParser() : parser;
-            boolean roundUp = includeLower == false; // using "gt" should round lower bound up
             Long low = lowerTerm == null ? Long.MIN_VALUE :
                 dateMathParser.parse(lowerTerm instanceof BytesRef ? ((BytesRef) lowerTerm).utf8ToString() : lowerTerm.toString(),
-                    context::nowInMillis, roundUp, zone).toEpochMilli();
-            roundUp = includeUpper; // using "lte" should round upper bound up
+                    context::nowInMillis, false, zone).toEpochMilli();
             Long high = upperTerm == null ? Long.MAX_VALUE :
                 dateMathParser.parse(upperTerm instanceof BytesRef ? ((BytesRef) upperTerm).utf8ToString() : upperTerm.toString(),
-                    context::nowInMillis, roundUp, zone).toEpochMilli();
+                    context::nowInMillis, false, zone).toEpochMilli();
 
             return super.rangeQuery(field, hasDocValues, low, high, includeLower, includeUpper, relation, zone,
                 dateMathParser, context);

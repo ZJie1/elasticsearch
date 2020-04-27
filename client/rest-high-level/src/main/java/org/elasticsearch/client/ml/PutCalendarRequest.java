@@ -19,7 +19,8 @@
 
 package org.elasticsearch.client.ml;
 
-import org.elasticsearch.client.Validatable;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.client.ml.calendars.Calendar;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -30,7 +31,7 @@ import java.util.Objects;
 /**
  * Request to create a new Machine Learning calendar
  */
-public class PutCalendarRequest implements Validatable, ToXContentObject {
+public class PutCalendarRequest extends ActionRequest implements ToXContentObject {
 
     private final Calendar calendar;
 
@@ -40,6 +41,11 @@ public class PutCalendarRequest implements Validatable, ToXContentObject {
 
     public Calendar getCalendar() {
         return calendar;
+    }
+
+    @Override
+    public ActionRequestValidationException validate() {
+        return null;
     }
 
     @Override

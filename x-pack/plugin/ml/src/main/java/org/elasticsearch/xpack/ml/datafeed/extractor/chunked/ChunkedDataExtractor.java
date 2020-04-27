@@ -114,7 +114,7 @@ public class ChunkedDataExtractor implements DataExtractor {
         return getNextStream();
     }
 
-    private void setUpChunkedSearch() {
+    private void setUpChunkedSearch() throws IOException {
         DataSummary dataSummary = dataSummaryFactory.buildDataSummary();
         if (dataSummary.hasData()) {
             currentStart = context.timeAligner.alignToFloor(dataSummary.earliestTime());
@@ -196,17 +196,20 @@ public class ChunkedDataExtractor implements DataExtractor {
          * So, if we need to gather an appropriate chunked time for aggregations, we can utilize the AggregatedDataSummary
          *
          * @return DataSummary object
+         * @throws IOException when timefield range search fails
          */
-        private DataSummary buildDataSummary() {
+        private DataSummary buildDataSummary() throws IOException {
             return context.hasAggregations ? newAggregatedDataSummary() : newScrolledDataSummary();
         }
 
-        private DataSummary newScrolledDataSummary() {
+        private DataSummary newScrolledDataSummary() throws IOException {
             SearchRequestBuilder searchRequestBuilder = rangeSearchRequest();
 
             SearchResponse searchResponse = executeSearchRequest(searchRequestBuilder);
             LOGGER.debug("[{}] Scrolling Data summary response was obtained", context.jobId);
             timingStatsReporter.reportSearchDuration(searchResponse.getTook());
+
+            ExtractorUtils.checkSearchWasSuccessful(context.jobId, searchResponse);
 
             Aggregations aggregations = searchResponse.getAggregations();
             long earliestTime = 0;
@@ -221,13 +224,15 @@ public class ChunkedDataExtractor implements DataExtractor {
             return new ScrolledDataSummary(earliestTime, latestTime, totalHits);
         }
 
-        private DataSummary newAggregatedDataSummary() {
+        private DataSummary newAggregatedDataSummary() throws IOException {
             // TODO: once RollupSearchAction is changed from indices:admin* to indices:data/read/* this branch is not needed
             ActionRequestBuilder<SearchRequest, SearchResponse> searchRequestBuilder =
                 dataExtractorFactory instanceof RollupDataExtractorFactory ? rollupRangeSearchRequest() : rangeSearchRequest();
             SearchResponse searchResponse = executeSearchRequest(searchRequestBuilder);
             LOGGER.debug("[{}] Aggregating Data summary response was obtained", context.jobId);
             timingStatsReporter.reportSearchDuration(searchResponse.getTook());
+
+            ExtractorUtils.checkSearchWasSuccessful(context.jobId, searchResponse);
 
             Aggregations aggregations = searchResponse.getAggregations();
             Min min = aggregations.get(EARLIEST_TIME);
@@ -246,17 +251,12 @@ public class ChunkedDataExtractor implements DataExtractor {
         private SearchRequestBuilder rangeSearchRequest() {
             return new SearchRequestBuilder(client, SearchAction.INSTANCE)
                 .setIndices(context.indices)
-                .setIndicesOptions(context.indicesOptions)
                 .setSource(rangeSearchBuilder())
-                .setAllowPartialSearchResults(false)
                 .setTrackTotalHits(true);
         }
 
         private RollupSearchAction.RequestBuilder rollupRangeSearchRequest() {
-            SearchRequest searchRequest = new SearchRequest().indices(context.indices)
-                .indicesOptions(context.indicesOptions)
-                .allowPartialSearchResults(false)
-                .source(rangeSearchBuilder());
+            SearchRequest searchRequest = new SearchRequest().indices(context.indices).source(rangeSearchBuilder());
             return new RollupSearchAction.RequestBuilder(client, searchRequest);
         }
     }

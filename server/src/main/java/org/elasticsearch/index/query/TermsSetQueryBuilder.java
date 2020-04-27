@@ -40,7 +40,6 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.fielddata.IndexNumericFieldData;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.script.Script;
-import org.elasticsearch.script.TermsSetQueryScript;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,6 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.elasticsearch.script.TermsSetQueryScript;
 
 public final class TermsSetQueryBuilder extends AbstractQueryBuilder<TermsSetQueryBuilder> {
 
@@ -262,7 +262,7 @@ public final class TermsSetQueryBuilder extends AbstractQueryBuilder<TermsSetQue
             IndexNumericFieldData fieldData = context.getForField(msmFieldType);
             longValuesSource = new FieldValuesSource(fieldData);
         } else if (minimumShouldMatchScript != null) {
-            TermsSetQueryScript.Factory factory = context.compile(minimumShouldMatchScript,
+            TermsSetQueryScript.Factory factory = context.getScriptService().compile(minimumShouldMatchScript,
                 TermsSetQueryScript.CONTEXT);
             Map<String, Object> params = new HashMap<>();
             params.putAll(minimumShouldMatchScript.getParams());

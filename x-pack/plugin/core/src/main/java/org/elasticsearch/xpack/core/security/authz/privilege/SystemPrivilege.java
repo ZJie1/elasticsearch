@@ -8,7 +8,6 @@ package org.elasticsearch.xpack.core.security.authz.privilege;
 import org.elasticsearch.index.seqno.RetentionLeaseActions;
 import org.elasticsearch.index.seqno.RetentionLeaseBackgroundSyncAction;
 import org.elasticsearch.index.seqno.RetentionLeaseSyncAction;
-import org.elasticsearch.persistent.CompletionPersistentTaskAction;
 import org.elasticsearch.transport.TransportActionProxy;
 import org.elasticsearch.xpack.core.security.support.Automatons;
 
@@ -34,8 +33,7 @@ public final class SystemPrivilege extends Privilege {
         RetentionLeaseActions.Add.ACTION_NAME + "*", // needed for CCR to add retention leases
         RetentionLeaseActions.Remove.ACTION_NAME + "*", // needed for CCR to remove retention leases
         RetentionLeaseActions.Renew.ACTION_NAME + "*", // needed for CCR to renew retention leases
-        "indices:admin/settings/update", // needed for DiskThresholdMonitor.markIndicesReadOnly
-        CompletionPersistentTaskAction.NAME // needed for ShardFollowTaskCleaner
+        "indices:admin/settings/update" // needed for DiskThresholdMonitor.markIndicesReadOnly
     );
 
     private static final Predicate<String> PREDICATE = (action) -> {

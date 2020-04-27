@@ -23,21 +23,24 @@ import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.ObjectParser;
+import org.elasticsearch.common.xcontent.ParseFieldRegistry;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationInitializationException;
+import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.AggregatorFactories.Builder;
 import org.elasticsearch.search.aggregations.AggregatorFactory;
 import org.elasticsearch.search.aggregations.bucket.significant.heuristics.SignificanceHeuristic;
+import org.elasticsearch.search.aggregations.bucket.significant.heuristics.SignificanceHeuristicParser;
 import org.elasticsearch.search.aggregations.bucket.terms.IncludeExclude;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregator;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregator.BucketCountThresholds;
+import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -66,10 +69,11 @@ public class SignificantTextAggregationBuilder extends AbstractAggregationBuilde
             DEFAULT_BUCKET_COUNT_THRESHOLDS);
     private SignificanceHeuristic significanceHeuristic = DEFAULT_SIGNIFICANCE_HEURISTIC;
 
-    private static final ObjectParser<SignificantTextAggregationBuilder, Void> PARSER = new ObjectParser<>(
-                SignificantTextAggregationBuilder.NAME,
-                SignificanceHeuristic.class, SignificantTextAggregationBuilder::significanceHeuristic, null);
-    static {
+    public static Aggregator.Parser getParser(
+            ParseFieldRegistry<SignificanceHeuristicParser> significanceHeuristicParserRegistry) {
+        ObjectParser<SignificantTextAggregationBuilder, Void> PARSER = new ObjectParser<>(
+                SignificantTextAggregationBuilder.NAME);
+
         PARSER.declareInt(SignificantTextAggregationBuilder::shardSize,
                 TermsAggregationBuilder.SHARD_SIZE_FIELD_NAME);
 
@@ -101,14 +105,28 @@ public class SignificantTextAggregationBuilder extends AbstractAggregationBuilde
         PARSER.declareField((b, v) -> b.includeExclude(IncludeExclude.merge(b.includeExclude(), v)),
                 IncludeExclude::parseExclude, IncludeExclude.EXCLUDE_FIELD,
                 ObjectParser.ValueType.STRING_ARRAY);
-    }
-    public static SignificantTextAggregationBuilder parse(String aggregationName, XContentParser parser) throws IOException {
-        return PARSER.parse(parser, new SignificantTextAggregationBuilder(aggregationName, null), null);
+
+        for (String name : significanceHeuristicParserRegistry.getNames()) {
+            PARSER.declareObject(SignificantTextAggregationBuilder::significanceHeuristic,
+                    (p, context) -> {
+                        SignificanceHeuristicParser significanceHeuristicParser = significanceHeuristicParserRegistry
+                                .lookupReturningNullIfNotFound(name, p.getDeprecationHandler());
+                        return significanceHeuristicParser.parse(p);
+                    }, new ParseField(name));
+        }
+        return new Aggregator.Parser() {
+            @Override
+            public AggregationBuilder parse(String aggregationName, XContentParser parser)
+                    throws IOException {
+                return PARSER.parse(parser,
+                        new SignificantTextAggregationBuilder(aggregationName, null), null);
+            }
+        };
     }
 
     protected SignificantTextAggregationBuilder(SignificantTextAggregationBuilder clone,
-                                                Builder factoriesBuilder, Map<String, Object> metadata) {
-        super(clone, factoriesBuilder, metadata);
+                                                Builder factoriesBuilder, Map<String, Object> metaData) {
+        super(clone, factoriesBuilder, metaData);
         this.bucketCountThresholds = new BucketCountThresholds(clone.bucketCountThresholds);
         this.fieldName = clone.fieldName;
         this.filterBuilder = clone.filterBuilder;
@@ -119,8 +137,8 @@ public class SignificantTextAggregationBuilder extends AbstractAggregationBuilde
     }
 
     @Override
-    protected AggregationBuilder shallowCopy(Builder factoriesBuilder, Map<String, Object> metadata) {
-        return new SignificantTextAggregationBuilder(this, factoriesBuilder, metadata);
+    protected AggregationBuilder shallowCopy(Builder factoriesBuilder, Map<String, Object> metaData) {
+        return new SignificantTextAggregationBuilder(this, factoriesBuilder, metaData);
     }
 
     protected TermsAggregator.BucketCountThresholds getBucketCountThresholds() {
@@ -322,18 +340,13 @@ public class SignificantTextAggregationBuilder extends AbstractAggregationBuilde
     }
 
     @Override
-    public BucketCardinality bucketCardinality() {
-        return BucketCardinality.MANY;
-    }
-
-    @Override
-    protected AggregatorFactory doBuild(QueryShardContext queryShardContext, AggregatorFactory parent,
-                                        Builder subFactoriesBuilder) throws IOException {
-        SignificanceHeuristic executionHeuristic = this.significanceHeuristic.rewrite(queryShardContext);
+    protected AggregatorFactory doBuild(SearchContext context, AggregatorFactory parent,
+            Builder subFactoriesBuilder) throws IOException {
+        SignificanceHeuristic executionHeuristic = this.significanceHeuristic.rewrite(context);
 
         return new SignificantTextAggregatorFactory(name, includeExclude, filterBuilder,
-                bucketCountThresholds, executionHeuristic, queryShardContext, parent, subFactoriesBuilder,
-                fieldName, sourceFieldNames, filterDuplicateText, metadata);
+                bucketCountThresholds, executionHeuristic, context, parent, subFactoriesBuilder,
+                fieldName, sourceFieldNames, filterDuplicateText, metaData);
     }
 
     @Override

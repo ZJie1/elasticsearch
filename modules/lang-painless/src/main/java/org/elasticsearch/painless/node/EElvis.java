@@ -20,11 +20,14 @@
 package org.elasticsearch.painless.node;
 
 import org.elasticsearch.painless.AnalyzerCaster;
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.ElvisNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+import org.objectweb.asm.Label;
+
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -33,9 +36,8 @@ import static java.util.Objects.requireNonNull;
  * non null. If the first expression is null then it evaluates the second expression and returns it.
  */
 public class EElvis extends AExpression {
-
-    protected AExpression lhs;
-    protected AExpression rhs;
+    private AExpression lhs;
+    private AExpression rhs;
 
     public EElvis(Location location, AExpression lhs, AExpression rhs) {
         super(location);
@@ -45,73 +47,73 @@ public class EElvis extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException("invalid assignment: cannot assign a value to elvis operation [?:]"));
-        }
+    void storeSettings(CompilerSettings settings) {
+        lhs.storeSettings(settings);
+        rhs.storeSettings(settings);
+    }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException("not a statement: result not used from elvis operation [?:]"));
-        }
+    @Override
+    void extractVariables(Set<String> variables) {
+        lhs.extractVariables(variables);
+        rhs.extractVariables(variables);
+    }
 
-        Output output = new Output();
-
-        if (input.expected != null && input.expected.isPrimitive()) {
+    @Override
+    void analyze(Locals locals) {
+        if (expected != null && expected.isPrimitive()) {
             throw createError(new IllegalArgumentException("Elvis operator cannot return primitives"));
         }
+        lhs.expected = expected;
+        lhs.explicit = explicit;
+        lhs.internal = internal;
+        rhs.expected = expected;
+        rhs.explicit = explicit;
+        rhs.internal = internal;
+        actual = expected;
+        lhs.analyze(locals);
+        rhs.analyze(locals);
 
-        Input leftInput = new Input();
-        leftInput.expected = input.expected;
-        leftInput.explicit = input.explicit;
-        leftInput.internal = input.internal;
-        Output leftOutput = lhs.analyze(classNode, scriptRoot, scope, leftInput);
-
-        Input rightInput = new Input();
-        rightInput.expected = input.expected;
-        rightInput.explicit = input.explicit;
-        rightInput.internal = input.internal;
-        Output rightOutput = rhs.analyze(classNode, scriptRoot, scope, rightInput);
-
-        output.actual = input.expected;
-
-        if (lhs instanceof ENull) {
+        if (lhs.isNull) {
             throw createError(new IllegalArgumentException("Extraneous elvis operator. LHS is null."));
         }
-        if (lhs instanceof EBoolean
-                || lhs instanceof ENumeric
-                || lhs instanceof EDecimal
-                || lhs instanceof EString
-                || lhs instanceof EConstant) {
+        if (lhs.constant != null) {
             throw createError(new IllegalArgumentException("Extraneous elvis operator. LHS is a constant."));
         }
-        if (leftOutput.actual.isPrimitive()) {
+        if (lhs.actual.isPrimitive()) {
             throw createError(new IllegalArgumentException("Extraneous elvis operator. LHS is a primitive."));
         }
-        if (rhs instanceof ENull) {
+        if (rhs.isNull) {
             throw createError(new IllegalArgumentException("Extraneous elvis operator. RHS is null."));
         }
 
-        if (input.expected == null) {
-            Class<?> promote = AnalyzerCaster.promoteConditional(leftOutput.actual, rightOutput.actual);
+        if (expected == null) {
+            Class<?> promote = AnalyzerCaster.promoteConditional(lhs.actual, rhs.actual, lhs.constant, rhs.constant);
 
-            leftInput.expected = promote;
-            rightInput.expected = promote;
-            output.actual = promote;
+            lhs.expected = promote;
+            rhs.expected = promote;
+            actual = promote;
         }
 
-        lhs.cast(leftInput, leftOutput);
-        rhs.cast(rightInput, rightOutput);
+        lhs = lhs.cast(locals);
+        rhs = rhs.cast(locals);
+    }
 
-        ElvisNode elvisNode = new ElvisNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
 
-        elvisNode.setLeftNode(lhs.cast(leftOutput));
-        elvisNode.setRightNode(rhs.cast(rightOutput));
+        Label end = new Label();
 
-        elvisNode.setLocation(location);
-        elvisNode.setExpressionType(output.actual);
+        lhs.write(writer, globals);
+        writer.dup();
+        writer.ifNonNull(end);
+        writer.pop();
+        rhs.write(writer, globals);
+        writer.mark(end);
+    }
 
-        output.expressionNode = elvisNode;
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString(lhs, rhs);
     }
 }

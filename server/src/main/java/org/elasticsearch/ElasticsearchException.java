@@ -36,7 +36,6 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.Index;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.rest.RestStatus;
-import org.elasticsearch.search.SearchException;
 import org.elasticsearch.search.aggregations.MultiBucketConsumerService;
 import org.elasticsearch.transport.TcpTransport;
 
@@ -53,7 +52,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Collections.unmodifiableMap;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.INDEX_UUID_NA_VALUE;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.INDEX_UUID_NA_VALUE;
 import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureFieldName;
 
@@ -276,7 +275,7 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
     public void writeTo(StreamOutput out) throws IOException {
         out.writeOptionalString(this.getMessage());
         out.writeException(this.getCause());
-        writeStackTraces(this, out, StreamOutput::writeException);
+        writeStackTraces(this, out);
         out.writeMapOfLists(headers, StreamOutput::writeString, StreamOutput::writeString);
         out.writeMapOfLists(metadata, StreamOutput::writeString, StreamOutput::writeString);
     }
@@ -284,10 +283,6 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
     public static ElasticsearchException readException(StreamInput input, int id) throws IOException {
         CheckedFunction<StreamInput, ? extends ElasticsearchException, IOException> elasticsearchException = ID_TO_SUPPLIER.get(id);
         if (elasticsearchException == null) {
-            if (id == 127 && input.getVersion().before(Version.V_7_5_0)) {
-                // was SearchContextException
-                return new SearchException(input);
-            }
             throw new IllegalStateException("unknown exception for id: " + id);
         }
         return elasticsearchException.apply(input);
@@ -641,7 +636,7 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
                 }
             }
         }
-        return new ElasticsearchException[]{new ElasticsearchException(ex.getMessage(), ex) {
+        return new ElasticsearchException[]{new ElasticsearchException(t.getMessage(), t) {
             @Override
             protected String getExceptionName() {
                 return getExceptionName(getCause());
@@ -686,7 +681,7 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
             }
             builder.append(' ');
         }
-        return builder.append(super.toString().trim()).toString();
+        return builder.append(ExceptionsHelper.detailedMessage(this).trim()).toString();
     }
 
     /**
@@ -715,8 +710,7 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
     /**
      * Serializes the given exceptions stacktrace elements as well as it's suppressed exceptions to the given output stream.
      */
-    public static <T extends Throwable> T writeStackTraces(T throwable, StreamOutput out,
-                                                           Writer<Throwable> exceptionWriter) throws IOException {
+    public static <T extends Throwable> T writeStackTraces(T throwable, StreamOutput out) throws IOException {
         StackTraceElement[] stackTrace = throwable.getStackTrace();
         out.writeVInt(stackTrace.length);
         for (StackTraceElement element : stackTrace) {
@@ -728,7 +722,7 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
         Throwable[] suppressed = throwable.getSuppressed();
         out.writeVInt(suppressed.length);
         for (Throwable t : suppressed) {
-            exceptionWriter.write(out, t);
+            out.writeException(t);
         }
         return throwable;
     }
@@ -967,11 +961,12 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
         RESOURCE_ALREADY_EXISTS_EXCEPTION(ResourceAlreadyExistsException.class,
             ResourceAlreadyExistsException::new, 123, UNKNOWN_VERSION_ADDED),
         // 124 used to be Script.ScriptParseException
-        HTTP_REQUEST_ON_TRANSPORT_EXCEPTION(TcpTransport.HttpRequestOnTransportException.class,
-                TcpTransport.HttpRequestOnTransportException::new, 125, UNKNOWN_VERSION_ADDED),
+        HTTP_ON_TRANSPORT_EXCEPTION(TcpTransport.HttpOnTransportException.class,
+                TcpTransport.HttpOnTransportException::new, 125, UNKNOWN_VERSION_ADDED),
         MAPPER_PARSING_EXCEPTION(org.elasticsearch.index.mapper.MapperParsingException.class,
                 org.elasticsearch.index.mapper.MapperParsingException::new, 126, UNKNOWN_VERSION_ADDED),
-        // 127 used to be org.elasticsearch.search.SearchContextException
+        SEARCH_CONTEXT_EXCEPTION(org.elasticsearch.search.SearchContextException.class,
+                org.elasticsearch.search.SearchContextException::new, 127, UNKNOWN_VERSION_ADDED),
         SEARCH_SOURCE_BUILDER_EXCEPTION(org.elasticsearch.search.builder.SearchSourceBuilderException.class,
                 org.elasticsearch.search.builder.SearchSourceBuilderException::new, 128, UNKNOWN_VERSION_ADDED),
         // 129 was EngineClosedException
@@ -1008,7 +1003,8 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
             org.elasticsearch.tasks.TaskCancelledException::new, 146, UNKNOWN_VERSION_ADDED),
         SHARD_LOCK_OBTAIN_FAILED_EXCEPTION(org.elasticsearch.env.ShardLockObtainFailedException.class,
                                            org.elasticsearch.env.ShardLockObtainFailedException::new, 147, UNKNOWN_VERSION_ADDED),
-        // 148 was UnknownNamedObjectException
+        UNKNOWN_NAMED_OBJECT_EXCEPTION(org.elasticsearch.common.xcontent.UnknownNamedObjectException.class,
+                org.elasticsearch.common.xcontent.UnknownNamedObjectException::new, 148, UNKNOWN_VERSION_ADDED),
         TOO_MANY_BUCKETS_EXCEPTION(MultiBucketConsumerService.TooManyBucketsException.class,
             MultiBucketConsumerService.TooManyBucketsException::new, 149, UNKNOWN_VERSION_ADDED),
         COORDINATION_STATE_REJECTED_EXCEPTION(org.elasticsearch.cluster.coordination.CoordinationStateRejectedException.class,
@@ -1031,17 +1027,7 @@ public class ElasticsearchException extends RuntimeException implements ToXConte
                 org.elasticsearch.index.shard.ShardNotInPrimaryModeException.class,
                 org.elasticsearch.index.shard.ShardNotInPrimaryModeException::new,
                 155,
-                UNKNOWN_VERSION_ADDED),
-        RETENTION_LEASE_INVALID_RETAINING_SEQUENCE_NUMBER_EXCEPTION(
-                org.elasticsearch.index.seqno.RetentionLeaseInvalidRetainingSeqNoException.class,
-                org.elasticsearch.index.seqno.RetentionLeaseInvalidRetainingSeqNoException::new,
-                156,
-                Version.V_7_5_0),
-        INGEST_PROCESSOR_EXCEPTION(
-                org.elasticsearch.ingest.IngestProcessorException.class,
-                org.elasticsearch.ingest.IngestProcessorException::new,
-                157,
-                Version.V_7_5_0);
+                UNKNOWN_VERSION_ADDED);
 
         final Class<? extends ElasticsearchException> exceptionClass;
         final CheckedFunction<StreamInput, ? extends ElasticsearchException, IOException> constructor;

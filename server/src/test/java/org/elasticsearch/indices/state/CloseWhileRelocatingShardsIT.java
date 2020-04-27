@@ -33,7 +33,6 @@ import org.elasticsearch.cluster.routing.allocation.decider.EnableAllocationDeci
 import org.elasticsearch.cluster.routing.allocation.decider.ThrottlingAllocationDecider;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ConcurrentCollections;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.indices.recovery.PeerRecoverySourceService;
@@ -105,7 +104,7 @@ public class CloseWhileRelocatingShardsIT extends ESIntegTestCase {
                     logger.debug("creating index {} with {} documents", indexName, nbDocs);
                     createIndex(indexName);
                     indexRandom(randomBoolean(), IntStream.range(0, nbDocs)
-                        .mapToObj(n -> client().prepareIndex(indexName).setSource("num", n))
+                        .mapToObj(n -> client().prepareIndex(indexName, "_doc").setSource("num", n))
                         .collect(Collectors.toList()));
                     break;
                 default:
@@ -118,7 +117,7 @@ public class CloseWhileRelocatingShardsIT extends ESIntegTestCase {
             indices[i] = indexName;
         }
 
-        ensureGreen(TimeValue.timeValueSeconds(60L),indices);
+        ensureGreen(indices);
         assertAcked(client().admin().cluster().prepareUpdateSettings()
             .setTransientSettings(Settings.builder()
                 .put(EnableAllocationDecider.CLUSTER_ROUTING_REBALANCE_ENABLE_SETTING.getKey(), Rebalance.NONE.toString())));
@@ -156,7 +155,7 @@ public class CloseWhileRelocatingShardsIT extends ESIntegTestCase {
             // Build the list of shards for which recoveries will be blocked
             final Set<ShardId> blockedShards = commands.commands().stream()
                 .map(c -> (MoveAllocationCommand) c)
-                .map(c -> new ShardId(clusterService.state().metadata().index(c.index()).getIndex(), c.shardId()))
+                .map(c -> new ShardId(clusterService.state().metaData().index(c.index()).getIndex(), c.shardId()))
                 .collect(Collectors.toSet());
             assertThat(blockedShards, hasSize(indices.length));
 

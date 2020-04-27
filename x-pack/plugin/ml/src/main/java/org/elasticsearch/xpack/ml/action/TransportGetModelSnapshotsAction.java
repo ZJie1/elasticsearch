@@ -5,8 +5,6 @@
  */
 package org.elasticsearch.xpack.ml.action;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.HandledTransportAction;
@@ -23,8 +21,6 @@ import java.util.stream.Collectors;
 
 public class TransportGetModelSnapshotsAction extends HandledTransportAction<GetModelSnapshotsAction.Request,
         GetModelSnapshotsAction.Response> {
-
-    private static final Logger logger = LogManager.getLogger(TransportGetModelSnapshotsAction.class);
 
     private final JobResultsProvider jobResultsProvider;
     private final JobManager jobManager;

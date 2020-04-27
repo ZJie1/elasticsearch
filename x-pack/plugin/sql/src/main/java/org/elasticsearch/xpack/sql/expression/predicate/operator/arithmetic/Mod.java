@@ -5,9 +5,10 @@
  */
 package org.elasticsearch.xpack.sql.expression.predicate.operator.arithmetic;
 
-import org.elasticsearch.xpack.ql.expression.Expression;
-import org.elasticsearch.xpack.ql.tree.NodeInfo;
-import org.elasticsearch.xpack.ql.tree.Source;
+import org.elasticsearch.xpack.sql.expression.Expression;
+import org.elasticsearch.xpack.sql.expression.predicate.operator.arithmetic.BinaryArithmeticProcessor.BinaryArithmeticOperation;
+import org.elasticsearch.xpack.sql.tree.Source;
+import org.elasticsearch.xpack.sql.tree.NodeInfo;
 
 /**
  * <a href="https://en.wikipedia.org/wiki/Modulo_operation">Modulo</a>
@@ -15,10 +16,10 @@ import org.elasticsearch.xpack.ql.tree.Source;
  * 
  * Note this operator is also registered as a function (needed for ODBC/SQL) purposes.
  */
-public class Mod extends SqlArithmeticOperation {
+public class Mod extends ArithmeticOperation {
 
     public Mod(Source source, Expression left, Expression right) {
-        super(source, left, right, SqlBinaryArithmeticOperation.MOD);
+        super(source, left, right, BinaryArithmeticOperation.MOD);
     }
 
     @Override

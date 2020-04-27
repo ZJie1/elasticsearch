@@ -36,6 +36,7 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.settings.Settings.Builder;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.MockEngineFactoryPlugin;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.plugins.Plugin;
@@ -69,10 +70,13 @@ public class SearchWithRandomExceptionsIT extends ESIntegTestCase {
     public void testRandomExceptions() throws IOException, InterruptedException, ExecutionException {
         String mapping = Strings.toString(XContentFactory.jsonBuilder().
                 startObject().
+                startObject("type").
                 startObject("properties").
                 startObject("test")
                 .field("type", "keyword")
-                .endObject().endObject()
+                .endObject().
+                        endObject().
+                        endObject()
                 .endObject());
         final double lowLevelRate;
         final double topLevelRate;
@@ -103,14 +107,14 @@ public class SearchWithRandomExceptionsIT extends ESIntegTestCase {
         logger.info("creating index: [test] using settings: [{}]", settings.build());
         assertAcked(prepareCreate("test")
                 .setSettings(settings)
-                .setMapping(mapping));
+                .addMapping("type", mapping, XContentType.JSON));
         ensureSearchable();
         final int numDocs = between(10, 100);
         int numCreated = 0;
         boolean[] added = new boolean[numDocs];
         for (int i = 0; i < numDocs; i++) {
             try {
-                IndexResponse indexResponse = client().prepareIndex("test").setId("" + i)
+                IndexResponse indexResponse = client().prepareIndex("test", "type", "" + i)
                         .setTimeout(TimeValue.timeValueSeconds(1)).setSource("test", English.intToEnglish(i)).get();
                 if (indexResponse.getResult() == DocWriteResponse.Result.CREATED) {
                     numCreated++;

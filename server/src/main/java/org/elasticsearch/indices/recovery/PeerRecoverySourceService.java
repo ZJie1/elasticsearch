@@ -24,14 +24,10 @@ import org.apache.logging.log4j.Logger;
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.support.ChannelActionListener;
-import org.elasticsearch.action.support.PlainActionFuture;
 import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.component.AbstractLifecycleComponent;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.concurrent.FutureUtils;
 import org.elasticsearch.index.IndexService;
 import org.elasticsearch.index.shard.IndexEventListener;
 import org.elasticsearch.index.shard.IndexShard;
@@ -54,7 +50,7 @@ import java.util.Set;
  * The source recovery accepts recovery requests from other peer shards and start the recovery process from this
  * source shard to the target shard.
  */
-public class PeerRecoverySourceService extends AbstractLifecycleComponent implements IndexEventListener {
+public class PeerRecoverySourceService implements IndexEventListener {
 
     private static final Logger logger = LogManager.getLogger(PeerRecoverySourceService.class);
 
@@ -65,32 +61,17 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
     private final TransportService transportService;
     private final IndicesService indicesService;
     private final RecoverySettings recoverySettings;
-    private final BigArrays bigArrays;
 
     final OngoingRecoveries ongoingRecoveries = new OngoingRecoveries();
 
     @Inject
     public PeerRecoverySourceService(TransportService transportService, IndicesService indicesService,
-                                     RecoverySettings recoverySettings, BigArrays bigArrays) {
+                                     RecoverySettings recoverySettings) {
         this.transportService = transportService;
         this.indicesService = indicesService;
         this.recoverySettings = recoverySettings;
-        this.bigArrays = bigArrays;
         transportService.registerRequestHandler(Actions.START_RECOVERY, ThreadPool.Names.GENERIC, StartRecoveryRequest::new,
             new StartRecoveryTransportRequestHandler());
-    }
-
-    @Override
-    protected void doStart() {
-    }
-
-    @Override
-    protected void doStop() {
-        ongoingRecoveries.awaitEmpty();
-    }
-
-    @Override
-    protected void doClose() {
     }
 
     @Override
@@ -137,14 +118,9 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
     }
 
     final class OngoingRecoveries {
-
         private final Map<IndexShard, ShardRecoveryContext> ongoingRecoveries = new HashMap<>();
 
-        @Nullable
-        private List<ActionListener<Void>> emptyListeners;
-
         synchronized RecoverySourceHandler addNewRecovery(StartRecoveryRequest request, IndexShard shard) {
-            assert lifecycle.started();
             final ShardRecoveryContext shardContext = ongoingRecoveries.computeIfAbsent(shard, s -> new ShardRecoveryContext());
             RecoverySourceHandler handler = shardContext.addNewRecovery(request, shard);
             shard.recoveryStats().incCurrentAsSource();
@@ -161,13 +137,6 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
             }
             if (shardRecoveryContext.recoveryHandlers.isEmpty()) {
                 ongoingRecoveries.remove(shard);
-            }
-            if (ongoingRecoveries.isEmpty()) {
-                if (emptyListeners != null) {
-                    final List<ActionListener<Void>> onEmptyListeners = emptyListeners;
-                    emptyListeners = null;
-                    ActionListener.onResponse(onEmptyListeners, null);
-                }
             }
         }
 
@@ -186,22 +155,6 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
                 }
                 ExceptionsHelper.maybeThrowRuntimeAndSuppress(failures);
             }
-        }
-
-        void awaitEmpty() {
-            assert lifecycle.stoppedOrClosed();
-            final PlainActionFuture<Void> future;
-            synchronized (this) {
-                if (ongoingRecoveries.isEmpty()) {
-                    return;
-                }
-                future = new PlainActionFuture<>();
-                if (emptyListeners == null) {
-                    emptyListeners = new ArrayList<>();
-                }
-                emptyListeners.add(future);
-            }
-            FutureUtils.get(future);
         }
 
         private final class ShardRecoveryContext {
@@ -225,7 +178,7 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
             private RecoverySourceHandler createRecoverySourceHandler(StartRecoveryRequest request, IndexShard shard) {
                 RecoverySourceHandler handler;
                 final RemoteRecoveryTargetHandler recoveryTarget =
-                    new RemoteRecoveryTargetHandler(request.recoveryId(), request.shardId(), transportService, bigArrays,
+                    new RemoteRecoveryTargetHandler(request.recoveryId(), request.shardId(), transportService,
                         request.targetNode(), recoverySettings, throttleTime -> shard.recoveryStats().addThrottleTime(throttleTime));
                 handler = new RecoverySourceHandler(shard, recoveryTarget, shard.getThreadPool(), request,
                     Math.toIntExact(recoverySettings.getChunkSize().getBytes()), recoverySettings.getMaxConcurrentFileChunks());

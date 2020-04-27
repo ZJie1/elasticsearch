@@ -5,15 +5,14 @@
  */
 package org.elasticsearch.xpack.security.authc.file;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.apache.logging.log4j.util.Supplier;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.Maps;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.watcher.FileChangesListener;
 import org.elasticsearch.watcher.FileWatcher;
@@ -192,13 +191,9 @@ public class FileUserPasswdStore {
         @Override
         public void onFileChanged(Path file) {
             if (file.equals(FileUserPasswdStore.this.file)) {
-                final Map<String, char[]> previousUsers = users;
+                logger.info("users file [{}] changed. updating users... )", file.toAbsolutePath());
                 users = parseFileLenient(file, logger, settings);
-
-                if (Maps.deepEquals(previousUsers, users) == false) {
-                    logger.info("users file [{}] changed. updating users... )", file.toAbsolutePath());
-                    notifyRefresh();
-                }
+                notifyRefresh();
             }
         }
     }

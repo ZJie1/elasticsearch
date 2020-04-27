@@ -19,22 +19,25 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.DotSubNode;
+import org.elasticsearch.painless.MethodWriter;
 import org.elasticsearch.painless.lookup.PainlessField;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.lookup.PainlessLookupUtility;
+import org.objectweb.asm.Type;
 
 import java.lang.reflect.Modifier;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a field load/store.
  */
-public class PSubField extends AExpression {
+final class PSubField extends AStoreable {
 
-    protected final PainlessField field;
+    private final PainlessField field;
 
     PSubField(Location location, PainlessField field) {
         super(location);
@@ -43,24 +46,86 @@ public class PSubField extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        throw createError(new IllegalStateException("illegal tree structure"));
+    }
 
-         if (input.write && Modifier.isFinal(field.javaField.getModifiers())) {
-             throw createError(new IllegalArgumentException(
-                    "invalid assignment: cannot assign a value to read-only field [" + field.javaField.getName() + "]"));
+    @Override
+    void extractVariables(Set<String> variables) {
+        throw createError(new IllegalStateException("Illegal tree structure."));
+    }
+
+    @Override
+    void analyze(Locals locals) {
+         if (write && Modifier.isFinal(field.javaField.getModifiers())) {
+             throw createError(new IllegalArgumentException("Cannot write to read-only field [" + field.javaField.getName() + "] " +
+                     "for type [" + PainlessLookupUtility.typeToCanonicalTypeName(field.javaField.getDeclaringClass()) + "]."));
          }
 
-         output.actual = field.typeParameter;
+        actual = field.typeParameter;
+    }
 
-        DotSubNode dotSubNode = new DotSubNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
 
-        dotSubNode.setLocation(location);
-        dotSubNode.setExpressionType(output.actual);
-        dotSubNode.setField(field);
+        if (java.lang.reflect.Modifier.isStatic(field.javaField.getModifiers())) {
+            writer.getStatic(Type.getType(
+                    field.javaField.getDeclaringClass()), field.javaField.getName(), MethodWriter.getType(field.typeParameter));
+        } else {
+            writer.getField(Type.getType(
+                    field.javaField.getDeclaringClass()), field.javaField.getName(), MethodWriter.getType(field.typeParameter));
+        }
+    }
 
-        output.expressionNode = dotSubNode;
+    @Override
+    int accessElementCount() {
+        return 1;
+    }
 
-        return output;
+    @Override
+    boolean isDefOptimized() {
+        return false;
+    }
+
+    @Override
+    void updateActual(Class<?> actual) {
+        throw new IllegalArgumentException("Illegal tree structure.");
+    }
+
+    @Override
+    void setup(MethodWriter writer, Globals globals) {
+        // Do nothing.
+    }
+
+    @Override
+    void load(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
+
+        if (java.lang.reflect.Modifier.isStatic(field.javaField.getModifiers())) {
+            writer.getStatic(Type.getType(
+                    field.javaField.getDeclaringClass()), field.javaField.getName(), MethodWriter.getType(field.typeParameter));
+        } else {
+            writer.getField(Type.getType(
+                    field.javaField.getDeclaringClass()), field.javaField.getName(), MethodWriter.getType(field.typeParameter));
+        }
+    }
+
+    @Override
+    void store(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
+
+        if (java.lang.reflect.Modifier.isStatic(field.javaField.getModifiers())) {
+            writer.putStatic(Type.getType(
+                    field.javaField.getDeclaringClass()), field.javaField.getName(), MethodWriter.getType(field.typeParameter));
+        } else {
+            writer.putField(Type.getType(
+                    field.javaField.getDeclaringClass()), field.javaField.getName(), MethodWriter.getType(field.typeParameter));
+        }
+    }
+
+    @Override
+    public String toString() {
+        return singleLineToString(prefix, field.javaField.getName());
     }
 }

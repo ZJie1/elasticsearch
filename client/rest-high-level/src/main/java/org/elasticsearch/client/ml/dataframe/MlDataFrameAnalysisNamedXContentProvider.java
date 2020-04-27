@@ -36,10 +36,6 @@ public class MlDataFrameAnalysisNamedXContentProvider implements NamedXContentPr
             new NamedXContentRegistry.Entry(
                 DataFrameAnalysis.class,
                 Regression.NAME,
-                (p, c) -> Regression.fromXContent(p)),
-            new NamedXContentRegistry.Entry(
-                DataFrameAnalysis.class,
-                Classification.NAME,
-                (p, c) -> Classification.fromXContent(p)));
+                (p, c) -> Regression.fromXContent(p)));
     }
 }

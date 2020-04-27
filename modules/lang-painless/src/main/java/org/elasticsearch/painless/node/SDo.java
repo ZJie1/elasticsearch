@@ -19,22 +19,26 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.BlockNode;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.DoWhileLoopNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.Opcodes;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a do-while loop.
  */
-public class SDo extends AStatement {
+public final class SDo extends AStatement {
 
-    protected final SBlock block;
-    protected final AExpression condition;
+    private final SBlock block;
+    private AExpression condition;
+
+    private boolean continuous = false;
 
     public SDo(Location location, SBlock block, AExpression condition) {
         super(location);
@@ -44,53 +48,95 @@ public class SDo extends AStatement {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
-        scope = scope.newLocalScope();
+    void storeSettings(CompilerSettings settings) {
+        condition.storeSettings(settings);
+
+        if (block != null) {
+            block.storeSettings(settings);
+        }
+    }
+
+    @Override
+    void extractVariables(Set<String> variables) {
+        condition.extractVariables(variables);
+
+        if (block != null) {
+            block.extractVariables(variables);
+        }
+    }
+
+    @Override
+    void analyze(Locals locals) {
+        locals = Locals.newLocalScope(locals);
 
         if (block == null) {
             throw createError(new IllegalArgumentException("Extraneous do while loop."));
         }
 
-        Input blockInput = new Input();
-        blockInput.beginLoop = true;
-        blockInput.inLoop = true;
-        Output blockOutput = block.analyze(classNode, scriptRoot, scope, blockInput);
+        block.beginLoop = true;
+        block.inLoop = true;
 
-        if (blockOutput.loopEscape && blockOutput.anyContinue == false) {
+        block.analyze(locals);
+
+        if (block.loopEscape && !block.anyContinue) {
             throw createError(new IllegalArgumentException("Extraneous do while loop."));
         }
 
-        AExpression.Input conditionInput = new AExpression.Input();
-        conditionInput.expected = boolean.class;
-        AExpression.Output conditionOutput = condition.analyze(classNode, scriptRoot, scope, conditionInput);
-        condition.cast(conditionInput, conditionOutput);
+        condition.expected = boolean.class;
+        condition.analyze(locals);
+        condition = condition.cast(locals);
 
-        boolean continuous = false;
-
-        if (condition instanceof EBoolean) {
-            continuous = ((EBoolean)condition).constant;
+        if (condition.constant != null) {
+            continuous = (boolean)condition.constant;
 
             if (!continuous) {
                 throw createError(new IllegalArgumentException("Extraneous do while loop."));
             }
 
-            if (blockOutput.anyBreak == false) {
-                output.methodEscape = true;
-                output.allEscape = true;
+            if (!block.anyBreak) {
+                methodEscape = true;
+                allEscape = true;
             }
         }
 
-        output.statementCount = 1;
+        statementCount = 1;
 
-        DoWhileLoopNode doWhileLoopNode = new DoWhileLoopNode();
-        doWhileLoopNode.setConditionNode(condition.cast(conditionOutput));
-        doWhileLoopNode.setBlockNode((BlockNode)blockOutput.statementNode);
-        doWhileLoopNode.setLocation(location);
-        doWhileLoopNode.setContinuous(continuous);
+        if (locals.hasVariable(Locals.LOOP)) {
+            loopCounter = locals.getVariable(location, Locals.LOOP);
+        }
+    }
 
-        output.statementNode = doWhileLoopNode;
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        writer.writeStatementOffset(location);
 
-        return output;
+        Label start = new Label();
+        Label begin = new Label();
+        Label end = new Label();
+
+        writer.mark(start);
+
+        block.continu = begin;
+        block.brake = end;
+        block.write(writer, globals);
+
+        writer.mark(begin);
+
+        if (!continuous) {
+            condition.write(writer, globals);
+            writer.ifZCmp(Opcodes.IFEQ, end);
+        }
+
+        if (loopCounter != null) {
+            writer.writeLoopCounter(loopCounter.getSlot(), Math.max(1, block.statementCount), location);
+        }
+
+        writer.goTo(start);
+        writer.mark(end);
+    }
+
+    @Override
+    public String toString() {
+        return singleLineToString(condition, block);
     }
 }

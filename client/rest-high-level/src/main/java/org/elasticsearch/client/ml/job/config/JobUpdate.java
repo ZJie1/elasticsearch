@@ -54,7 +54,6 @@ public class JobUpdate implements ToXContentObject {
         PARSER.declareLong(Builder::setModelSnapshotRetentionDays, Job.MODEL_SNAPSHOT_RETENTION_DAYS);
         PARSER.declareStringArray(Builder::setCategorizationFilters, AnalysisConfig.CATEGORIZATION_FILTERS);
         PARSER.declareField(Builder::setCustomSettings, (p, c) -> p.map(), Job.CUSTOM_SETTINGS, ObjectParser.ValueType.OBJECT);
-        PARSER.declareBoolean(Builder::setAllowLazyOpen, Job.ALLOW_LAZY_OPEN);
     }
 
     private final String jobId;
@@ -69,14 +68,13 @@ public class JobUpdate implements ToXContentObject {
     private final Long resultsRetentionDays;
     private final List<String> categorizationFilters;
     private final Map<String, Object> customSettings;
-    private final Boolean allowLazyOpen;
 
     private JobUpdate(String jobId, @Nullable List<String> groups, @Nullable String description,
                       @Nullable List<DetectorUpdate> detectorUpdates, @Nullable ModelPlotConfig modelPlotConfig,
                       @Nullable AnalysisLimits analysisLimits, @Nullable TimeValue backgroundPersistInterval,
                       @Nullable Long renormalizationWindowDays, @Nullable Long resultsRetentionDays,
                       @Nullable Long modelSnapshotRetentionDays, @Nullable List<String> categorisationFilters,
-                      @Nullable Map<String, Object> customSettings, @Nullable Boolean allowLazyOpen) {
+                      @Nullable Map<String, Object> customSettings) {
         this.jobId = jobId;
         this.groups = groups;
         this.description = description;
@@ -89,7 +87,6 @@ public class JobUpdate implements ToXContentObject {
         this.resultsRetentionDays = resultsRetentionDays;
         this.categorizationFilters = categorisationFilters;
         this.customSettings = customSettings;
-        this.allowLazyOpen = allowLazyOpen;
     }
 
     public String getJobId() {
@@ -140,10 +137,6 @@ public class JobUpdate implements ToXContentObject {
         return customSettings;
     }
 
-    public Boolean getAllowLazyOpen() {
-        return allowLazyOpen;
-    }
-
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
@@ -181,9 +174,6 @@ public class JobUpdate implements ToXContentObject {
         if (customSettings != null) {
             builder.field(Job.CUSTOM_SETTINGS.getPreferredName(), customSettings);
         }
-        if (allowLazyOpen != null) {
-            builder.field(Job.ALLOW_LAZY_OPEN.getPreferredName(), allowLazyOpen);
-        }
         builder.endObject();
         return builder;
     }
@@ -211,15 +201,13 @@ public class JobUpdate implements ToXContentObject {
             && Objects.equals(this.modelSnapshotRetentionDays, that.modelSnapshotRetentionDays)
             && Objects.equals(this.resultsRetentionDays, that.resultsRetentionDays)
             && Objects.equals(this.categorizationFilters, that.categorizationFilters)
-            && Objects.equals(this.customSettings, that.customSettings)
-            && Objects.equals(this.allowLazyOpen, that.allowLazyOpen);
+            && Objects.equals(this.customSettings, that.customSettings);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(jobId, groups, description, detectorUpdates, modelPlotConfig, analysisLimits, renormalizationWindowDays,
-            backgroundPersistInterval, modelSnapshotRetentionDays, resultsRetentionDays, categorizationFilters, customSettings,
-            allowLazyOpen);
+            backgroundPersistInterval, modelSnapshotRetentionDays, resultsRetentionDays, categorizationFilters, customSettings);
     }
 
     public static class DetectorUpdate implements ToXContentObject {
@@ -315,7 +303,6 @@ public class JobUpdate implements ToXContentObject {
         private Long resultsRetentionDays;
         private List<String> categorizationFilters;
         private Map<String, Object> customSettings;
-        private Boolean allowLazyOpen;
 
         /**
          * New {@link JobUpdate.Builder} object for the existing job
@@ -459,15 +446,9 @@ public class JobUpdate implements ToXContentObject {
             return this;
         }
 
-        public Builder setAllowLazyOpen(boolean allowLazyOpen) {
-            this.allowLazyOpen = allowLazyOpen;
-            return this;
-        }
-
         public JobUpdate build() {
             return new JobUpdate(jobId, groups, description, detectorUpdates, modelPlotConfig, analysisLimits, backgroundPersistInterval,
-                renormalizationWindowDays, resultsRetentionDays, modelSnapshotRetentionDays, categorizationFilters, customSettings,
-                allowLazyOpen);
+                renormalizationWindowDays, resultsRetentionDays, modelSnapshotRetentionDays, categorizationFilters, customSettings);
         }
     }
 }

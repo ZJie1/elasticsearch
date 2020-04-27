@@ -115,7 +115,15 @@ public class RoleMapperExpressionParserTests extends ESTestCase {
 
     private RoleMapperExpression parse(String json) throws IOException {
         return new RoleMapperExpressionParser().parse("rules", XContentType.JSON.xContent().createParser(new NamedXContentRegistry(
-                Collections.emptyList()), DeprecationHandler.IGNORE_DEPRECATIONS, json));
+                Collections.emptyList()), new DeprecationHandler() {
+                    @Override
+                    public void usedDeprecatedName(String usedName, String modernName) {
+                    }
+
+                    @Override
+                    public void usedDeprecatedField(String usedName, String replacedWith) {
+                    }
+                }, json));
     }
 
 }

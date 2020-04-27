@@ -17,17 +17,13 @@ import org.elasticsearch.test.rest.FakeRestRequest;
 import org.elasticsearch.xpack.core.XPackSettings;
 import org.hamcrest.Matchers;
 
-import java.util.Collections;
-import java.util.List;
-
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.instanceOf;
 
 public class SamlBaseRestHandlerTests extends ESTestCase {
 
     public void testSamlAvailableOnTrialAndPlatinum() {
-        final SamlBaseRestHandler handler = buildHandler(randomFrom(
-            License.OperationMode.TRIAL, License.OperationMode.PLATINUM, License.OperationMode.ENTERPRISE));
+        final SamlBaseRestHandler handler = buildHandler(randomFrom(License.OperationMode.TRIAL, License.OperationMode.PLATINUM));
         assertThat(handler.checkFeatureAvailable(new FakeRestRequest()), Matchers.nullValue());
     }
 
@@ -52,11 +48,6 @@ public class SamlBaseRestHandlerTests extends ESTestCase {
             @Override
             public String getName() {
                 return "saml_test";
-            }
-
-            @Override
-            public List<Route> routes() {
-                return Collections.emptyList();
             }
 
             @Override

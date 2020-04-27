@@ -5,19 +5,18 @@
  */
 package org.elasticsearch.xpack.sql.querydsl.agg;
 
-import org.elasticsearch.search.aggregations.AggregationBuilders;
-import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 
-import java.util.function.Function;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.cardinality;
 
-public class CardinalityAgg extends DefaultAggSourceLeafAgg {
+public class CardinalityAgg extends LeafAgg {
 
-    public CardinalityAgg(String id, AggSource source) {
-        super(id, source);
+    public CardinalityAgg(String id, String fieldName) {
+        super(id, fieldName);
     }
 
     @Override
-    Function<String, ValuesSourceAggregationBuilder<?>> builder() {
-        return AggregationBuilders::cardinality;
+    AggregationBuilder toBuilder() {
+        return cardinality(id()).field(fieldName());
     }
 }

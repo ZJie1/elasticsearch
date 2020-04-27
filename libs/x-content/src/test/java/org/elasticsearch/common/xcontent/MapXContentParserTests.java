@@ -25,7 +25,6 @@ import org.elasticsearch.common.xcontent.support.MapXContentParser;
 import org.elasticsearch.test.ESTestCase;
 
 import java.io.IOException;
-import java.util.EnumSet;
 import java.util.Map;
 
 import static org.elasticsearch.common.xcontent.XContentParserTests.generateRandomObject;
@@ -74,13 +73,7 @@ public class MapXContentParserTests extends ESTestCase {
     }
 
     public void compareTokens(CheckedConsumer<XContentBuilder, IOException> consumer) throws IOException {
-        for (XContentType xContentType : EnumSet.allOf(XContentType.class)) {
-            logger.info("--> testing with xcontent type: {}", xContentType);
-            compareTokens(consumer, xContentType);
-        }
-    }
-
-    public void compareTokens(CheckedConsumer<XContentBuilder, IOException> consumer, XContentType xContentType) throws IOException {
+        final XContentType xContentType = randomFrom(XContentType.values());
         try (XContentBuilder builder = XContentBuilder.builder(xContentType.xContent())) {
             consumer.accept(builder);
             final Map<String, Object> map;
@@ -101,13 +94,7 @@ public class MapXContentParserTests extends ESTestCase {
                         assertEquals(token, mapToken);
                         assertEquals(parser.currentName(), mapParser.currentName());
                         if (token != null && (token.isValue() || token == XContentParser.Token.VALUE_NULL)) {
-                            if (xContentType != XContentType.YAML || token != XContentParser.Token.VALUE_EMBEDDED_OBJECT) {
-                                // YAML struggles with converting byte arrays into text, because it
-                                // does weird base64 decoding to the values. We don't do this
-                                // weirdness in the MapXContentParser, so don't try to stringify it.
-                                // The .binaryValue() comparison below still works correctly though.
-                                assertEquals(parser.textOrNull(), mapParser.textOrNull());
-                            }
+                            assertEquals(parser.textOrNull(), mapParser.textOrNull());
                             switch (token) {
                                 case VALUE_STRING:
                                     assertEquals(parser.text(), mapParser.text());

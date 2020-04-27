@@ -5,6 +5,7 @@
  */
 package org.elasticsearch.xpack.watcher.execution;
 
+import com.google.common.collect.Iterables;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
@@ -30,7 +31,6 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.EsRejectedExecutionException;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
-import org.elasticsearch.common.util.iterable.Iterables;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -433,14 +433,7 @@ public class ExecutionService {
                             "Error storing watch history record for watch [{}] after thread pool rejection",
                             triggeredWatch.id()), exc);
                 }
-                try {
-                    deleteTrigger(triggeredWatch.id());
-                } catch (Exception exc) {
-                    logger.error((Supplier<?>) () ->
-                        new ParameterizedMessage(
-                            "Error deleting entry from .triggered_watches for watch [{}] after thread pool rejection",
-                            triggeredWatch.id()), exc);
-                }
+                deleteTrigger(triggeredWatch.id());
             }));
         }
     }

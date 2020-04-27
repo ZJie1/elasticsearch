@@ -42,10 +42,9 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.elasticsearch.search.profile.query.RandomQueryGenerator.randomQueryBuilder;
-import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.isEmptyOrNullString;
 import static org.hamcrest.Matchers.not;
 
 
@@ -55,6 +54,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
      * This test simply checks to make sure nothing crashes.  Test indexes 100-150 documents,
      * constructs 20-100 random queries and tries to profile them
      */
+    @AwaitsFix(bugUrl = "https://issues.apache.org/jira/browse/LUCENE-8658")
     public void testProfileQuery() throws Exception {
         createIndex("test");
         ensureGreen();
@@ -62,7 +62,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -97,7 +97,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                     }
 
                     CollectorResult result = searchProfiles.getCollectorResult();
-                    assertThat(result.getName(), is(not(emptyOrNullString())));
+                    assertThat(result.getName(), not(isEmptyOrNullString()));
                     assertThat(result.getTime(), greaterThan(0L));
                 }
             }
@@ -111,7 +111,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
      * to make sure the profiling doesn't interfere with the hits being returned
      */
     public void testProfileMatchesRegular() throws Exception {
-        createIndex("test", Settings.builder()
+        createIndex("test", Settings.builder() 
                 .put("index.number_of_shards", 1)
                 .put("index.number_of_replicas", 0).build());
         ensureGreen();
@@ -119,8 +119,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
-                    "id", String.valueOf(i),
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -138,14 +137,14 @@ public class QueryProfilerIT extends ESIntegTestCase {
         SearchRequestBuilder vanilla = client().prepareSearch("test")
             .setQuery(q)
             .setProfile(false)
-            .addSort("id.keyword", SortOrder.ASC)
+            .addSort("_id", SortOrder.ASC)
             .setSearchType(SearchType.QUERY_THEN_FETCH)
             .setRequestCache(false);
 
         SearchRequestBuilder profile = client().prepareSearch("test")
             .setQuery(q)
             .setProfile(true)
-            .addSort("id.keyword", SortOrder.ASC)
+            .addSort("_id", SortOrder.ASC)
             .setSearchType(SearchType.QUERY_THEN_FETCH)
             .setRequestCache(false);
 
@@ -204,7 +203,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -235,7 +234,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -251,7 +250,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -300,7 +299,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -318,7 +317,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -350,7 +349,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -368,7 +367,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -402,7 +401,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -415,7 +414,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -449,7 +448,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -462,7 +461,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -496,7 +495,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -509,7 +508,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );
@@ -542,7 +541,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -555,7 +554,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i) + " " + English.intToEnglish(i+1),
                     "field2", i
             );
@@ -596,7 +595,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
                 }
 
                 CollectorResult result = searchProfiles.getCollectorResult();
-                assertThat(result.getName(), is(not(emptyOrNullString())));
+                assertThat(result.getName(), not(isEmptyOrNullString()));
                 assertThat(result.getTime(), greaterThan(0L));
             }
         }
@@ -612,7 +611,7 @@ public class QueryProfilerIT extends ESIntegTestCase {
         int numDocs = randomIntBetween(100, 150);
         IndexRequestBuilder[] docs = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < numDocs; i++) {
-            docs[i] = client().prepareIndex("test").setId(String.valueOf(i)).setSource(
+            docs[i] = client().prepareIndex("test", "type1", String.valueOf(i)).setSource(
                     "field1", English.intToEnglish(i),
                     "field2", i
             );

@@ -22,9 +22,10 @@ import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
-import org.elasticsearch.search.aggregations.BucketOrder;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
+import org.elasticsearch.search.aggregations.BucketOrder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -100,10 +101,10 @@ public class DoubleTerms extends InternalMappedTerms<DoubleTerms, DoubleTerms.Bu
         }
     }
 
-    public DoubleTerms(String name, BucketOrder order, int requiredSize, long minDocCount,
-            Map<String, Object> metadata, DocValueFormat format, int shardSize, boolean showTermDocCountError, long otherDocCount,
+    public DoubleTerms(String name, BucketOrder order, int requiredSize, long minDocCount, List<PipelineAggregator> pipelineAggregators,
+            Map<String, Object> metaData, DocValueFormat format, int shardSize, boolean showTermDocCountError, long otherDocCount,
             List<Bucket> buckets, long docCountError) {
-        super(name, order, requiredSize, minDocCount, metadata, format, shardSize, showTermDocCountError,
+        super(name, order, requiredSize, minDocCount, pipelineAggregators, metaData, format, shardSize, showTermDocCountError,
                 otherDocCount, buckets, docCountError);
     }
 
@@ -121,7 +122,7 @@ public class DoubleTerms extends InternalMappedTerms<DoubleTerms, DoubleTerms.Bu
 
     @Override
     public DoubleTerms create(List<Bucket> buckets) {
-        return new DoubleTerms(name, order, requiredSize, minDocCount, metadata, format, shardSize,
+        return new DoubleTerms(name, order, requiredSize, minDocCount, this.pipelineAggregators(), metaData, format, shardSize,
                 showTermDocCountError, otherDocCount, buckets, docCountError);
     }
 
@@ -133,7 +134,7 @@ public class DoubleTerms extends InternalMappedTerms<DoubleTerms, DoubleTerms.Bu
 
     @Override
     protected DoubleTerms create(String name, List<Bucket> buckets, long docCountError, long otherDocCount) {
-        return new DoubleTerms(name, order, requiredSize, minDocCount, getMetadata(), format,
+        return new DoubleTerms(name, order, requiredSize, minDocCount, pipelineAggregators(), getMetaData(), format,
                 shardSize, showTermDocCountError, otherDocCount, buckets, docCountError);
     }
 
@@ -143,7 +144,7 @@ public class DoubleTerms extends InternalMappedTerms<DoubleTerms, DoubleTerms.Bu
     }
 
     @Override
-    public InternalAggregation reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+    public InternalAggregation doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
         boolean promoteToDouble = false;
         for (InternalAggregation agg : aggregations) {
             if (agg instanceof LongTerms && ((LongTerms) agg).format == DocValueFormat.RAW) {
@@ -156,7 +157,7 @@ public class DoubleTerms extends InternalMappedTerms<DoubleTerms, DoubleTerms.Bu
             }
         }
         if (promoteToDouble == false) {
-            return super.reduce(aggregations, reduceContext);
+            return super.doReduce(aggregations, reduceContext);
         }
         List<InternalAggregation> newAggs = new ArrayList<>(aggregations.size());
         for (InternalAggregation agg : aggregations) {
@@ -167,7 +168,7 @@ public class DoubleTerms extends InternalMappedTerms<DoubleTerms, DoubleTerms.Bu
                 newAggs.add(agg);
             }
         }
-        return newAggs.get(0).reduce(newAggs, reduceContext);
+        return newAggs.get(0).doReduce(newAggs, reduceContext);
     }
 
     @Override

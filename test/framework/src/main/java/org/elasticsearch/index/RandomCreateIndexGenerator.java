@@ -25,12 +25,11 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.index.mapper.MapperService;
 
 import java.io.IOException;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_REPLICAS;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_SHARDS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_REPLICAS;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_NUMBER_OF_SHARDS;
 import static org.elasticsearch.test.ESTestCase.randomAlphaOfLength;
 import static org.elasticsearch.test.ESTestCase.randomBoolean;
 import static org.elasticsearch.test.ESTestCase.randomFrom;
@@ -51,7 +50,8 @@ public final class RandomCreateIndexGenerator {
         CreateIndexRequest request = new CreateIndexRequest(index);
         randomAliases(request);
         if (randomBoolean()) {
-            request.mapping(randomMapping(MapperService.SINGLE_MAPPING_NAME));
+            String type = randomAlphaOfLength(5);
+            request.mapping(type, randomMapping(type));
         }
         if (randomBoolean()) {
             request.settings(randomIndexSettings());
@@ -61,8 +61,8 @@ public final class RandomCreateIndexGenerator {
 
     /**
      * Returns a {@link Settings} instance which include random values for
-     * {@link org.elasticsearch.cluster.metadata.IndexMetadata#SETTING_NUMBER_OF_SHARDS} and
-     * {@link org.elasticsearch.cluster.metadata.IndexMetadata#SETTING_NUMBER_OF_REPLICAS}
+     * {@link org.elasticsearch.cluster.metadata.IndexMetaData#SETTING_NUMBER_OF_SHARDS} and
+     * {@link org.elasticsearch.cluster.metadata.IndexMetaData#SETTING_NUMBER_OF_REPLICAS}
      */
     public static Settings randomIndexSettings() {
         Settings.Builder builder = Settings.builder();

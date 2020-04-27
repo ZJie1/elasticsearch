@@ -17,16 +17,18 @@ import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.cluster.metadata.IndexMetadata;
-import org.elasticsearch.cluster.metadata.MappingMetadata;
-import org.elasticsearch.cluster.metadata.Metadata;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.MappingMetaData;
+import org.elasticsearch.cluster.metadata.MetaData;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.test.VersionUtils;
 import org.elasticsearch.threadpool.ThreadPool;
-import org.elasticsearch.xpack.core.ml.MlConfigIndex;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedConfig;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedTimingStats;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
@@ -36,6 +38,7 @@ import org.elasticsearch.xpack.core.ml.job.process.autodetect.state.ModelSizeSta
 import org.elasticsearch.xpack.core.ml.job.process.autodetect.state.ModelSnapshot;
 import org.elasticsearch.xpack.core.ml.job.process.autodetect.state.Quantiles;
 import org.elasticsearch.xpack.core.ml.job.process.autodetect.state.TimingStats;
+import org.elasticsearch.xpack.core.ml.job.results.AnomalyRecord;
 import org.elasticsearch.xpack.core.ml.job.results.CategoryDefinition;
 import org.elasticsearch.xpack.core.ml.job.results.ReservedFieldNames;
 import org.elasticsearch.xpack.core.ml.job.results.Result;
@@ -53,6 +56,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.mapper.MapperService.SINGLE_MAPPING_NAME;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -80,10 +85,11 @@ public class ElasticsearchMappingsTests extends ESTestCase {
 
     private static List<String> INTERNAL_FIELDS = Arrays.asList(
             GetResult._ID,
-            GetResult._INDEX
+            GetResult._INDEX,
+            GetResult._TYPE
     );
 
-    public void testResultsMappingReservedFields() throws Exception {
+    public void testResultsMapppingReservedFields() throws Exception {
         Set<String> overridden = new HashSet<>(KEYWORDS);
 
         // These are not reserved because they're data types, not field names
@@ -103,7 +109,7 @@ public class ElasticsearchMappingsTests extends ESTestCase {
         compareFields(expected, ReservedFieldNames.RESERVED_RESULT_FIELD_NAMES);
     }
 
-    public void testConfigMappingReservedFields() throws Exception {
+    public void testConfigMapppingReservedFields() throws Exception {
         Set<String> overridden = new HashSet<>(KEYWORDS);
 
         // These are not reserved because they're data types, not field names
@@ -118,6 +124,7 @@ public class ElasticsearchMappingsTests extends ESTestCase {
 
         compareFields(expected, ReservedFieldNames.RESERVED_CONFIG_FIELD_NAMES);
     }
+
 
     private void compareFields(Set<String> expected, Set<String> reserved) {
         if (reserved.size() != expected.size()) {
@@ -139,6 +146,32 @@ public class ElasticsearchMappingsTests extends ESTestCase {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public void testTermFieldMapping() throws IOException {
+
+        XContentBuilder builder = ElasticsearchMappings.termFieldsMapping(Arrays.asList("apple", "strawberry",
+                AnomalyRecord.BUCKET_SPAN.getPreferredName()));
+
+        XContentParser parser = createParser(builder);
+        Map<String, Object> mapping = (Map<String, Object>) parser.map().get(SINGLE_MAPPING_NAME);
+        Map<String, Object> properties = (Map<String, Object>) mapping.get(ElasticsearchMappings.PROPERTIES);
+
+        Map<String, Object> instanceMapping = (Map<String, Object>) properties.get("apple");
+        assertNotNull(instanceMapping);
+        String dataType = (String)instanceMapping.get(ElasticsearchMappings.TYPE);
+        assertEquals(ElasticsearchMappings.KEYWORD, dataType);
+
+        instanceMapping = (Map<String, Object>) properties.get("strawberry");
+        assertNotNull(instanceMapping);
+        dataType = (String)instanceMapping.get(ElasticsearchMappings.TYPE);
+        assertEquals(ElasticsearchMappings.KEYWORD, dataType);
+
+        // check no mapping for the reserved field
+        instanceMapping = (Map<String, Object>) properties.get(AnomalyRecord.BUCKET_SPAN.getPreferredName());
+        assertNull(instanceMapping);
+    }
+
+
     public void testMappingRequiresUpdateNoMapping() throws IOException {
         ClusterState.Builder csBuilder = ClusterState.builder(new ClusterName("_name"));
         ClusterState cs = csBuilder.build();
@@ -148,50 +181,50 @@ public class ElasticsearchMappingsTests extends ESTestCase {
     }
 
     public void testMappingRequiresUpdateNullMapping() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("null_mapping", null));
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("null_mapping", null));
         String[] indices = new String[] { "null_index" };
         assertArrayEquals(indices, ElasticsearchMappings.mappingRequiresUpdate(cs, indices, Version.CURRENT));
     }
 
     public void testMappingRequiresUpdateNoVersion() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("no_version_field", "NO_VERSION_FIELD"));
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("no_version_field", "NO_VERSION_FIELD"));
         String[] indices = new String[] { "no_version_field" };
         assertArrayEquals(indices, ElasticsearchMappings.mappingRequiresUpdate(cs, indices, Version.CURRENT));
     }
 
     public void testMappingRequiresUpdateRecentMappingVersion() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("version_current", Version.CURRENT.toString()));
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("version_current", Version.CURRENT.toString()));
         String[] indices = new String[] { "version_current" };
         assertArrayEquals(new String[] {}, ElasticsearchMappings.mappingRequiresUpdate(cs, indices, Version.CURRENT));
     }
 
     public void testMappingRequiresUpdateMaliciousMappingVersion() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(
             Collections.singletonMap("version_current", Collections.singletonMap("nested", "1.0")));
         String[] indices = new String[] { "version_nested" };
         assertArrayEquals(indices, ElasticsearchMappings.mappingRequiresUpdate(cs, indices, Version.CURRENT));
     }
 
     public void testMappingRequiresUpdateBogusMappingVersion() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("version_bogus", "0.0"));
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("version_bogus", "0.0"));
         String[] indices = new String[] { "version_bogus" };
         assertArrayEquals(indices, ElasticsearchMappings.mappingRequiresUpdate(cs, indices, Version.CURRENT));
     }
 
     public void testMappingRequiresUpdateNewerMappingVersion() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("version_newer", Version.CURRENT));
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("version_newer", Version.CURRENT));
         String[] indices = new String[] { "version_newer" };
         assertArrayEquals(new String[] {}, ElasticsearchMappings.mappingRequiresUpdate(cs, indices, VersionUtils.getPreviousVersion()));
     }
 
     public void testMappingRequiresUpdateNewerMappingVersionMinor() throws IOException {
-        ClusterState cs = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("version_newer_minor", Version.CURRENT));
+        ClusterState cs = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("version_newer_minor", Version.CURRENT));
         String[] indices = new String[] { "version_newer_minor" };
         assertArrayEquals(new String[] {},
             ElasticsearchMappings.mappingRequiresUpdate(cs, indices, VersionUtils.getPreviousMinorVersion()));
     }
 
-    public void testAddDocMappingIfMissing() {
+    public void testAddDocMappingIfMissing() throws IOException {
         ThreadPool threadPool = mock(ThreadPool.class);
         when(threadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
         Client client = mock(Client.class);
@@ -204,10 +237,10 @@ public class ElasticsearchMappingsTests extends ESTestCase {
             })
             .when(client).execute(eq(PutMappingAction.INSTANCE), any(), any(ActionListener.class));
 
-        ClusterState clusterState = getClusterStateWithMappingsWithMetadata(Collections.singletonMap("index-name", "0.0"));
+        ClusterState clusterState = getClusterStateWithMappingsWithMetaData(Collections.singletonMap("index-name", "0.0"));
         ElasticsearchMappings.addDocMappingIfMissing(
             "index-name",
-            () -> "{\"_doc\":{\"properties\":{\"some-field\":{\"type\":\"long\"}}}}",
+            ElasticsearchMappingsTests::fakeMapping,
             client,
             clusterState,
             ActionListener.wrap(
@@ -222,21 +255,35 @@ public class ElasticsearchMappingsTests extends ESTestCase {
         verifyNoMoreInteractions(client);
 
         PutMappingRequest request = requestCaptor.getValue();
+        assertThat(request.type(), equalTo("_doc"));
         assertThat(request.indices(), equalTo(new String[] { "index-name" }));
         assertThat(request.source(), equalTo("{\"_doc\":{\"properties\":{\"some-field\":{\"type\":\"long\"}}}}"));
     }
 
-    private ClusterState getClusterStateWithMappingsWithMetadata(Map<String, Object> namesAndVersions) {
-        Metadata.Builder metadataBuilder = Metadata.builder();
+    private static XContentBuilder fakeMapping(String mappingType) throws IOException {
+        return jsonBuilder()
+            .startObject()
+                .startObject(mappingType)
+                    .startObject(ElasticsearchMappings.PROPERTIES)
+                        .startObject("some-field")
+                            .field(ElasticsearchMappings.TYPE, ElasticsearchMappings.LONG)
+                        .endObject()
+                    .endObject()
+                .endObject()
+            .endObject();
+    }
+
+    private ClusterState getClusterStateWithMappingsWithMetaData(Map<String, Object> namesAndVersions) throws IOException {
+        MetaData.Builder metaDataBuilder = MetaData.builder();
 
         for (Map.Entry<String, Object> entry : namesAndVersions.entrySet()) {
 
             String indexName = entry.getKey();
             Object version = entry.getValue();
 
-            IndexMetadata.Builder indexMetadata = IndexMetadata.builder(indexName);
-            indexMetadata.settings(Settings.builder().put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
-                .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 1).put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 0));
+            IndexMetaData.Builder indexMetaData = IndexMetaData.builder(indexName);
+            indexMetaData.settings(Settings.builder().put(IndexMetaData.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, 1).put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, 0));
 
             Map<String, Object> mapping = new HashMap<>();
             Map<String, Object> properties = new HashMap<>();
@@ -251,30 +298,30 @@ public class ElasticsearchMappingsTests extends ESTestCase {
             }
             mapping.put("_meta", meta);
 
-            indexMetadata.putMapping(new MappingMetadata("_doc", mapping));
+            indexMetaData.putMapping(new MappingMetaData("_doc", mapping));
 
-            metadataBuilder.put(indexMetadata);
+            metaDataBuilder.put(indexMetaData);
         }
-        Metadata metadata = metadataBuilder.build();
+        MetaData metaData = metaDataBuilder.build();
 
         ClusterState.Builder csBuilder = ClusterState.builder(new ClusterName("_name"));
-        csBuilder.metadata(metadata);
+        csBuilder.metaData(metaData);
         return csBuilder.build();
     }
 
     private Set<String> collectResultsDocFieldNames() throws IOException {
         // Only the mappings for the results index should be added below.  Do NOT add mappings for other indexes here.
-        return collectFieldNames(AnomalyDetectorsIndex.resultsMapping());
+        return collectFieldNames(ElasticsearchMappings.resultsMapping("_doc"));
     }
 
     private Set<String> collectConfigDocFieldNames() throws IOException {
         // Only the mappings for the config index should be added below.  Do NOT add mappings for other indexes here.
-        return collectFieldNames(MlConfigIndex.mapping());
+        return collectFieldNames(ElasticsearchMappings.configMapping());
     }
 
-    private Set<String> collectFieldNames(String mapping) throws IOException {
+    private Set<String> collectFieldNames(XContentBuilder mapping) throws IOException {
         BufferedInputStream inputStream =
-                new BufferedInputStream(new ByteArrayInputStream(mapping.getBytes(StandardCharsets.UTF_8)));
+                new BufferedInputStream(new ByteArrayInputStream(Strings.toString(mapping).getBytes(StandardCharsets.UTF_8)));
         JsonParser parser = new JsonFactory().createParser(inputStream);
         Set<String> fieldNames = new HashSet<>();
         boolean isAfterPropertiesStart = false;

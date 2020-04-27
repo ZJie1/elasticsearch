@@ -19,7 +19,6 @@
 
 package org.elasticsearch.common.path;
 
-import org.elasticsearch.common.path.PathTrie.TrieMatchingMode;
 import org.elasticsearch.rest.RestUtils;
 import org.elasticsearch.test.ESTestCase;
 
@@ -29,6 +28,8 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.nullValue;
+
+import org.elasticsearch.common.path.PathTrie.TrieMatchingMode;
 
 public class PathTrieTests extends ESTestCase {
 
@@ -121,13 +122,13 @@ public class PathTrieTests extends ESTestCase {
         PathTrie<String> trie = new PathTrie<>(NO_DECODER);
         trie.insert("{testA}", "test1");
         trie.insert("{testA}/{testB}", "test2");
-        trie.insert("a/{testB}", "test3");
+        trie.insert("a/{testA}", "test3");
         trie.insert("{testA}/b", "test4");
         trie.insert("{testA}/b/c", "test5");
         trie.insert("a/{testB}/c", "test6");
         trie.insert("a/b/{testC}", "test7");
         trie.insert("{testA}/b/{testB}", "test8");
-        trie.insert("x/{testB}/z", "test9");
+        trie.insert("x/{testA}/z", "test9");
         trie.insert("{testA}/{testB}/{testC}", "test10");
 
         Map<String, String> params = new HashMap<>();
@@ -195,7 +196,7 @@ public class PathTrieTests extends ESTestCase {
         trie.insert("a", "test2");
         trie.insert("{testA}/{testB}", "test3");
         trie.insert("a/{testB}", "test4");
-        trie.insert("{testA}/b", "test5");
+        trie.insert("{testB}/b", "test5");
         trie.insert("a/b", "test6");
         trie.insert("{testA}/b/{testB}", "test7");
         trie.insert("x/{testA}/z", "test8");

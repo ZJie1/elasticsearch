@@ -20,9 +20,7 @@ import org.elasticsearch.watcher.FileWatcher;
 import org.elasticsearch.watcher.ResourceWatcherService;
 import org.elasticsearch.xpack.core.XPackPlugin;
 import org.elasticsearch.xpack.core.security.authc.RealmConfig;
-import org.elasticsearch.xpack.core.security.authc.support.CachingRealm;
 import org.elasticsearch.xpack.core.security.authc.support.DnRoleMapperSettings;
-import org.elasticsearch.xpack.core.security.authc.support.UserRoleMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -225,14 +223,10 @@ public class DnRoleMapper implements UserRoleMapper {
         @Override
         public void onFileChanged(Path file) {
             if (file.equals(DnRoleMapper.this.file)) {
-                final Map<String, List<String>> previousDnRoles = dnRoles;
+                logger.info("role mappings file [{}] changed for realm [{}/{}]. updating mappings...", file.toAbsolutePath(),
+                        config.type(), config.name());
                 dnRoles = parseFileLenient(file, logger, config.type(), config.name());
-
-                if (previousDnRoles.equals(dnRoles) == false) {
-                    logger.info("role mappings file [{}] changed for realm [{}/{}]. updating mappings...", file.toAbsolutePath(),
-                            config.type(), config.name());
-                    notifyRefresh();
-                }
+                notifyRefresh();
             }
         }
     }

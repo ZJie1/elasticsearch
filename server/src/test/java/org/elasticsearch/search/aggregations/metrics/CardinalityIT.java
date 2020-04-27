@@ -90,15 +90,6 @@ public class CardinalityIT extends ESIntegTestCase {
 
             return scripts;
         }
-
-        @Override
-        protected Map<String, Function<Map<String, Object>, Object>> nonDeterministicPluginScripts() {
-            Map<String, Function<Map<String, Object>, Object>> scripts = new HashMap<>();
-
-            scripts.put("Math.random()", vars -> CardinalityIT.randomDouble());
-
-            return scripts;
-        }
     }
 
     @Override
@@ -115,8 +106,8 @@ public class CardinalityIT extends ESIntegTestCase {
     @Override
     public void setupSuiteScopeCluster() throws Exception {
 
-        prepareCreate("idx").setMapping(
-                jsonBuilder().startObject().startObject("_doc").startObject("properties")
+        prepareCreate("idx").addMapping("type",
+                jsonBuilder().startObject().startObject("type").startObject("properties")
                     .startObject("str_value")
                         .field("type", "keyword")
                     .endObject()
@@ -141,7 +132,7 @@ public class CardinalityIT extends ESIntegTestCase {
         precisionThreshold = randomIntBetween(0, 1 << randomInt(20));
         IndexRequestBuilder[] builders = new IndexRequestBuilder[(int) numDocs];
         for (int i = 0; i < numDocs; ++i) {
-            builders[i] = client().prepareIndex("idx").setSource(jsonBuilder()
+            builders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
                         .field("str_value", "s" + i)
                         .array("str_values", new String[]{"s" + (i * 2), "s" + (i * 2 + 1)})
@@ -156,7 +147,7 @@ public class CardinalityIT extends ESIntegTestCase {
 
         IndexRequestBuilder[] dummyDocsBuilder = new IndexRequestBuilder[10];
         for (int i = 0; i < dummyDocsBuilder.length; i++) {
-            dummyDocsBuilder[i] = client().prepareIndex("idx").setSource("a_field", "1");
+            dummyDocsBuilder[i] = client().prepareIndex("idx", "type").setSource("a_field", "1");
         }
         indexRandom(true, dummyDocsBuilder);
 
@@ -458,15 +449,15 @@ public class CardinalityIT extends ESIntegTestCase {
     }
 
     /**
-     * Make sure that a request using a deterministic script or not using a script get cached.
-     * Ensure requests using nondeterministic scripts do not get cached.
+     * Make sure that a request using a script does not get cached and a request
+     * not using a script does get cached.
      */
-    public void testScriptCaching() throws Exception {
-        assertAcked(prepareCreate("cache_test_idx").setMapping("d", "type=long")
+    public void testDontCacheScripts() throws Exception {
+        assertAcked(prepareCreate("cache_test_idx").addMapping("type", "d", "type=long")
                 .setSettings(Settings.builder().put("requests.cache.enable", true).put("number_of_shards", 1).put("number_of_replicas", 1))
                 .get());
-        indexRandom(true, client().prepareIndex("cache_test_idx").setId("1").setSource("s", 1),
-                client().prepareIndex("cache_test_idx").setId("2").setSource("s", 2));
+        indexRandom(true, client().prepareIndex("cache_test_idx", "type", "1").setSource("s", 1),
+                client().prepareIndex("cache_test_idx", "type", "2").setSource("s", 2));
 
         // Make sure we are starting with a clear cache
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
@@ -474,21 +465,8 @@ public class CardinalityIT extends ESIntegTestCase {
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
                 .getMissCount(), equalTo(0L));
 
-        // Test that a request using a nondeterministic script does not get cached
+        // Test that a request using a script does not get cached
         SearchResponse r = client().prepareSearch("cache_test_idx").setSize(0)
-                .addAggregation(
-                        cardinality("foo").field("d").script(new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "Math.random()",
-                                                                              emptyMap())))
-                .get();
-        assertSearchResponse(r);
-
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-                .getHitCount(), equalTo(0L));
-        assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-                .getMissCount(), equalTo(0L));
-
-        // Test that a request using a deterministic script gets cached
-        r = client().prepareSearch("cache_test_idx").setSize(0)
                 .addAggregation(
                         cardinality("foo").field("d").script(new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "_value", emptyMap())))
                 .get();
@@ -497,15 +475,16 @@ public class CardinalityIT extends ESIntegTestCase {
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
                 .getHitCount(), equalTo(0L));
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-                .getMissCount(), equalTo(1L));
+                .getMissCount(), equalTo(0L));
 
-        // Ensure that non-scripted requests are cached as normal
+        // To make sure that the cache is working test that a request not using
+        // a script is cached
         r = client().prepareSearch("cache_test_idx").setSize(0).addAggregation(cardinality("foo").field("d")).get();
         assertSearchResponse(r);
 
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
                 .getHitCount(), equalTo(0L));
         assertThat(client().admin().indices().prepareStats("cache_test_idx").setRequestCache(true).get().getTotal().getRequestCache()
-                .getMissCount(), equalTo(2L));
+                .getMissCount(), equalTo(1L));
     }
 }

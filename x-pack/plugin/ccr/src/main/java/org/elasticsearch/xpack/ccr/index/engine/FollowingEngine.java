@@ -16,7 +16,6 @@ import org.apache.lucene.search.DocValuesFieldExistsQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TopDocs;
-import org.elasticsearch.Assertions;
 import org.elasticsearch.ElasticsearchStatusException;
 import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.index.VersionType;
@@ -118,12 +117,7 @@ public final class FollowingEngine extends InternalEngine {
 
     @Override
     protected void advanceMaxSeqNoOfUpdatesOrDeletesOnPrimary(long seqNo) {
-        if (Assertions.ENABLED) {
-            final long localCheckpoint = getProcessedLocalCheckpoint();
-            final long maxSeqNoOfUpdates = getMaxSeqNoOfUpdatesOrDeletes();
-            assert localCheckpoint < maxSeqNoOfUpdates || maxSeqNoOfUpdates >= seqNo :
-                "maxSeqNoOfUpdates is not advanced local_checkpoint=" + localCheckpoint + " msu=" + maxSeqNoOfUpdates + " seq_no=" + seqNo;
-        }
+        assert getMaxSeqNoOfUpdatesOrDeletes() >= seqNo : seqNo + " < " + getMaxSeqNoOfUpdatesOrDeletes();
         super.advanceMaxSeqNoOfUpdatesOrDeletesOnPrimary(seqNo); // extra safe in production code
     }
 

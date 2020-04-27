@@ -1,13 +1,12 @@
-[role="xpack"]
 [[input-chain]]
-=== Chain input
+=== Chain Input
 
 Use the `chain` input to load data from multiple sources into the watch 
 execution context when the watch is triggered. The inputs in a chain
 are processed in order and the data loaded by an input can be accessed by the
 subsequent inputs in the chain. 
 
-The `chain` input enables you to perform actions based on data from multiple
+The `chain` input enables you perform actions based on data from multiple 
 sources. You can also use the data collected by one input to load data
 from another source.
 
@@ -45,12 +44,12 @@ path set by a `simple` input:
     arbitrary objects.)
 <2> Loads the `path` set by the `first` input.
 
-==== Accessing chained input data
+==== Accessing Chained Input Data
 
 To reference data loaded by a particular input, you use the input's name,
 `ctx.payload.<input-name>.<value>`.
 
-==== Transforming chained input data
+==== Transforming Chained Input Data
 
 In certain use-cases the output of the first input should be used as input
 in a subsequent input. This requires you to do a transform, before you pass

@@ -15,7 +15,6 @@ import org.elasticsearch.xpack.core.ClientHelper;
 import org.elasticsearch.xpack.core.ml.datafeed.DatafeedConfig;
 import org.elasticsearch.xpack.core.ml.datafeed.extractor.DataExtractor;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
-import org.elasticsearch.xpack.core.ml.utils.ExceptionsHelper;
 import org.elasticsearch.xpack.core.rollup.action.GetRollupIndexCapsAction;
 import org.elasticsearch.xpack.ml.datafeed.DatafeedTimingStatsReporter;
 import org.elasticsearch.xpack.ml.datafeed.extractor.aggregation.AggregationDataExtractorFactory;
@@ -60,10 +59,9 @@ public interface DataExtractorFactory {
                 }
             },
             e -> {
-                Throwable cause = ExceptionsHelper.unwrapCause(e);
-                if (cause instanceof IndexNotFoundException) {
+                if (e instanceof IndexNotFoundException) {
                     listener.onFailure(new ResourceNotFoundException("datafeed [" + datafeed.getId()
-                        + "] cannot retrieve data because index " + ((IndexNotFoundException) cause).getIndex() + " does not exist"));
+                        + "] cannot retrieve data because index " + ((IndexNotFoundException)e).getIndex() + " does not exist"));
                 } else {
                     listener.onFailure(e);
                 }
@@ -79,7 +77,7 @@ public interface DataExtractorFactory {
                 client,
                 ClientHelper.ML_ORIGIN,
                 GetRollupIndexCapsAction.INSTANCE,
-                new GetRollupIndexCapsAction.Request(datafeed.getIndices().toArray(new String[0]), datafeed.getIndicesOptions()),
+                new GetRollupIndexCapsAction.Request(datafeed.getIndices().toArray(new String[0])),
                 getRollupIndexCapsActionHandler);
         }
     }

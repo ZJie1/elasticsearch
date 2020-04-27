@@ -52,9 +52,4 @@ public class NamedWriteableAwareStreamInput extends FilterStreamInput {
             + "] than it was read from [" + name + "].";
         return c;
     }
-
-    @Override
-    public NamedWriteableRegistry namedWriteableRegistry() {
-        return namedWriteableRegistry;
-    }
 }

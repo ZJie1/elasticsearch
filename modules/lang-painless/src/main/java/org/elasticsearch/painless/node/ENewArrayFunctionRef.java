@@ -19,28 +19,29 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
 import org.elasticsearch.painless.FunctionRef;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.BlockNode;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.DefInterfaceReferenceNode;
-import org.elasticsearch.painless.ir.FunctionNode;
-import org.elasticsearch.painless.ir.NewArrayNode;
-import org.elasticsearch.painless.ir.ReturnNode;
-import org.elasticsearch.painless.ir.TypedInterfaceReferenceNode;
-import org.elasticsearch.painless.ir.VariableNode;
-import org.elasticsearch.painless.symbol.ScriptRoot;
+import org.elasticsearch.painless.MethodWriter;
+import org.objectweb.asm.Type;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a function reference.
  */
-public class ENewArrayFunctionRef extends AExpression {
+public final class ENewArrayFunctionRef extends AExpression implements ILambda {
+    private final String type;
 
-    protected final String type;
+    private CompilerSettings settings;
+
+    private SFunction function;
+    private FunctionRef ref;
+    private String defPointer;
 
     public ENewArrayFunctionRef(Location location, String type) {
         super(location);
@@ -49,87 +50,62 @@ public class ENewArrayFunctionRef extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        if (input.write) {
-            throw createError(new IllegalArgumentException(
-                    "cannot assign a value to new array function reference with target type [ + " + type  + "]"));
-        }
+    void storeSettings(CompilerSettings settings) {
+        this.settings = settings;
+    }
 
-        if (input.read == false) {
-            throw createError(new IllegalArgumentException(
-                    "not a statement: new array function reference with target type [" + type + "] not used"));
-        }
+    @Override
+    void extractVariables(Set<String> variables) {
+        // do nothing
+    }
 
-        Output output = new Output();
+    @Override
+    void analyze(Locals locals) {
+        SReturn code = new SReturn(location, new ENewArray(location, type, Arrays.asList(new EVariable(location, "size")), false));
+        function = new SFunction(location, type, locals.getNextSyntheticName(),
+                Arrays.asList("int"), Arrays.asList("size"), Arrays.asList(code), true);
+        function.storeSettings(settings);
+        function.generateSignature(locals.getPainlessLookup());
+        function.extractVariables(null);
+        function.analyze(Locals.newLambdaScope(locals.getProgramScope(), function.name, function.returnType,
+                function.parameters, 0, settings.getMaxLoopCounter()));
 
-        Class<?> clazz = scriptRoot.getPainlessLookup().canonicalTypeNameToType(this.type);
-
-        if (clazz == null) {
-            throw createError(new IllegalArgumentException("Not a type [" + this.type + "]."));
-        }
-
-        String name = scriptRoot.getNextSyntheticName("newarray");
-        scriptRoot.getFunctionTable().addFunction(name, clazz, Collections.singletonList(int.class), true, true);
-
-        if (input.expected == null) {
-            output.actual = String.class;
-            String defReferenceEncoding = "Sthis." + name + ",0";
-
-            DefInterfaceReferenceNode defInterfaceReferenceNode = new DefInterfaceReferenceNode();
-
-            defInterfaceReferenceNode.setLocation(location);
-            defInterfaceReferenceNode.setExpressionType(output.actual);
-            defInterfaceReferenceNode.setDefReferenceEncoding(defReferenceEncoding);
-
-            output.expressionNode = defInterfaceReferenceNode;
+        if (expected == null) {
+            ref = null;
+            actual = String.class;
+            defPointer = "Sthis." + function.name + ",0";
         } else {
-            FunctionRef ref = FunctionRef.create(scriptRoot.getPainlessLookup(), scriptRoot.getFunctionTable(),
-                    location, input.expected, "this", name, 0);
-            output.actual = input.expected;
+            defPointer = null;
+            ref = FunctionRef.create(locals.getPainlessLookup(), locals.getMethods(), location, expected, "this", function.name, 0);
+            actual = expected;
+        }
+    }
 
-            TypedInterfaceReferenceNode typedInterfaceReferenceNode = new TypedInterfaceReferenceNode();
-
-            typedInterfaceReferenceNode.setLocation(location);
-            typedInterfaceReferenceNode.setExpressionType(output.actual);
-            typedInterfaceReferenceNode.setReference(ref);
-
-            output.expressionNode = typedInterfaceReferenceNode;
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        if (ref != null) {
+            writer.writeDebugInfo(location);
+            writer.invokeLambdaCall(ref);
+        } else {
+            // push a null instruction as a placeholder for future lambda instructions
+            writer.push((String)null);
         }
 
-        VariableNode variableNode = new VariableNode();
-        variableNode.setLocation(location);
-        variableNode.setExpressionType(int.class);
-        variableNode.setName("size");
+        globals.addSyntheticMethod(function);
+    }
 
-        NewArrayNode newArrayNode = new NewArrayNode();
-        newArrayNode.setLocation(location);
-        newArrayNode.setExpressionType(clazz);
-        newArrayNode.setInitialize(false);
+    @Override
+    public String getPointer() {
+        return defPointer;
+    }
 
-        newArrayNode.addArgumentNode(variableNode);
+    @Override
+    public Type[] getCaptures() {
+        return new Type[0]; // no captures
+    }
 
-        ReturnNode returnNode = new ReturnNode();
-        returnNode.setLocation(location);
-        returnNode.setExpressionNode(newArrayNode);
-
-        BlockNode blockNode = new BlockNode();
-        blockNode.setAllEscape(true);
-        blockNode.setStatementCount(1);
-        blockNode.addStatementNode(returnNode);
-
-        FunctionNode functionNode = new FunctionNode();
-        functionNode.setMaxLoopCounter(0);
-        functionNode.setName(name);
-        functionNode.setReturnType(clazz);
-        functionNode.addTypeParameter(int.class);
-        functionNode.addParameterName("size");
-        functionNode.setStatic(true);
-        functionNode.setVarArgs(false);
-        functionNode.setSynthetic(true);
-        functionNode.setBlockNode(blockNode);
-
-        classNode.addFunctionNode(functionNode);
-
-        return output;
+    @Override
+    public String toString() {
+        return singleLineToString(type + "[]", "new");
     }
 }

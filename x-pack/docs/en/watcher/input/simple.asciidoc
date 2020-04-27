@@ -1,6 +1,5 @@
-[role="xpack"]
 [[input-simple]]
-=== Simple input
+=== Simple Input
 
 Use the `simple` input to load static data into the execution
 context when the watch is triggered. This enables you to store the data 

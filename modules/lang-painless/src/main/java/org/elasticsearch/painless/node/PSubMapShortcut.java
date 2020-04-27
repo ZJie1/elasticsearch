@@ -19,23 +19,27 @@
 
 package org.elasticsearch.painless.node;
 
+import org.elasticsearch.painless.CompilerSettings;
+import org.elasticsearch.painless.Globals;
+import org.elasticsearch.painless.Locals;
 import org.elasticsearch.painless.Location;
-import org.elasticsearch.painless.Scope;
-import org.elasticsearch.painless.ir.ClassNode;
-import org.elasticsearch.painless.ir.MapSubShortcutNode;
+import org.elasticsearch.painless.MethodWriter;
 import org.elasticsearch.painless.lookup.PainlessLookupUtility;
 import org.elasticsearch.painless.lookup.PainlessMethod;
-import org.elasticsearch.painless.symbol.ScriptRoot;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a map load/store shortcut. (Internal only.)
  */
-public class PSubMapShortcut extends AExpression {
+final class PSubMapShortcut extends AStoreable {
 
-    protected final Class<?> targetClass;
-    protected final AExpression index;
+    private final Class<?> targetClass;
+    private AExpression index;
+
+    private PainlessMethod getter;
+    private PainlessMethod setter;
 
     PSubMapShortcut(Location location, Class<?> targetClass, AExpression index) {
         super(location);
@@ -45,13 +49,21 @@ public class PSubMapShortcut extends AExpression {
     }
 
     @Override
-    Output analyze(ClassNode classNode, ScriptRoot scriptRoot, Scope scope, Input input) {
-        Output output = new Output();
+    void storeSettings(CompilerSettings settings) {
+        throw createError(new IllegalStateException("illegal tree structure"));
+    }
 
+    @Override
+    void extractVariables(Set<String> variables) {
+        throw createError(new IllegalStateException("Illegal tree structure."));
+    }
+
+    @Override
+    void analyze(Locals locals) {
         String canonicalClassName = PainlessLookupUtility.typeToCanonicalTypeName(targetClass);
 
-        PainlessMethod getter = scriptRoot.getPainlessLookup().lookupPainlessMethod(targetClass, false, "get", 1);
-        PainlessMethod setter = scriptRoot.getPainlessLookup().lookupPainlessMethod(targetClass, false, "put", 2);
+        getter = locals.getPainlessLookup().lookupPainlessMethod(targetClass, false, "get", 1);
+        setter = locals.getPainlessLookup().lookupPainlessMethod(targetClass, false, "put", 2);
 
         if (getter != null && (getter.returnType == void.class || getter.typeParameters.size() != 1)) {
             throw createError(new IllegalArgumentException("Illegal map get shortcut for type [" + canonicalClassName + "]."));
@@ -66,30 +78,68 @@ public class PSubMapShortcut extends AExpression {
             throw createError(new IllegalArgumentException("Shortcut argument types must match."));
         }
 
-        Output indexOutput;
+        if ((read || write) && (!read || getter != null) && (!write || setter != null)) {
+            index.expected = setter != null ? setter.typeParameters.get(0) : getter.typeParameters.get(0);
+            index.analyze(locals);
+            index = index.cast(locals);
 
-        if ((input.read || input.write) && (input.read == false || getter != null) && (input.write == false || setter != null)) {
-            Input indexInput = new Input();
-            indexInput.expected = setter != null ? setter.typeParameters.get(0) : getter.typeParameters.get(0);
-            indexOutput = index.analyze(classNode, scriptRoot, scope, indexInput);
-            index.cast(indexInput, indexOutput);
-
-            output.actual = setter != null ? setter.typeParameters.get(1) : getter.returnType;
+            actual = setter != null ? setter.typeParameters.get(1) : getter.returnType;
         } else {
             throw createError(new IllegalArgumentException("Illegal map shortcut for type [" + canonicalClassName + "]."));
         }
+    }
 
-        MapSubShortcutNode mapSubShortcutNode = new MapSubShortcutNode();
+    @Override
+    void write(MethodWriter writer, Globals globals) {
+        index.write(writer, globals);
 
-        mapSubShortcutNode.setChildNode(index.cast(indexOutput));
+        writer.writeDebugInfo(location);
+        writer.invokeMethodCall(getter);
 
-        mapSubShortcutNode.setLocation(location);
-        mapSubShortcutNode.setExpressionType(output.actual);
-        mapSubShortcutNode.setGetter(getter);
-        mapSubShortcutNode.setSetter(setter);
+        if (getter.returnType != getter.javaMethod.getReturnType()) {
+            writer.checkCast(MethodWriter.getType(getter.returnType));
+        }
+    }
 
-        output.expressionNode = mapSubShortcutNode;
+    @Override
+    int accessElementCount() {
+        return 2;
+    }
 
-        return output;
+    @Override
+    boolean isDefOptimized() {
+        return false;
+    }
+
+    @Override
+    void updateActual(Class<?> actual) {
+        throw new IllegalArgumentException("Illegal tree structure.");
+    }
+
+    @Override
+    void setup(MethodWriter writer, Globals globals) {
+        index.write(writer, globals);
+    }
+
+    @Override
+    void load(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
+        writer.invokeMethodCall(getter);
+
+        if (getter.returnType != getter.javaMethod.getReturnType()) {
+            writer.checkCast(MethodWriter.getType(getter.returnType));
+        }
+    }
+
+    @Override
+    void store(MethodWriter writer, Globals globals) {
+        writer.writeDebugInfo(location);
+        writer.invokeMethodCall(setter);
+        writer.writePop(MethodWriter.getType(setter.returnType).getSize());
+    }
+
+    @Override
+    public String toString() {
+        return singleLineToString(prefix, index);
     }
 }

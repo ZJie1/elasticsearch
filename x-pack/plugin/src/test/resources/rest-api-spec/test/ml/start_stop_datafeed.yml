@@ -365,17 +365,14 @@ setup:
       ml.start_datafeed:
         datafeed_id: "start-stop-datafeed-job-foo-1-feed"
   - match: { started: true }
-  - match: { node: /\S+/ }
   - do:
       ml.start_datafeed:
         datafeed_id: "start-stop-datafeed-job-foo-2-feed"
   - match: { started: true }
-  - match: { node: /\S+/ }
   - do:
       ml.start_datafeed:
         datafeed_id: "start-stop-datafeed-job-bar-1-feed"
   - match: { started: true }
-  - match: { node: /\S+/ }
 
   - do:
       ml.stop_datafeed:

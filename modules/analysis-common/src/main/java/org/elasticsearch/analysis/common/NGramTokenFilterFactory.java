@@ -19,8 +19,10 @@
 
 package org.elasticsearch.analysis.common;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.ngram.NGramTokenFilter;
+import org.elasticsearch.common.logging.DeprecationLogger;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.index.IndexSettings;
@@ -29,6 +31,9 @@ import org.elasticsearch.index.analysis.TokenFilterFactory;
 
 
 public class NGramTokenFilterFactory extends AbstractTokenFilterFactory {
+
+    private static final DeprecationLogger DEPRECATION_LOGGER
+        = new DeprecationLogger(LogManager.getLogger(NGramTokenFilterFactory.class));
 
     private final int minGram;
 

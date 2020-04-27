@@ -35,7 +35,8 @@ https://www.elastic.co/subscriptions.
 ==== Authorization
 
 You must have `monitor` cluster privileges to use this API.
-For more information, see <<security-privileges>>.
+For more information, see
+{xpack-ref}/security-privileges.html[Security Privileges].
 
 
 [float]
@@ -43,12 +44,13 @@ For more information, see <<security-privileges>>.
 
 The following example provides information about a trial license:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 GET /_license
 --------------------------------------------------
+// CONSOLE
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "license" : {
@@ -60,7 +62,6 @@ GET /_license
     "expiry_date" : "2018-11-19T22:05:12.332Z",
     "expiry_date_in_millis" : 1542665112332,
     "max_nodes" : 1000,
-    "max_resource_units" : null,
     "issued_to" : "test",
     "issuer" : "elasticsearch",
     "start_date_in_millis" : -1

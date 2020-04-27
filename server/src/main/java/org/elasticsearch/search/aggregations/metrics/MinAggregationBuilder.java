@@ -23,16 +23,18 @@ import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.ObjectParser;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.AggregatorFactories;
+import org.elasticsearch.search.aggregations.AggregatorFactories.Builder;
 import org.elasticsearch.search.aggregations.AggregatorFactory;
-import org.elasticsearch.search.aggregations.support.CoreValuesSourceType;
+import org.elasticsearch.search.aggregations.support.ValueType;
 import org.elasticsearch.search.aggregations.support.ValuesSource;
+import org.elasticsearch.search.aggregations.support.ValuesSource.Numeric;
 import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
 import org.elasticsearch.search.aggregations.support.ValuesSourceConfig;
-import org.elasticsearch.search.aggregations.support.ValuesSourceRegistry;
+import org.elasticsearch.search.aggregations.support.ValuesSourceParserHelper;
 import org.elasticsearch.search.aggregations.support.ValuesSourceType;
+import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
 import java.util.Map;
@@ -40,40 +42,34 @@ import java.util.Map;
 public class MinAggregationBuilder extends ValuesSourceAggregationBuilder.LeafOnly<ValuesSource.Numeric, MinAggregationBuilder> {
     public static final String NAME = "min";
 
-    public static final ObjectParser<MinAggregationBuilder, String> PARSER = ObjectParser.fromBuilder(NAME, MinAggregationBuilder::new);
+    private static final ObjectParser<MinAggregationBuilder, Void> PARSER;
     static {
-        ValuesSourceAggregationBuilder.declareFields(PARSER, true, true, false);
+        PARSER = new ObjectParser<>(AvgAggregationBuilder.NAME);
+        ValuesSourceParserHelper.declareNumericFields(PARSER, true, true, false);
+    }
+
+    public static AggregationBuilder parse(String aggregationName, XContentParser parser) throws IOException {
+        return PARSER.parse(parser, new MinAggregationBuilder(aggregationName), null);
     }
 
     public MinAggregationBuilder(String name) {
-        super(name);
+        super(name, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
     }
 
-    protected MinAggregationBuilder(MinAggregationBuilder clone,
-                                    AggregatorFactories.Builder factoriesBuilder,
-                                    Map<String, Object> metadata) {
-        super(clone, factoriesBuilder, metadata);
+    protected MinAggregationBuilder(MinAggregationBuilder clone, Builder factoriesBuilder, Map<String, Object> metaData) {
+        super(clone, factoriesBuilder, metaData);
     }
 
     @Override
-    protected AggregationBuilder shallowCopy(AggregatorFactories.Builder factoriesBuilder, Map<String, Object> metadata) {
-        return new MinAggregationBuilder(this, factoriesBuilder, metadata);
-    }
-
-    public static void registerAggregators(ValuesSourceRegistry.Builder builder) {
-        MinAggregatorFactory.registerAggregators(builder);
+    protected AggregationBuilder shallowCopy(Builder factoriesBuilder, Map<String, Object> metaData) {
+        return new MinAggregationBuilder(this, factoriesBuilder, metaData);
     }
 
     /**
      * Read from a stream.
      */
     public MinAggregationBuilder(StreamInput in) throws IOException {
-        super(in);
-    }
-
-    @Override
-    protected ValuesSourceType defaultValueSourceType() {
-        return CoreValuesSourceType.NUMERIC;
+        super(in, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
     }
 
     @Override
@@ -82,10 +78,9 @@ public class MinAggregationBuilder extends ValuesSourceAggregationBuilder.LeafOn
     }
 
     @Override
-    protected MinAggregatorFactory innerBuild(QueryShardContext queryShardContext, ValuesSourceConfig config,
-                                              AggregatorFactory parent,
-                                              AggregatorFactories.Builder subFactoriesBuilder) throws IOException {
-        return new MinAggregatorFactory(name, config, queryShardContext, parent, subFactoriesBuilder, metadata);
+    protected MinAggregatorFactory innerBuild(SearchContext context, ValuesSourceConfig<Numeric> config,
+            AggregatorFactory parent, Builder subFactoriesBuilder) throws IOException {
+        return new MinAggregatorFactory(name, config, context, parent, subFactoriesBuilder, metaData);
     }
 
     @Override

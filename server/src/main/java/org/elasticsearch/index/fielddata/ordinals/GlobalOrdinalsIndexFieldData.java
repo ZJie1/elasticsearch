@@ -26,18 +26,14 @@ import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.util.Accountable;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.AbstractIndexComponent;
 import org.elasticsearch.index.IndexSettings;
-import org.elasticsearch.index.fielddata.LeafOrdinalsFieldData;
+import org.elasticsearch.index.fielddata.AtomicOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.Nested;
 import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.ScriptDocValues;
-import org.elasticsearch.index.fielddata.plain.AbstractLeafOrdinalsFieldData;
-import org.elasticsearch.search.DocValueFormat;
+import org.elasticsearch.index.fielddata.plain.AbstractAtomicOrdinalsFieldData;
 import org.elasticsearch.search.MultiValueMode;
-import org.elasticsearch.search.sort.BucketedSort;
-import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -60,12 +56,12 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
     private final long memorySizeInBytes;
 
     private final OrdinalMap ordinalMap;
-    private final LeafOrdinalsFieldData[] segmentAfd;
+    private final AtomicOrdinalsFieldData[] segmentAfd;
     private final Function<SortedSetDocValues, ScriptDocValues<?>> scriptFunction;
 
     protected GlobalOrdinalsIndexFieldData(IndexSettings indexSettings,
                                            String fieldName,
-                                           LeafOrdinalsFieldData[] segmentAfd,
+                                           AtomicOrdinalsFieldData[] segmentAfd,
                                            OrdinalMap ordinalMap,
                                            long memorySizeInBytes,
                                            Function<SortedSetDocValues, ScriptDocValues<?>> scriptFunction) {
@@ -82,7 +78,7 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
     }
 
     @Override
-    public LeafOrdinalsFieldData loadDirect(LeafReaderContext context) throws Exception {
+    public AtomicOrdinalsFieldData loadDirect(LeafReaderContext context) throws Exception {
         throw new IllegalStateException("loadDirect(LeafReaderContext) should not be called in this context");
     }
 
@@ -107,12 +103,6 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
     }
 
     @Override
-    public BucketedSort newBucketedSort(BigArrays bigArrays, Object missingValue, MultiValueMode sortMode, Nested nested,
-            SortOrder sortOrder, DocValueFormat format, int bucketSize, BucketedSort.ExtraData extra) {
-        throw new IllegalArgumentException("only supported on numeric fields");
-    }
-
-    @Override
     public void clear() {}
 
     @Override
@@ -127,7 +117,7 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
     }
 
     @Override
-    public LeafOrdinalsFieldData load(LeafReaderContext context) {
+    public AtomicOrdinalsFieldData load(LeafReaderContext context) {
         throw new IllegalStateException("load(LeafReaderContext) should not be called in this context");
     }
 
@@ -172,7 +162,7 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
         }
 
         @Override
-        public LeafOrdinalsFieldData loadDirect(LeafReaderContext context) throws Exception {
+        public AtomicOrdinalsFieldData loadDirect(LeafReaderContext context) throws Exception {
             return load(context);
         }
 
@@ -197,12 +187,6 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
         }
 
         @Override
-        public BucketedSort newBucketedSort(BigArrays bigArrays, Object missingValue, MultiValueMode sortMode, Nested nested,
-                SortOrder sortOrder, DocValueFormat format, int bucketSize, BucketedSort.ExtraData extra) {
-            throw new IllegalArgumentException("only supported on numeric fields");
-        }
-
-        @Override
         public void clear() {}
 
         @Override
@@ -216,9 +200,9 @@ public final class GlobalOrdinalsIndexFieldData extends AbstractIndexComponent i
         }
 
         @Override
-        public LeafOrdinalsFieldData load(LeafReaderContext context) {
+        public AtomicOrdinalsFieldData load(LeafReaderContext context) {
             assert source.getReaderCacheHelper().getKey() == context.parent.reader().getReaderCacheHelper().getKey();
-            return new AbstractLeafOrdinalsFieldData(scriptFunction) {
+            return new AbstractAtomicOrdinalsFieldData(scriptFunction) {
                 @Override
                 public SortedSetDocValues getOrdinalsValues() {
                     final SortedSetDocValues values = segmentAfd[context.ord].getOrdinalsValues();

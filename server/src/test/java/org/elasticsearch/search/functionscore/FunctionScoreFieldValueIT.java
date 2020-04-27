@@ -40,10 +40,11 @@ import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertOrde
  */
 public class FunctionScoreFieldValueIT extends ESIntegTestCase {
     public void testFieldValueFactor() throws IOException {
-        assertAcked(prepareCreate("test").setMapping(
+        assertAcked(prepareCreate("test").addMapping(
+                "type1",
                 jsonBuilder()
                         .startObject()
-                        .startObject("_doc")
+                        .startObject("type1")
                         .startObject("properties")
                         .startObject("test")
                         .field("type", randomFrom(new String[]{"short", "float", "long", "integer", "double"}))
@@ -55,9 +56,9 @@ public class FunctionScoreFieldValueIT extends ESIntegTestCase {
                         .endObject()
                         .endObject()).get());
 
-        client().prepareIndex("test").setId("1").setSource("test", 5, "body", "foo").get();
-        client().prepareIndex("test").setId("2").setSource("test", 17, "body", "foo").get();
-        client().prepareIndex("test").setId("3").setSource("body", "bar").get();
+        client().prepareIndex("test", "type1", "1").setSource("test", 5, "body", "foo").get();
+        client().prepareIndex("test", "type1", "2").setSource("test", 17, "body", "foo").get();
+        client().prepareIndex("test", "type1", "3").setSource("body", "bar").get();
 
         refresh();
 
@@ -112,7 +113,7 @@ public class FunctionScoreFieldValueIT extends ESIntegTestCase {
         assertEquals(response.getHits().getAt(0).getScore(), response.getHits().getAt(2).getScore(), 0);
 
 
-        client().prepareIndex("test").setId("2").setSource("test", -1, "body", "foo").get();
+        client().prepareIndex("test", "type1", "2").setSource("test", -1, "body", "foo").get();
         refresh();
 
         // -1 divided by 0 is infinity, which should provoke an exception.

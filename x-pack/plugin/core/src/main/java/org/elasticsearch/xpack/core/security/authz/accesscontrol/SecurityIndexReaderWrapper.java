@@ -18,16 +18,14 @@ import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.index.shard.ShardUtils;
 import org.elasticsearch.license.XPackLicenseState;
-import org.elasticsearch.license.XPackLicenseState.Feature;
 import org.elasticsearch.script.ScriptService;
-import org.elasticsearch.xpack.core.security.SecurityContext;
+import org.elasticsearch.xpack.core.security.authc.Authentication;
 import org.elasticsearch.xpack.core.security.authz.AuthorizationServiceField;
 import org.elasticsearch.xpack.core.security.authz.permission.DocumentPermissions;
 import org.elasticsearch.xpack.core.security.support.Exceptions;
 import org.elasticsearch.xpack.core.security.user.User;
 
 import java.io.IOException;
-import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -47,23 +45,22 @@ public class SecurityIndexReaderWrapper implements CheckedFunction<DirectoryRead
     private final Function<ShardId, QueryShardContext> queryShardContextProvider;
     private final DocumentSubsetBitsetCache bitsetCache;
     private final XPackLicenseState licenseState;
-    private final SecurityContext securityContext;
+    private final ThreadContext threadContext;
     private final ScriptService scriptService;
 
     public SecurityIndexReaderWrapper(Function<ShardId, QueryShardContext> queryShardContextProvider,
-                                      DocumentSubsetBitsetCache bitsetCache, SecurityContext securityContext,
-                                      XPackLicenseState licenseState, ScriptService scriptService) {
+                                      DocumentSubsetBitsetCache bitsetCache, ThreadContext threadContext, XPackLicenseState licenseState,
+                                      ScriptService scriptService) {
         this.scriptService = scriptService;
         this.queryShardContextProvider = queryShardContextProvider;
         this.bitsetCache = bitsetCache;
-        this.securityContext = securityContext;
+        this.threadContext = threadContext;
         this.licenseState = licenseState;
     }
 
     @Override
     public DirectoryReader apply(final DirectoryReader reader) {
-        if (licenseState.isSecurityEnabled() == false ||
-            licenseState.isAllowed(Feature.SECURITY_DLS_FLS) == false) {
+        if (licenseState.isDocumentAndFieldLevelSecurityAllowed() == false) {
             return reader;
         }
 
@@ -98,7 +95,6 @@ public class SecurityIndexReaderWrapper implements CheckedFunction<DirectoryRead
     }
 
     protected IndicesAccessControl getIndicesAccessControl() {
-        final ThreadContext threadContext = securityContext.getThreadContext();
         IndicesAccessControl indicesAccessControl = threadContext.getTransient(AuthorizationServiceField.INDICES_PERMISSIONS_KEY);
         if (indicesAccessControl == null) {
             throw Exceptions.authorizationError("no indices permissions found");
@@ -106,8 +102,9 @@ public class SecurityIndexReaderWrapper implements CheckedFunction<DirectoryRead
         return indicesAccessControl;
     }
 
-    protected User getUser() {
-        return Objects.requireNonNull(securityContext.getUser());
+    protected User getUser(){
+        Authentication authentication = Authentication.getAuthentication(threadContext);
+        return authentication.getUser();
     }
 
 }

@@ -22,11 +22,11 @@ package org.elasticsearch.action.admin.indices.get;
 import com.carrotsearch.hppc.cursors.ObjectObjectCursor;
 import org.elasticsearch.action.admin.indices.alias.Alias;
 import org.elasticsearch.action.admin.indices.get.GetIndexRequest.Feature;
-import org.elasticsearch.action.support.IndicesOptions;
-import org.elasticsearch.cluster.metadata.AliasMetadata;
-import org.elasticsearch.cluster.metadata.MappingMetadata;
+import org.elasticsearch.cluster.metadata.AliasMetaData;
+import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.test.ESIntegTestCase;
 
@@ -34,12 +34,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.elasticsearch.cluster.metadata.IndexMetadata.INDEX_METADATA_BLOCK;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_BLOCKS_METADATA;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_BLOCKS_READ;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_BLOCKS_WRITE;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_READ_ONLY;
-import static org.elasticsearch.cluster.metadata.IndexMetadata.SETTING_READ_ONLY_ALLOW_DELETE;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.INDEX_METADATA_BLOCK;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_BLOCKS_METADATA;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_BLOCKS_READ;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_BLOCKS_WRITE;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_READ_ONLY;
+import static org.elasticsearch.cluster.metadata.IndexMetaData.SETTING_READ_ONLY_ALLOW_DELETE;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertBlocked;
 import static org.hamcrest.Matchers.equalTo;
@@ -50,7 +50,7 @@ import static org.hamcrest.Matchers.notNullValue;
 public class GetIndexIT extends ESIntegTestCase {
     @Override
     protected void setupSuiteScopeCluster() throws Exception {
-        assertAcked(prepareCreate("idx").addAlias(new Alias("alias_idx"))
+        assertAcked(prepareCreate("idx").addAlias(new Alias("alias_idx")).addMapping("type1", "{\"type1\":{}}", XContentType.JSON)
                 .setSettings(Settings.builder().put("number_of_shards", 1)).get());
         ensureSearchable("idx");
         createIndex("empty_idx");
@@ -75,15 +75,6 @@ public class GetIndexIT extends ESIntegTestCase {
         } catch (IndexNotFoundException e) {
             assertThat(e.getMessage(), is("no such index [missing_idx]"));
         }
-    }
-
-    public void testUnknownIndexWithAllowNoIndices() {
-        GetIndexResponse response = client().admin().indices().prepareGetIndex()
-            .addIndices("missing_idx").setIndicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN).get();
-        assertThat(response.indices(), notNullValue());
-        assertThat(response.indices().length, equalTo(0));
-        assertThat(response.mappings(), notNullValue());
-        assertThat(response.mappings().size(), equalTo(0));
     }
 
     public void testEmpty() {
@@ -239,29 +230,34 @@ public class GetIndexIT extends ESIntegTestCase {
     }
 
     private void assertMappings(GetIndexResponse response, String indexName) {
-        ImmutableOpenMap<String, MappingMetadata> mappings = response.mappings();
+        ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings = response.mappings();
         assertThat(mappings, notNullValue());
         assertThat(mappings.size(), equalTo(1));
-        MappingMetadata indexMappings = mappings.get(indexName);
+        ImmutableOpenMap<String, MappingMetaData> indexMappings = mappings.get(indexName);
         assertThat(indexMappings, notNullValue());
+        assertThat(indexMappings.size(), equalTo(1));
+        MappingMetaData mapping = indexMappings.get("type1");
+        assertThat(mapping, notNullValue());
+        assertThat(mapping.type(), equalTo("type1"));
     }
 
     private void assertEmptyOrOnlyDefaultMappings(GetIndexResponse response, String indexName) {
-        ImmutableOpenMap<String, MappingMetadata> mappings = response.mappings();
+        ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings = response.mappings();
         assertThat(mappings, notNullValue());
         assertThat(mappings.size(), equalTo(1));
-        MappingMetadata indexMappings = mappings.get(indexName);
-        assertEquals(indexMappings, MappingMetadata.EMPTY_MAPPINGS);
+        ImmutableOpenMap<String, MappingMetaData> indexMappings = mappings.get(indexName);
+        assertThat(indexMappings, notNullValue());
+        assertThat(indexMappings.size(), equalTo(0));
     }
 
     private void assertAliases(GetIndexResponse response, String indexName) {
-        ImmutableOpenMap<String, List<AliasMetadata>> aliases = response.aliases();
+        ImmutableOpenMap<String, List<AliasMetaData>> aliases = response.aliases();
         assertThat(aliases, notNullValue());
         assertThat(aliases.size(), equalTo(1));
-        List<AliasMetadata> indexAliases = aliases.get(indexName);
+        List<AliasMetaData> indexAliases = aliases.get(indexName);
         assertThat(indexAliases, notNullValue());
         assertThat(indexAliases.size(), equalTo(1));
-        AliasMetadata alias = indexAliases.get(0);
+        AliasMetaData alias = indexAliases.get(0);
         assertThat(alias, notNullValue());
         assertThat(alias.alias(), equalTo("alias_idx"));
     }
@@ -278,7 +274,7 @@ public class GetIndexIT extends ESIntegTestCase {
 
     private void assertEmptyAliases(GetIndexResponse response) {
         assertThat(response.aliases(), notNullValue());
-        for (final ObjectObjectCursor<String, List<AliasMetadata>> entry : response.getAliases()) {
+        for (final ObjectObjectCursor<String, List<AliasMetaData>> entry : response.getAliases()) {
             assertTrue(entry.value.isEmpty());
         }
     }

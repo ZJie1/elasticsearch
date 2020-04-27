@@ -59,6 +59,7 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.mapper.MapperService.SINGLE_MAPPING_NAME;
 import static org.elasticsearch.search.SearchService.DEFAULT_KEEPALIVE_SETTING;
 import static org.elasticsearch.xpack.core.ClientHelper.SECURITY_ORIGIN;
 import static org.elasticsearch.xpack.core.ClientHelper.executeAsyncWithOrigin;
@@ -176,13 +177,12 @@ public class NativePrivilegeStore {
         }
         final BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         if (termsQuery != null) {
-            boolQuery.should(termsQuery);
+            boolQuery.filter(termsQuery);
         }
         for (String wildcard : wildcardNames) {
             final String prefix = wildcard.substring(0, wildcard.length() - 1);
-            boolQuery.should(QueryBuilders.prefixQuery(APPLICATION.getPreferredName(), prefix));
+            boolQuery.filter(QueryBuilders.prefixQuery(APPLICATION.getPreferredName(), prefix));
         }
-        boolQuery.minimumShouldMatch(1);
         return boolQuery;
     }
 
@@ -199,7 +199,7 @@ public class NativePrivilegeStore {
         } else {
             securityIndexManager.checkIndexVersionThenExecute(listener::onFailure,
                 () -> executeAsyncWithOrigin(client.threadPool().getThreadContext(), SECURITY_ORIGIN,
-                    client.prepareGet(SECURITY_MAIN_ALIAS, toDocId(application, name))
+                    client.prepareGet(SECURITY_MAIN_ALIAS, SINGLE_MAPPING_NAME, toDocId(application, name))
                             .request(),
                     new ActionListener<GetResponse>() {
                         @Override
@@ -251,7 +251,7 @@ public class NativePrivilegeStore {
             final String name = privilege.getName();
             final XContentBuilder xContentBuilder = privilege.toXContent(jsonBuilder(), true);
             ClientHelper.executeAsyncWithOrigin(client.threadPool().getThreadContext(), SECURITY_ORIGIN,
-                client.prepareIndex(SECURITY_MAIN_ALIAS).setId(toDocId(privilege.getApplication(), name))
+                client.prepareIndex(SECURITY_MAIN_ALIAS, SINGLE_MAPPING_NAME, toDocId(privilege.getApplication(), name))
                     .setSource(xContentBuilder)
                     .setRefreshPolicy(refreshPolicy)
                     .request(), listener, client::index);
@@ -282,7 +282,7 @@ public class NativePrivilegeStore {
                     }, listener::onFailure), names.size());
                 for (String name : names) {
                     ClientHelper.executeAsyncWithOrigin(client.threadPool().getThreadContext(), SECURITY_ORIGIN,
-                        client.prepareDelete(SECURITY_MAIN_ALIAS, toDocId(application, name))
+                        client.prepareDelete(SECURITY_MAIN_ALIAS, SINGLE_MAPPING_NAME, toDocId(application, name))
                             .setRefreshPolicy(refreshPolicy)
                             .request(), groupListener, client::delete);
                 }

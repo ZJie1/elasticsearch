@@ -6,7 +6,6 @@
 package org.elasticsearch.license;
 
 import org.elasticsearch.ElasticsearchSecurityException;
-import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.test.ESTestCase;
 
 import java.util.Arrays;
@@ -33,9 +32,5 @@ public class LicenseUtilsTests extends ESTestCase {
 
         exception = new ElasticsearchSecurityException("msg");
         assertFalse(LicenseUtils.isLicenseExpiredException(exception));
-    }
-
-    public void testVersionsUpToDate() {
-        assertThat(LicenseUtils.compatibleLicenseVersion(DiscoveryNodes.EMPTY_NODES), equalTo(License.VERSION_CURRENT));
     }
 }

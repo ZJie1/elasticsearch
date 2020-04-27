@@ -23,6 +23,7 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
 import java.io.IOException;
 import java.util.List;
@@ -45,8 +46,8 @@ public class InternalStats extends InternalNumericMetricsAggregation.MultiValue 
     protected final double sum;
 
     public InternalStats(String name, long count, double sum, double min, double max, DocValueFormat formatter,
-                         Map<String, Object> metadata) {
-        super(name, metadata);
+                         List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData) {
+        super(name, pipelineAggregators, metaData);
         this.count = count;
         this.sum = sum;
         this.min = min;
@@ -144,12 +145,12 @@ public class InternalStats extends InternalNumericMetricsAggregation.MultiValue 
     }
 
     @Override
-    public InternalStats reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+    public InternalStats doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
         long count = 0;
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
-        CompensatedSum kahanSummation = new CompensatedSum(0, 0);
-
+        double sum = 0;
+        double compensation = 0;
         for (InternalAggregation aggregation : aggregations) {
             InternalStats stats = (InternalStats) aggregation;
             count += stats.getCount();
@@ -157,9 +158,17 @@ public class InternalStats extends InternalNumericMetricsAggregation.MultiValue 
             max = Math.max(max, stats.getMax());
             // Compute the sum of double values with Kahan summation algorithm which is more
             // accurate than naive summation.
-            kahanSummation.add(stats.getSum());
+            double value = stats.getSum();
+            if (Double.isFinite(value) == false) {
+                sum += value;
+            } else if (Double.isFinite(sum)) {
+                double corrected = value - compensation;
+                double newSum = sum + corrected;
+                compensation = (newSum - sum) - corrected;
+                sum = newSum;
+            }
         }
-        return new InternalStats(name, count, kahanSummation.value(), min, max, format, getMetadata());
+        return new InternalStats(name, count, sum, min, max, format, pipelineAggregators(), getMetaData());
     }
 
     static class Fields {

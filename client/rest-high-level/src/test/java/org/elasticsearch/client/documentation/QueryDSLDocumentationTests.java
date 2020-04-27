@@ -441,28 +441,26 @@ public class QueryDSLDocumentationTests extends ESTestCase {
     }
 
     public void testRankFeatureSaturation() {
-        RankFeatureQueryBuilders.saturation("pagerank");
+        RankFeatureQueryBuilders.saturation(
+            "pagerank"); // <1>
     }
 
     public void testRankFeatureSaturationPivot() {
         RankFeatureQueryBuilders.saturation(
-            "pagerank",
-            8
-        );
+            "pagerank",     // <1>
+            8);                 // <2>
     }
 
     public void testRankFeatureLog() {
         RankFeatureQueryBuilders.log(
-            "pagerank",
-            4f
-        );
+            "pagerank",     // <1>
+            4f);          // <2>
     }
 
     public void testRankFeatureSigmoid() {
         RankFeatureQueryBuilders.sigmoid(
-            "pagerank",
-            7,
-            0.6f
-        );
+            "pagerank",   // <1>
+            7,                // <2>
+            0.6f);             // <3>
     }
 }

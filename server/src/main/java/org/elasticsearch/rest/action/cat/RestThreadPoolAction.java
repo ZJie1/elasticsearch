@@ -32,19 +32,17 @@ import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.common.Table;
 import org.elasticsearch.common.regex.Regex;
-import org.elasticsearch.monitor.process.ProcessInfo;
+import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.action.RestActionListener;
 import org.elasticsearch.rest.action.RestResponseListener;
 import org.elasticsearch.threadpool.ThreadPool;
-import org.elasticsearch.threadpool.ThreadPoolInfo;
 import org.elasticsearch.threadpool.ThreadPoolStats;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -53,11 +51,9 @@ import static org.elasticsearch.rest.RestRequest.Method.GET;
 
 public class RestThreadPoolAction extends AbstractCatAction {
 
-    @Override
-    public List<Route> routes() {
-        return List.of(
-            new Route(GET, "/_cat/thread_pool"),
-            new Route(GET, "/_cat/thread_pool/{thread_pool_patterns}"));
+    public RestThreadPoolAction(RestController controller) {
+        controller.registerHandler(GET, "/_cat/thread_pool", this);
+        controller.registerHandler(GET, "/_cat/thread_pool/{thread_pool_patterns}", this);
     }
 
     @Override
@@ -82,14 +78,12 @@ public class RestThreadPoolAction extends AbstractCatAction {
             @Override
             public void processResponse(final ClusterStateResponse clusterStateResponse) {
                 NodesInfoRequest nodesInfoRequest = new NodesInfoRequest();
-                nodesInfoRequest.clear().addMetrics(
-                        NodesInfoRequest.Metric.PROCESS.metricName(),
-                        NodesInfoRequest.Metric.THREAD_POOL.metricName());
+                nodesInfoRequest.clear().process(true).threadPool(true);
                 client.admin().cluster().nodesInfo(nodesInfoRequest, new RestActionListener<NodesInfoResponse>(channel) {
                     @Override
                     public void processResponse(final NodesInfoResponse nodesInfoResponse) {
                         NodesStatsRequest nodesStatsRequest = new NodesStatsRequest();
-                        nodesStatsRequest.clear().addMetric(NodesStatsRequest.Metric.THREAD_POOL.metricName());
+                        nodesStatsRequest.clear().threadPool(true);
                         client.admin().cluster().nodesStats(nodesStatsRequest, new RestResponseListener<NodesStatsResponse>(channel) {
                             @Override
                             public RestResponse buildResponse(NodesStatsResponse nodesStatsResponse) throws Exception {
@@ -185,7 +179,7 @@ public class RestThreadPoolAction extends AbstractCatAction {
                     poolThreadStats.put(threadPoolStat.getName(), threadPoolStat);
                 }
                 if (info != null) {
-                    for (ThreadPool.Info threadPoolInfo : info.getInfo(ThreadPoolInfo.class)) {
+                    for (ThreadPool.Info threadPoolInfo : info.getThreadPool()) {
                         poolThreadInfo.put(threadPoolInfo.getName(), threadPoolInfo);
                     }
                 }
@@ -199,7 +193,7 @@ public class RestThreadPoolAction extends AbstractCatAction {
                 table.addCell(node.getName());
                 table.addCell(node.getId());
                 table.addCell(node.getEphemeralId());
-                table.addCell(info == null ? null : info.getInfo(ProcessInfo.class).getId());
+                table.addCell(info == null ? null : info.getProcess().getId());
                 table.addCell(node.getHostName());
                 table.addCell(node.getHostAddress());
                 table.addCell(node.getAddress().address().getPort());

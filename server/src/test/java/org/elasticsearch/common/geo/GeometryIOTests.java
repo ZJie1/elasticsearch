@@ -88,6 +88,10 @@ public class GeometryIOTests extends ESTestCase {
             return false;
         }
 
+        if (geometry.type() == ShapeType.CIRCLE) {
+            return false;
+        }
+
         if (geometry.type() == ShapeType.GEOMETRYCOLLECTION) {
             GeometryCollection<?> collection = (GeometryCollection<?>) geometry;
             for (Geometry g : collection) {

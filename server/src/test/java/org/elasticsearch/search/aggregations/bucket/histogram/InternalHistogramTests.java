@@ -20,11 +20,13 @@
 package org.elasticsearch.search.aggregations.bucket.histogram;
 
 import org.apache.lucene.util.TestUtil;
+import org.elasticsearch.common.io.stream.Writeable.Reader;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.BucketOrder;
+import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.ParsedMultiBucketAggregation;
-import org.elasticsearch.test.InternalAggregationTestCase;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 import org.elasticsearch.test.InternalMultiBucketAggregationTestCase;
 
 import java.util.ArrayList;
@@ -71,7 +73,10 @@ public class InternalHistogramTests extends InternalMultiBucketAggregationTestCa
     }
 
     @Override
-    protected InternalHistogram createTestInstance(String name, Map<String, Object> metadata, InternalAggregations aggregations) {
+    protected InternalHistogram createTestInstance(String name,
+                                                   List<PipelineAggregator> pipelineAggregators,
+                                                   Map<String, Object> metaData,
+                                                   InternalAggregations aggregations) {
         final double base = round(randomInt(50) - 30);
         final int numBuckets = randomNumberOfBuckets();
         List<InternalHistogram.Bucket> buckets = new ArrayList<>();
@@ -83,7 +88,7 @@ public class InternalHistogramTests extends InternalMultiBucketAggregationTestCa
             }
         }
         BucketOrder order = BucketOrder.key(randomBoolean());
-        return new InternalHistogram(name, buckets, order, minDocCount, emptyBucketInfo, format, keyed, metadata);
+        return new InternalHistogram(name, buckets, order, minDocCount, emptyBucketInfo, format, keyed, pipelineAggregators, metaData);
     }
 
     // issue 26787
@@ -102,10 +107,9 @@ public class InternalHistogramTests extends InternalMultiBucketAggregationTestCa
         }
         InternalHistogram.Bucket b = buckets.get(buckets.size() - 1);
         newBuckets.add(new InternalHistogram.Bucket(Double.NaN, b.docCount, keyed, b.format, b.aggregations));
-
+        
         InternalHistogram newHistogram = histogram.create(newBuckets);
-        newHistogram.reduce(Arrays.asList(newHistogram, histogram2),
-                InternalAggregationTestCase.emptyReduceContextBuilder().forPartialReduction());
+        newHistogram.doReduce(Arrays.asList(newHistogram, histogram2), new InternalAggregation.ReduceContext(null, null, false));
     }
 
     @Override
@@ -149,6 +153,11 @@ public class InternalHistogramTests extends InternalMultiBucketAggregationTestCa
     }
 
     @Override
+    protected Reader<InternalHistogram> instanceReader() {
+        return InternalHistogram::new;
+    }
+
+    @Override
     protected Class<? extends ParsedMultiBucketAggregation> implementationClass() {
         return ParsedHistogram.class;
     }
@@ -159,7 +168,8 @@ public class InternalHistogramTests extends InternalMultiBucketAggregationTestCa
         List<InternalHistogram.Bucket> buckets = instance.getBuckets();
         BucketOrder order = instance.getOrder();
         long minDocCount = instance.getMinDocCount();
-        Map<String, Object> metadata = instance.getMetadata();
+        List<PipelineAggregator> pipelineAggregators = instance.pipelineAggregators();
+        Map<String, Object> metaData = instance.getMetaData();
         InternalHistogram.EmptyBucketInfo emptyBucketInfo = instance.emptyBucketInfo;
         switch (between(0, 4)) {
         case 0:
@@ -178,16 +188,16 @@ public class InternalHistogramTests extends InternalMultiBucketAggregationTestCa
             emptyBucketInfo = null;
             break;
         case 4:
-            if (metadata == null) {
-                metadata = new HashMap<>(1);
+            if (metaData == null) {
+                metaData = new HashMap<>(1);
             } else {
-                metadata = new HashMap<>(instance.getMetadata());
+                metaData = new HashMap<>(instance.getMetaData());
             }
-            metadata.put(randomAlphaOfLength(15), randomInt());
+            metaData.put(randomAlphaOfLength(15), randomInt());
             break;
         default:
             throw new AssertionError("Illegal randomisation branch");
         }
-        return new InternalHistogram(name, buckets, order, minDocCount, emptyBucketInfo, format, keyed, metadata);
+        return new InternalHistogram(name, buckets, order, minDocCount, emptyBucketInfo, format, keyed, pipelineAggregators, metaData);
     }
 }

@@ -19,7 +19,6 @@
 package org.elasticsearch.test;
 
 import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
 import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.Nullable;
@@ -40,7 +39,6 @@ import org.elasticsearch.index.shard.IndexShardState;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.indices.cluster.IndicesClusterStateService.AllocatedIndices.IndexRemovalReason;
 import org.elasticsearch.plugins.Plugin;
-import org.elasticsearch.repositories.RepositoriesService;
 import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.watcher.ResourceWatcherService;
@@ -49,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * This is a testing plugin that registers a generic
@@ -86,9 +83,7 @@ public final class MockIndexEventListener {
         public Collection<Object> createComponents(Client client, ClusterService clusterService, ThreadPool threadPool,
                                                    ResourceWatcherService resourceWatcherService, ScriptService scriptService,
                                                    NamedXContentRegistry xContentRegistry, Environment environment,
-                                                   NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry,
-                                                   IndexNameExpressionResolver expressionResolver,
-                                                   Supplier<RepositoriesService> repositoriesServiceSupplier) {
+                                                   NodeEnvironment nodeEnvironment, NamedWriteableRegistry namedWriteableRegistry) {
             return Collections.singletonList(listener);
         }
     }
@@ -129,6 +124,11 @@ public final class MockIndexEventListener {
         public void indexShardStateChanged(IndexShard indexShard, @Nullable IndexShardState previousState,
                 IndexShardState currentState, @Nullable String reason) {
             delegate.indexShardStateChanged(indexShard, previousState, currentState, reason);
+        }
+
+        @Override
+        public void onShardInactive(IndexShard indexShard) {
+            delegate.onShardInactive(indexShard);
         }
 
         @Override

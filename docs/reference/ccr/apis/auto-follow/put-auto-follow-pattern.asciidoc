@@ -11,7 +11,7 @@ Creates an auto-follow pattern.
 [[ccr-put-auto-follow-pattern-request]]
 ==== {api-request-title}
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /_ccr/auto_follow/<auto_follow_pattern_name>
 {
@@ -23,6 +23,7 @@ PUT /_ccr/auto_follow/<auto_follow_pattern_name>
   "follow_index_pattern" : "<follow_index_pattern>"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:remote_cluster]
 // TEST[s/<auto_follow_pattern_name>/auto_follow_pattern_name/]
 // TEST[s/<remote_cluster>/remote_cluster/]
@@ -31,10 +32,11 @@ PUT /_ccr/auto_follow/<auto_follow_pattern_name>
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /_ccr/auto_follow/auto_follow_pattern_name
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 //////////////////////////
@@ -45,13 +47,14 @@ DELETE /_ccr/auto_follow/auto_follow_pattern_name
 * If the {es} {security-features} are enabled, you must have `read` and `monitor`
 index privileges for the leader index patterns. You must also have `manage_ccr`
 cluster privileges on the cluster that contains the follower index. For more
-information, see <<security-privileges>>.
+information, see
+{stack-ov}/security-privileges.html[Security privileges].
 
 [[ccr-put-auto-follow-pattern-desc]]
 ==== {api-description-title}
 
 This API creates a new named collection of
-<<ccr-auto-follow,auto-follow patterns>> against the remote cluster
+{stack-ov}/ccr-auto-follow.html[auto-follow patterns] against the remote cluster
 specified in the request body. Newly created indices on the remote cluster
 matching any of the specified patterns will be automatically configured as follower
 indices.
@@ -84,7 +87,7 @@ include::../follow-request-body.asciidoc[]
 
 This example creates an auto-follow pattern named `my_auto_follow_pattern`:
 
-[source,console]
+[source,js]
 --------------------------------------------------
 PUT /_ccr/auto_follow/my_auto_follow_pattern
 {
@@ -106,23 +109,26 @@ PUT /_ccr/auto_follow/my_auto_follow_pattern
   "read_poll_timeout" : "30s"
 }
 --------------------------------------------------
+// CONSOLE
 // TEST[setup:remote_cluster]
 
 The API returns the following result:
 
-[source,console-result]
+[source,js]
 --------------------------------------------------
 {
   "acknowledged" : true
 }
 --------------------------------------------------
+// TESTRESPONSE
 
 //////////////////////////
 
-[source,console]
+[source,js]
 --------------------------------------------------
 DELETE /_ccr/auto_follow/my_auto_follow_pattern
 --------------------------------------------------
+// CONSOLE
 // TEST[continued]
 
 //////////////////////////

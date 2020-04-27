@@ -44,7 +44,7 @@ Note that setting will be applied for newly created indices.
 
 It can also be set on a per-index basis at index creation time:
 
-[source,console]
+[source,js]
 ----
 PUT my_index
 {
@@ -53,3 +53,4 @@ PUT my_index
    }
 }
 ----
+// CONSOLE

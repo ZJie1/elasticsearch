@@ -80,7 +80,7 @@ public class DateRangeTests extends BaseAggregationTestCase<DateRangeAggregation
             "}";
         XContentParser parser = createParser(JsonXContent.jsonXContent, rangeAggregation);
         XContentParseException ex = expectThrows(XContentParseException.class,
-                () -> DateRangeAggregationBuilder.PARSER.parse(parser, "aggregationName"));
+                () -> DateRangeAggregationBuilder.parse("aggregationName", parser));
         assertThat(ex.getCause(), notNullValue());
         assertThat(ex.getCause().getMessage(), containsString("badField"));
     }

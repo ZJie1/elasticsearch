@@ -23,6 +23,7 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.DocValueFormat;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.pipeline.PipelineAggregator;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,8 +33,9 @@ import java.util.Objects;
 public class InternalSum extends InternalNumericMetricsAggregation.SingleValue implements Sum {
     private final double sum;
 
-    InternalSum(String name, double sum, DocValueFormat formatter, Map<String, Object> metadata) {
-        super(name, metadata);
+    InternalSum(String name, double sum, DocValueFormat formatter, List<PipelineAggregator> pipelineAggregators,
+                    Map<String, Object> metaData) {
+        super(name, pipelineAggregators, metaData);
         this.sum = sum;
         this.format = formatter;
     }
@@ -69,15 +71,23 @@ public class InternalSum extends InternalNumericMetricsAggregation.SingleValue i
     }
 
     @Override
-    public InternalSum reduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
+    public InternalSum doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
         // Compute the sum of double values with Kahan summation algorithm which is more
         // accurate than naive summation.
-        CompensatedSum kahanSummation = new CompensatedSum(0, 0);
+        double sum = 0;
+        double compensation = 0;
         for (InternalAggregation aggregation : aggregations) {
             double value = ((InternalSum) aggregation).sum;
-            kahanSummation.add(value);
+            if (Double.isFinite(value) == false) {
+                sum += value;
+            } else if (Double.isFinite(sum)) {
+                double corrected = value - compensation;
+                double newSum = sum + corrected;
+                compensation = (newSum - sum) - corrected;
+                sum = newSum;
+            }
         }
-        return new InternalSum(name, kahanSummation.value(), format, getMetadata());
+        return new InternalSum(name, sum, format, pipelineAggregators(), getMetaData());
     }
 
     @Override

@@ -25,21 +25,22 @@ https://www.elastic.co/subscriptions.
 ==== Authorization
 
 You must have `monitor` cluster privileges to use this API.
-For more information, see <<security-privileges>>.
+For more information, see
+{xpack-ref}/security-privileges.html[Security Privileges].
 
 [float]
 ==== Examples
 
 The following example checks whether you are eligible to start a basic:
 
-[source,console]
+[source,js]
 ------------------------------------------------------------
 GET /_license/basic_status
 ------------------------------------------------------------
+// CONSOLE
 
 Example response:
-
-[source,console-result]
+[source,js]
 ------------------------------------------------------------
 {
   "eligible_to_start_basic": true

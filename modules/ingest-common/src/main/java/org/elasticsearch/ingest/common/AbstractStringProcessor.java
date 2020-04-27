@@ -24,8 +24,6 @@ import org.elasticsearch.ingest.ConfigurationUtils;
 import org.elasticsearch.ingest.IngestDocument;
 import org.elasticsearch.ingest.Processor;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -60,8 +58,7 @@ abstract class AbstractStringProcessor<T> extends AbstractProcessor {
 
     @Override
     public final IngestDocument execute(IngestDocument document) {
-        Object val = document.getFieldValue(field, Object.class, ignoreMissing);
-        Object newValue;
+        String val = document.getFieldValue(field, String.class, ignoreMissing);
 
         if (val == null && ignoreMissing) {
             return document;
@@ -69,29 +66,7 @@ abstract class AbstractStringProcessor<T> extends AbstractProcessor {
             throw new IllegalArgumentException("field [" + field + "] is null, cannot process it.");
         }
 
-        if (val instanceof List) {
-            List<?> list = (List<?>) val;
-            List<Object> newList = new ArrayList<>(list.size());
-            for (Object value : list) {
-                if (value instanceof String) {
-                    newList.add(process((String) value));
-                } else {
-                    throw new IllegalArgumentException("value [" + value + "] of type [" + value.getClass().getName() +
-                        "] in list field [" + field + "] cannot be cast to [" + String.class.getName() + "]");
-                }
-            }
-            newValue = newList;
-        } else {
-            if (val instanceof String) {
-                newValue = process((String) val);
-            } else {
-                throw new IllegalArgumentException("field [" + field + "] of type [" + val.getClass().getName() + "] cannot be cast to [" +
-                    String.class.getName() + "]");
-            }
-
-        }
-
-        document.setFieldValue(targetField, newValue);
+        document.setFieldValue(targetField, process(val));
         return document;
     }
 

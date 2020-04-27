@@ -32,6 +32,7 @@ import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.index.query.QueryShardContext;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,7 @@ public class RoutingFieldMapper extends MetadataFieldMapper {
         @Override
         public MetadataFieldMapper.Builder<?,?> parse(String name, Map<String, Object> node,
                                                       ParserContext parserContext) throws MapperParsingException {
-            Builder builder = new Builder(parserContext.mapperService().fieldType(NAME));
+            Builder builder = new Builder(parserContext.mapperService().fullName(NAME));
             for (Iterator<Map.Entry<String, Object>> iterator = node.entrySet().iterator(); iterator.hasNext();) {
                 Map.Entry<String, Object> entry = iterator.next();
                 String fieldName = entry.getKey();
@@ -97,9 +98,14 @@ public class RoutingFieldMapper extends MetadataFieldMapper {
         }
 
         @Override
-        public MetadataFieldMapper getDefault(ParserContext context) {
+        public MetadataFieldMapper getDefault(MappedFieldType fieldType, ParserContext context) {
             final Settings indexSettings = context.mapperService().getIndexSettings().getSettings();
-            return new RoutingFieldMapper(indexSettings, Defaults.FIELD_TYPE);
+            if (fieldType != null) {
+                return new RoutingFieldMapper(indexSettings, fieldType);
+            } else {
+                return parse(NAME, Collections.emptyMap(), context)
+                        .build(new BuilderContext(indexSettings, new ContentPath(1)));
+            }
         }
     }
 

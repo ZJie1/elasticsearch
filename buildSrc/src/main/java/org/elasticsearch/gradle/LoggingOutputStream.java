@@ -44,9 +44,7 @@ public abstract class LoggingOutputStream extends OutputStream {
 
     @Override
     public void write(final int b) throws IOException {
-        if (b == 0) {
-            return;
-        }
+        if (b == 0) return;
         if (b == '\n') {
             // always flush with newlines instead of adding to the buffer
             flush();
@@ -71,9 +69,7 @@ public abstract class LoggingOutputStream extends OutputStream {
 
     @Override
     public void flush() {
-        if (end == start) {
-            return;
-        }
+        if (end == start) return;
         logLine(new String(buffer, start, end - start));
         start = end;
     }
